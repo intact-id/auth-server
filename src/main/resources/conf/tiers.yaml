@@ -1,0 +1,50 @@
+tiers:
+  tiers:
+    TIER_1:
+      name: "Basic Document Verification"
+      cost: 0.025
+      priceRange: [ 0.30, 0.40 ]
+      features:
+        - "OCR data extraction"
+        - "Selfie capture"
+        - "Basic liveness check"
+        - "Match selfie to ID"
+      exclusions:
+        - "No government database check"
+        - "No fraud detection"
+
+    TIER_2:
+      name: "Standard KYC"
+      cost: 0.175
+      priceRange: [ 0.80, 1.00 ]
+      features:
+        - "OCR data extraction"
+        - "Selfie capture"
+        - "Basic liveness check"
+        - "Match selfie to ID"
+        - "Enhanced liveness detection (video-based)"
+        - "Document fraud detection"
+        - "IPRS government database verification"
+        - "ID expiration check"
+        - "Duplicate verification"
+
+    TIER_3:
+      name: "Enhanced KYC"
+      cost: 0.475
+      priceRange: [ 2.00, 2.50 ]
+      features:
+        - "OCR data extraction"
+        - "Selfie capture"
+        - "Basic liveness check"
+        - "Match selfie to ID"
+        - "Enhanced liveness detection (video-based)"
+        - "Document fraud detection"
+        - "IPRS government database verification"
+        - "ID expiration check"
+        - "Duplicate verification"
+        - "Sanctions screening (OFAC, UN, EU)"
+        - "PEP checks"
+        - "Adverse media screening"
+        - "Risk scoring"
+        - "Compliance reporting"
+        - "Manual review queue"

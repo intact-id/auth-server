@@ -1,0 +1,15 @@
+package com.intact_id.db.repository;
+
+import com.intact_id.db.model.Company;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.UUID;
+
+/**
+ * @Author frank
+ * email frank.mwangi@dadanadagroup.com
+ * Created on 16/11/2025 16:37
+ */
+
+public interface CompanyOnboardRepository extends JpaRepository<Company, UUID> {
+}
