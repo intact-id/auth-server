@@ -1,4 +1,4 @@
-package com.intact_id.dto;
+package com.intact_id.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -25,5 +25,5 @@ public class ApiResponse<T> {
     private T data;
     private String errorMessage;
     private boolean success;
-    private String isInternalError;
+    private boolean isInternalError;
 }

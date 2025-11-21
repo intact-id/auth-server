@@ -17,12 +17,12 @@ public class GeneratorUtils {
      * Generate a human-readable company/customer code
      * Format: COMP-<6-digit random>-ID
      */
-    public  String generateCompanyIdentifierCode() {
+    public String generateCompanyIdentifierCode() {
         int number = 100000 + RANDOM.nextInt(900000); // 6-digit random number
         return String.format("COMP-%d-ID", number);
-
     }
-    private String generateApplicationNumber() {
+
+    public String generateApplicationNumber() {
         int year = LocalDateTime.now().getYear();
         String shortId = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         return String.format("APP-%d-%s", year, shortId);
