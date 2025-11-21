@@ -1,27 +1,26 @@
 
-// ============================================
-// 4. IMPROVED CONTROLLER
-// ============================================
 package com.intact_id.api.kycSubscriptionTier;
 
 import com.intact_id.config.TiersConfig;
-import com.intact_id.dto.ApiResponse;
-import com.intact_id.dto.TierResponseDTO;
-import com.intact_id.dto.TiersListResponseDTO;
-import com.intact_id.util.mapper.TiersResponseMappersUtil;
+import com.intact_id.dto.response.ApiResponse;
+import com.intact_id.dto.response.TierResponseDTO;
+import com.intact_id.dto.response.TiersListResponseDTO;
+import com.intact_id.util.mapper.MapperUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-        import java.util.List;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -31,7 +30,7 @@ import org.springframework.web.bind.annotation.*;
 public class KycSubscriptionTierController {
 
     private final TiersConfig tiersConfig;
-    private final TiersResponseMappersUtil tiersMapper;
+    private final MapperUtils mapperUtils;
 
     @GetMapping
     @Operation(
@@ -56,7 +55,7 @@ public class KycSubscriptionTierController {
             List<TierResponseDTO> tierList = tiersConfig.getTiers()
                     .entrySet()
                     .stream()
-                    .map(entry -> tiersMapper.mapToDTO(entry.getKey(), entry.getValue()))
+                    .map(entry -> mapperUtils.mapTiersToDTO(entry.getKey(), entry.getValue()))
                     .toList();
 
             log.info("Successfully fetched {} tiers", tierList.size());
@@ -121,7 +120,7 @@ public class KycSubscriptionTierController {
                                 .build());
             }
 
-            TierResponseDTO tierDTO = tiersMapper.mapToDTO(tierKey, tier);
+            TierResponseDTO tierDTO = mapperUtils.mapTiersToDTO(tierKey, tier);
 
             return ResponseEntity.ok(
                     ApiResponse.<TierResponseDTO>builder()

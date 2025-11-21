@@ -1,0 +1,55 @@
+package com.intact_id.util.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+
+/**
+ * @Author frank
+ * email frank.mwangi@dadanadagroup.com
+ * Created on 21/11/2025 19:44
+ */
+
+public class ApplicationExceptions {
+
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public static class DuplicateResourceException extends RuntimeException {
+        public DuplicateResourceException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public static class IntactCompanyNotFoundException extends RuntimeException {
+        public IntactCompanyNotFoundException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public static class InvalidStatusTransitionException extends RuntimeException {
+        public InvalidStatusTransitionException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public static class IntactUnauthorizedException extends RuntimeException {
+        public IntactUnauthorizedException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public static class IntactInternalServerException extends RuntimeException {
+        public IntactInternalServerException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public static class IntactBadRequestException extends RuntimeException {
+        public IntactBadRequestException(String message) {
+            super(message);
+        }
+    }
+}

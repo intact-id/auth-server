@@ -1,11 +1,10 @@
 package com.intact_id.db.model;
 
 import com.intact_id.constant.base.Auditable;
+import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.util.generator.GeneratorUtils;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.PrePersist;
-import lombok.EqualsAndHashCode;
+import jakarta.persistence.*;
+import lombok.*;
 
 /**
  * @Author frank
@@ -13,13 +12,15 @@ import lombok.EqualsAndHashCode;
  * Created on 16/11/2025 19:11
  */
 
-
+@Data
 @Entity
+@NoArgsConstructor
+@AllArgsConstructor
 @EqualsAndHashCode(callSuper = false)
 public class CompanyApplication extends Auditable {
 
     @Column(name = "application_number", unique = true, nullable = false, length = 50)
-    private String applicationNumber; // APP-0001, APP-2025-0001
+    private String applicationNumber;
 
 
     @Column(name = "legal_name", nullable = false)
@@ -47,6 +48,9 @@ public class CompanyApplication extends Auditable {
     @Column(name = "business_type")
     private String businessType; // digital_lender, neobank, crypto_exchange, remittance
 
+    @Column(name = "application_status")
+    @Enumerated(EnumType.STRING)
+    private GlobalStatuses applicationStatus = GlobalStatuses.PENDING;
 
     @Column(name = "contact_person_name", length = 255)
     private String contactPersonName;
@@ -61,13 +65,4 @@ public class CompanyApplication extends Auditable {
     private String contactPersonPhone;
 
 
-    private String generateApplicationNumber() {
-        GeneratorUtils generatorUtils = new GeneratorUtils();
-        return generatorUtils.generateCompanyIdentifierCode();
-    }
-
-    @PrePersist
-    void prePersist() {
-        this.applicationNumber = this.generateApplicationNumber();
-    }
 }
