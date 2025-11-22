@@ -5,6 +5,10 @@ import com.intact_id.util.converter.PgJsonbToMapConverter;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +21,8 @@ import java.util.Map;
 
 
 @Entity
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = false)
 @Table(name = "company_communications", indexes = {
         @Index(name = "idx_comm_email", columnList = "email"),
@@ -73,6 +79,7 @@ public class CompanyCommunicationDetails extends Auditable { ;
      */
 
     @Column(name = "notification_settings", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     @Convert(converter = PgJsonbToMapConverter.class)
     private Map<String, Object> notificationSettings = new HashMap<>();
 

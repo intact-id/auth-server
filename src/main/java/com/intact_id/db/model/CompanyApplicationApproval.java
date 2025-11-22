@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @Data
 @Entity
-@Table(name = "application_approvals")
+@Table(name = "company_application_approvals")
 @EqualsAndHashCode(callSuper = false)
 public class CompanyApplicationApproval extends Auditable {
 
