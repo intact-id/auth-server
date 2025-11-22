@@ -5,6 +5,10 @@ import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.util.converter.PgJsonbToMapConverter;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -17,6 +21,8 @@ import java.util.Map;
  */
 
 @Entity
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = false)
 public class CompanyCredentials extends Auditable {
     @OneToOne(fetch = FetchType.LAZY)
@@ -41,7 +47,7 @@ public class CompanyCredentials extends Auditable {
     private LocalDateTime expiresAt;
 
     @Column(name = "rate_limit_per_hour")
-    private Integer rateLimitPerHour ;
+    private Integer rateLimitPerHour;
 
     @Column(name = "rate_limit_per_day")
     private Integer rateLimitPerDay;
@@ -60,6 +66,7 @@ public class CompanyCredentials extends Auditable {
 
     @Column(name = "security_settings", columnDefinition = "jsonb")
     @Convert(converter = PgJsonbToMapConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> securitySettings = new HashMap<>();
     // {
     //   "ip_whitelist": ["192.168.1.1", "10.0.0.0/24"],
@@ -71,6 +78,7 @@ public class CompanyCredentials extends Auditable {
 
     @Column(name = "metadata", columnDefinition = "jsonb")
     @Convert(converter = PgJsonbToMapConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata = new HashMap<>();
 
     //helper methods
@@ -113,4 +121,5 @@ public class CompanyCredentials extends Auditable {
 
     public boolean isWithinRateLimit(int requestsInLastHour) {
         return requestsInLastHour < rateLimitPerHour;
-    }}
+    }
+}

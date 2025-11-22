@@ -6,8 +6,11 @@ import com.intact_id.util.converter.PgJsonbToMapConverter;
 import com.intact_id.util.generator.GeneratorUtils;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -18,7 +21,10 @@ import java.util.UUID;
  */
 
 @Entity
+@Getter
+@Setter
 @Table(name = "company_tbl")
+@NoArgsConstructor
 @EqualsAndHashCode(callSuper = false)
 public class Company extends Auditable {
 
@@ -49,10 +55,10 @@ public class Company extends Auditable {
     private LocalDateTime approvedAt;
 
     @Column(name = "approved_by")
-    private UUID approvedBy; // References admins.id
+    private String approvedBy; // References admins.id
 
     @Column(name = "application_id")
-    private UUID applicationId;
+    private String applicationId;
 
     @OneToOne(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private CompanyCommunicationDetails communication;
@@ -61,14 +67,15 @@ public class Company extends Auditable {
     private CompanyCredentials credentials;
 
     @Column(name = "extra_details",columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)  // This is the key fix
     @Convert(converter = PgJsonbToMapConverter.class)
-    private Map<String,Object> metaData;
+    private Map<String,Object> metaData=new HashMap<>();
 
     public boolean isActive() {
         return this.status == GlobalStatuses.ACTIVE;
     }
 
-    public void activate(UUID approvedBy) {
+    public void activate(String approvedBy) {
         this.status = GlobalStatuses.ACTIVE;
         this.approvedAt = LocalDateTime.now();
         this.approvedBy = approvedBy;
@@ -81,10 +88,5 @@ public class Company extends Auditable {
     public void close() {
         this.status = GlobalStatuses.CLOSED;
     }
-    @PrePersist
-    public void prePersist() {
 
-        GeneratorUtils generatorUtils = new GeneratorUtils();
-        this.companyIdentifierCode = generatorUtils.generateCompanyIdentifierCode();
-    }
 }

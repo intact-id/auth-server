@@ -1,4 +1,4 @@
-CREATE TABLE application_approvals
+CREATE TABLE company_application_approvals
 (
     id                  VARCHAR(255) NOT NULL,
     created_at          TIMESTAMP WITHOUT TIME ZONE,
