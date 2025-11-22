@@ -11,7 +11,7 @@ import lombok.Getter;
  */
 @Getter
 public enum GlobalStatuses {
-
+    SUBMITTED("Action or process is submitted"),
     PENDING("Action or process is created but not yet started or completed"),
     PENDING_APPROVAL("Action or process is created but cannot be used since it is not approved"),
     APPROVED("Action or process has been approved "),
@@ -25,6 +25,8 @@ public enum GlobalStatuses {
     EXPIRED("Time-bound action or entity is no longer valid"),
     PROCESSING("Action or process is currently being executed"),
     DRAFT("Work is in progress, not finalized"),
+    INFO_REQUESTED("extra info is being requested so as to continue with the action or proccess"),
+    REJECTED("action or proccess has been rejected"),
     ARCHIVED("Entity or record is stored for historical purposes"),
     UNKNOWN("Status is unknown or not set"),
     CLOSED("entity or business or service has been closed"),;

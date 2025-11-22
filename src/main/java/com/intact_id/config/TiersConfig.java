@@ -20,7 +20,6 @@ import java.util.Map;
 @PropertySource(value = "classpath:conf/tiers.yaml", factory = YamlPropertySourceFactory.class)
 public class TiersConfig {
 
-    // This must match the YAML structure under "tiers:"
     private Map<String, Tier> tiers = new HashMap<>();
 
     @Data
@@ -34,12 +33,10 @@ public class TiersConfig {
 
     @PostConstruct
     void init() {
-        log.info("====================================");
-        log.info("Tiers Configuration Loaded");
-        log.info("====================================");
+
 
         if (tiers == null || tiers.isEmpty()) {
-            log.error("⚠️ WARNING: No tiers loaded! Check your YAML file path and structure.");
+            log.error("No tiers loaded.");
             return;
         }
 
