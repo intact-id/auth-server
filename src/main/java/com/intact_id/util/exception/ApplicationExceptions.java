@@ -32,6 +32,13 @@ public class ApplicationExceptions {
         }
     }
 
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public static class InvalidActionException extends RuntimeException {
+        public InvalidActionException(String message) {
+            super(message);
+        }
+    }
+
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public static class IntactUnauthorizedException extends RuntimeException {
         public IntactUnauthorizedException(String message) {

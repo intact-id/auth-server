@@ -2,6 +2,8 @@ package com.intact_id.util.mapper;
 
 import com.intact_id.config.TiersConfig;
 import com.intact_id.db.model.CompanyApplication;
+import com.intact_id.db.model.CompanyApplicationApproval;
+import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.dto.response.CompanyApplicationResponseDto;
 import com.intact_id.dto.response.TierResponseDTO;
 import org.springframework.stereotype.Service;
@@ -48,5 +50,29 @@ public class MapperUtils {
                 .createdBy(entity.getCreatedBy())
                 .updatedBy(entity.getUpdatedBy())
                 .build();
+    }
+
+    public ApplicationApprovalResponseDto toApplicationApprovalResponseDto(CompanyApplicationApproval approval) {
+        if (approval == null) {
+            return null;
+        }
+
+        ApplicationApprovalResponseDto dto = new ApplicationApprovalResponseDto();
+
+        dto.setId(approval.getId());
+        dto.setCompanyId(approval.getCompanyId());
+        dto.setApplicationId(approval.getApplicationId());
+        dto.setPerformedBy(approval.getPerformedBy());
+        dto.setPerformedByAction(approval.getPerformedByAction());
+        dto.setApprovedBy(approval.getApprovedBy());
+        dto.setFinalAction(approval.getFinalAction());
+        dto.setApproverNote(approval.getApproverNote());
+        dto.setEndUserMessage(approval.getEndUserMessage());
+        dto.setActionPerformedAt(approval.getActionPerformedAt());
+        dto.setActionApprovedAt(approval.getActionApprovedAt());
+        dto.setCreatedAt(approval.getCreatedAt());
+        dto.setUpdatedAt(approval.getUpdatedAt());
+
+        return dto;
     }
 }
