@@ -22,88 +22,73 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/company-applications")
 @Validated
-@Tag(
-        name = "Company Applications",
-        description = "Endpoints for submitting and managing company KYC applications"
-)
+@Tag(name = "Company Applications", description = "Public and Admin endpoints for company applications")
 public class CompanyApplicationController {
     private final CompanyApplicationService companyApplicationService;
 
-    @PostMapping
-    @Operation(summary = "Submit a new company application")
-    public ResponseEntity<ApiResponse<CompanyApplicationCreationResponseDto>> submitApplication(
+    // ============ PUBLIC ENDPOINTS ============
+
+    @PostMapping("/api/public/companies/register")
+    @Operation(summary = "Submit company registration application (Public)")
+    public ResponseEntity<ApiResponse<CompanyApplicationCreationResponseDto>> registerCompany(
             @Valid @RequestBody CompanyApplicationRequestDto request) {
 
         try {
-            log.info("Received company application for: {}", request.getLegalName());
+            log.info("Public registration request for: {}", request.getLegalName());
+            var response = companyApplicationService.submitApplication(request);
 
-            var companyApplicationResponse = companyApplicationService.submitApplication(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<CompanyApplicationCreationResponseDto>builder()
                             .success(true)
-                            .responseCode(201)
-                            .responseMessage("Company application submitted successfully")
-                            .data(companyApplicationResponse)
-                            .build()
-            );
+                            .responseCode(HttpStatus.CREATED.value())
+                            .responseMessage("Application submitted successfully")
+                            .data(response)
+                            .build());
         } catch (ApplicationExceptions.DuplicateResourceException e) {
-            log.error("duplicate application", e);
             return ResponseEntity.status(HttpStatus.CONFLICT).body(
                     ApiResponse.<CompanyApplicationCreationResponseDto>builder()
                             .responseCode(HttpStatus.CONFLICT.value())
                             .responseMessage("An existing application already exists")
                             .errorMessage(e.getMessage())
                             .isInternalError(false)
-                            .build()
-            );
+                            .build());
         }
     }
 
-    @GetMapping("/{applicationNumber}")
-    @Operation(summary = "Get application status by application ID")
-
-    public ResponseEntity<ApiResponse<CompanyApplicationResponseDto>> getApplicationStatus(
-            @Parameter(description = "Application ID")
-            @PathVariable String applicationNumber) {
+    @GetMapping("/api/public/applications/{appId}/status")
+    @Operation(summary = "Get application status (Public)")
+    public ResponseEntity<ApiResponse<CompanyApplicationResponseDto>> getPublicApplicationStatus(
+            @PathVariable String appId) {
 
         try {
-            log.info("Fetching application status for: {}", applicationNumber);
-
-            var applicationResponse = companyApplicationService.getApplication(applicationNumber);
-
-            return ResponseEntity.status(HttpStatus.OK).body(
+            var response = companyApplicationService.getApplication(appId);
+            return ResponseEntity.ok(
                     ApiResponse.<CompanyApplicationResponseDto>builder()
                             .responseCode(HttpStatus.OK.value())
-                            .responseMessage("Application fetched successfully")
+                            .responseMessage("Application status retrieved")
                             .success(true)
-                            .data(applicationResponse)
-                            .build()
-            );
+                            .data(response)
+                            .build());
         } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
-            log.error("Error fetching application {}", applicationNumber, e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
                     ApiResponse.<CompanyApplicationResponseDto>builder()
                             .responseCode(HttpStatus.NOT_FOUND.value())
-                            .responseMessage("Application Not Found")
+                            .responseMessage("Application not found")
                             .errorMessage(e.getMessage())
                             .success(false)
                             .isInternalError(false)
-                            .build()
-            );
+                            .build());
         }
     }
 
-    @GetMapping
-    @Operation(summary = "Get all applications (Admin only)")
+    // ============ ADMIN ENDPOINTS ============
+
+    @GetMapping("/api/admin/applications")
+    @Operation(summary = "Get all applications (Admin)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<Page<CompanyApplicationResponseDto>>> getAllApplications(
             @RequestParam(required = false) GlobalStatuses status,
@@ -111,86 +96,80 @@ public class CompanyApplicationController {
             @RequestParam(defaultValue = "10") int size) {
 
         try {
-            log.info("Fetching applications | Status: {}, Page: {}, Size: {}", status, page, size);
+            log.info("Admin fetching applications | Status: {}, Page: {}, Size: {}", status, page, size);
             Pageable pageable = PageRequest.of(page, size);
+            var applications = companyApplicationService.getAllApplications(status, pageable);
 
-            var pagedCompanyApplications = companyApplicationService.getAllApplications(status, pageable);
-
-            return ResponseEntity.status(HttpStatus.OK).body(
+            return ResponseEntity.ok(
                     ApiResponse.<Page<CompanyApplicationResponseDto>>builder()
                             .responseCode(HttpStatus.OK.value())
                             .responseMessage("Applications fetched successfully")
                             .success(true)
-                            .data(pagedCompanyApplications)
-                            .build()
-            );
-
+                            .data(applications)
+                            .build());
         } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
-            log.error("Error fetching applications", e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
                     ApiResponse.<Page<CompanyApplicationResponseDto>>builder()
                             .responseCode(HttpStatus.NOT_FOUND.value())
-                            .responseMessage("Application Not Found")
+                            .responseMessage("Applications not found")
                             .success(false)
                             .errorMessage(e.getMessage())
                             .isInternalError(false)
-                            .build()
-            );
+                            .build());
         }
     }
 
-//    @PutMapping("/{applicationId}/status")
-//    @Operation(summary = "Update application status (Admin only)")
-//    @SecurityRequirement(name = "bearerAuth")
-//    public ResponseEntity<ApiResponse<Map<String, Object>>> updateApplicationStatus(
-//            @PathVariable String applicationId,
-//            @RequestBody Map<String, Object> statusUpdate) {
-//
-//        try {
-//            log.info("Updating {} to status {}", applicationId, statusUpdate.get("status"));
-//
-//            // MOCK
-//            Map<String, Object> responseData = new HashMap<>();
-//            responseData.put("applicationId", applicationId);
-//            responseData.put("newStatus", statusUpdate.get("status"));
-//            responseData.put("updatedAt", LocalDateTime.now());
-//
-//            return ok("Status updated successfully", responseData);
-//        } catch (Exception e) {
-//            log.error("Error updating application {}", applicationId, e);
-//            return internalError("Failed to update status: " + e.getMessage());
-//        }
-//    }
+    @GetMapping("/api/admin/applications/{id}")
+    @Operation(summary = "Get application by ID (Admin)")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<ApiResponse<CompanyApplicationResponseDto>> getApplicationById(
+            @Parameter(description = "Application ID") @PathVariable String id) {
 
-    @DeleteMapping("/{applicationId}")
-    @Operation(summary = "Delete or cancel a company application")
+        try {
+            var response = companyApplicationService.getApplication(id);
+            return ResponseEntity.ok(
+                    ApiResponse.<CompanyApplicationResponseDto>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Application fetched successfully")
+                            .success(true)
+                            .data(response)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<CompanyApplicationResponseDto>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage("Application not found")
+                            .errorMessage(e.getMessage())
+                            .success(false)
+                            .isInternalError(false)
+                            .build());
+        }
+    }
 
+    @DeleteMapping("/api/admin/applications/{applicationId}")
+    @Operation(summary = "Delete application (Admin)")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<Void>> deleteApplication(
             @PathVariable String applicationId) {
 
         try {
-            log.info("Deleting application {}", applicationId);
-
+            log.info("Admin deleting application {}", applicationId);
             companyApplicationService.deleteApplication(applicationId);
+
             return ResponseEntity.status(HttpStatus.NO_CONTENT).body(
                     ApiResponse.<Void>builder()
                             .responseMessage("Application deleted successfully")
                             .responseCode(HttpStatus.NO_CONTENT.value())
-                            .data(null)
                             .success(true)
-                            .build()
-            );
+                            .build());
         } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
-            log.error("Error deleting application {}", applicationId, e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
                     ApiResponse.<Void>builder()
                             .responseCode(HttpStatus.NOT_FOUND.value())
                             .responseMessage("Application not found")
                             .errorMessage(e.getMessage())
                             .isInternalError(false)
-                            .build()
-            );
+                            .build());
         }
     }
-
 }

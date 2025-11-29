@@ -1,5 +1,6 @@
 package com.intact_id.db.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.util.converter.PgJsonbToMapConverter;

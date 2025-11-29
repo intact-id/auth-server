@@ -1,5 +1,6 @@
 package com.intact_id.util.generator;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -10,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class GeneratorUtils {
 
@@ -57,6 +59,7 @@ public class GeneratorUtils {
      * Validate plain string against hashed value
      */
     public boolean validateHash(String plain, String hashed) {
+        log.info("{} {} from util",plain,hashed);
         String hashedPlain = hashString(plain);
         return hashedPlain.equals(hashed);
     }

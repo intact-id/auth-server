@@ -8,10 +8,11 @@ import java.util.UUID;
 
 /**
  * @Author frank
- * email frank.mwangi@dadanadagroup.com
- * Created on 16/11/2025 16:37
+ *         email frank.mwangi@dadanadagroup.com
+ *         Created on 16/11/2025 16:37
  */
 
-public interface CompanyRepository extends JpaRepository<Company, String> {
-   Optional<Company>findByCompanyIdentifierCode(String customerId);
+public interface CompanyRepository extends JpaRepository<Company, String>,
+      org.springframework.data.jpa.repository.JpaSpecificationExecutor<Company> {
+   Optional<Company> findByCompanyIdentifierCode(String customerId);
 }

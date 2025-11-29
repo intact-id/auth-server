@@ -53,4 +53,9 @@ public abstract class Auditable {
         this.updatedAt = LocalDateTime.now();
         this.createdBy = UUID.randomUUID().toString();
     }
+    @PreUpdate
+    void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
+        this.updatedBy = UUID.randomUUID().toString();
+    }
 }
