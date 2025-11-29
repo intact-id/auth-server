@@ -60,14 +60,14 @@ public class Company extends Auditable {
     @Column(name = "application_id")
     private String applicationId;
 
-    @OneToOne(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "company", cascade = CascadeType.ALL)
     private CompanyCommunicationDetails communication;
 
-    @OneToOne(mappedBy = "company", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "company", cascade = CascadeType.ALL)
     private CompanyCredentials credentials;
 
     @Column(name = "extra_details",columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)  // This is the key fix
+    @JdbcTypeCode(SqlTypes.JSON)
     @Convert(converter = PgJsonbToMapConverter.class)
     private Map<String,Object> metaData=new HashMap<>();
 
