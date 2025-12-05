@@ -61,6 +61,13 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Skip if already authenticated (e.g., via JWT)
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            log.debug("Skipping API key auth - already authenticated via JWT");
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
             // Validate credentials
             boolean isValid = credentialsValidator.validateCredentials(request);
@@ -100,9 +107,6 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             log.error("Authentication error", e);
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Authentication failed");
-        } finally {
-            // Clear security context after request
-            SecurityContextHolder.clearContext();
         }
     }
 

@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -21,12 +22,16 @@ public class SecurityConfig {
 
         private final ApiKeyAuthFilter apiKeyAuthFilter;
         private final JwtAuthenticationFilter jwtAuthFilter;
+        private final CorsConfigurationSource corsConfigurationSource;
 
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
                 http
                                 // Disable CSRF for API
                                 .csrf(AbstractHttpConfigurer::disable)
+
+                                // Enable CORS
+                                .cors(cors -> cors.configurationSource(corsConfigurationSource))
 
                                 // Stateless session management
                                 .sessionManagement(session -> session

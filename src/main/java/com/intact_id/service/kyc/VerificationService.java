@@ -81,16 +81,8 @@ public class VerificationService {
 
         VerificationRequest savedRequest = verificationRequestRepository.save(verificationRequest);
 
-        // Store documents (mock - in production would upload to S3)
-        saveDocument(savedRequest, request.getSelfie(), "selfie");
-        saveDocument(savedRequest, request.getIdFront(), "id_front");
-        if (request.getIdBack() != null)
-            saveDocument(savedRequest, request.getIdBack(), "id_back");
-        if (request.getProofOfAddress() != null)
-            saveDocument(savedRequest, request.getProofOfAddress(), "proof_of_address");
-
-        // Start async verification
-        processVerificationAsync(savedRequest);
+        // Start async verification immediately - file saving happens in background
+        processVerificationAsync(savedRequest, request);
 
         return KycVerificationResponseDto.builder()
                 .verificationId(savedRequest.getId())
@@ -102,9 +94,14 @@ public class VerificationService {
                 .build();
     }
 
+    private void addDocument(List<VerificationDocument> list, VerificationDocument doc) {
+        if (doc != null)
+            list.add(doc);
+    }
+
     @Async
     @Transactional
-    public void processVerificationAsync(VerificationRequest request) {
+    public void processVerificationAsync(VerificationRequest request, KycVerificationRequestDto requestDto) {
         try {
             log.info("Starting async verification processing for: {}", request.getId());
 
@@ -112,9 +109,18 @@ public class VerificationService {
             request.markAsProcessing();
             verificationRequestRepository.save(request);
 
+            // Save documents in background (this was blocking the API before)
+            List<VerificationDocument> documents = new java.util.ArrayList<>();
+            addDocument(documents, saveDocument(request, requestDto.getSelfie(), "selfie"));
+            addDocument(documents, saveDocument(request, requestDto.getIdFront(), "id_front"));
+            if (requestDto.getIdBack() != null)
+                addDocument(documents, saveDocument(request, requestDto.getIdBack(), "id_back"));
+            if (requestDto.getProofOfAddress() != null)
+                addDocument(documents, saveDocument(request, requestDto.getProofOfAddress(), "proof_of_address"));
+
             // Call external KYC service (mocked)
             ExternalKycServiceClient.VerificationResult result = externalKycServiceClient
-                    .performVerification(request.getTier(), request).get();
+                    .performVerification(request.getTier(), request, documents).get();
 
             // Save verification steps
             for (ExternalKycServiceClient.CheckResult check : result.getChecks()) {
@@ -130,6 +136,15 @@ public class VerificationService {
 
             // Update verification request with final result
             request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
+
+            // Store error details if present
+            if (result.getFailureReason() != null) {
+                request.setFailureReason(result.getFailureReason());
+            }
+            if (result.getErrorDetails() != null) {
+                request.setErrorDetails(result.getErrorDetails());
+            }
+
             verificationRequestRepository.save(request);
 
             log.info("Verification completed successfully for: {}", request.getId());
@@ -139,7 +154,32 @@ public class VerificationService {
 
         } catch (Exception e) {
             log.error("Verification processing failed for: {}", request.getId(), e);
-            request.markAsFailed();
+
+            String failureReason = "SystemError";
+            String errorDetails = e.getMessage();
+
+            // Extract more specific error information if available
+            if (e.getCause() != null && e.getCause() instanceof feign.FeignException) {
+                feign.FeignException feignException = (feign.FeignException) e.getCause();
+                try {
+                    String responseBody = feignException.contentUTF8();
+                    if (responseBody != null && !responseBody.isEmpty()) {
+                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        com.fasterxml.jackson.databind.JsonNode errorJson = mapper.readTree(responseBody);
+
+                        if (errorJson.has("error")) {
+                            failureReason = errorJson.get("error").asText();
+                        }
+                        if (errorJson.has("message")) {
+                            errorDetails = errorJson.get("message").asText();
+                        }
+                    }
+                } catch (Exception parseEx) {
+                    log.warn("Failed to parse error response", parseEx);
+                }
+            }
+
+            request.markAsFailed(failureReason, errorDetails);
             verificationRequestRepository.save(request);
 
             // Send webhook notification for failure
@@ -147,9 +187,9 @@ public class VerificationService {
         }
     }
 
-    private void saveDocument(VerificationRequest request, MultipartFile file, String documentType) {
+    private VerificationDocument saveDocument(VerificationRequest request, MultipartFile file, String documentType) {
         if (file == null || file.isEmpty())
-            return;
+            return null;
 
         try {
             // Create uploads directory if not exists
@@ -173,7 +213,7 @@ public class VerificationService {
             document.setMimeType(file.getContentType());
             document.setOriginalFilename(file.getOriginalFilename());
 
-            verificationDocumentRepository.save(document);
+            return verificationDocumentRepository.save(document);
         } catch (java.io.IOException e) {
             log.error("Failed to save document: {}", documentType, e);
             throw new ApplicationExceptions.IntactBadRequestException("Failed to save document");
@@ -221,6 +261,8 @@ public class VerificationService {
                 .verificationType(request.getVerificationType())
                 .overallDecision(request.getOverallDecision())
                 .riskScore(request.getRiskScore())
+                .failureReason(request.getFailureReason())
+                .customerData(request.getCustomerData())
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
                 .build());

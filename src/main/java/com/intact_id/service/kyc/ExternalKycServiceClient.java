@@ -42,15 +42,14 @@ public class ExternalKycServiceClient {
 
         public CompletableFuture<VerificationResult> performVerification(
                         String tier,
-                        VerificationRequest request) {
+                        VerificationRequest request,
+                        List<VerificationDocument> documents) {
 
                 log.info("Starting async verification for tier: {} verification: {}", tier, request.getId());
 
                 return CompletableFuture.supplyAsync(() -> {
                         try {
-                                // Fetch documents
-                                List<VerificationDocument> documents = verificationDocumentRepository
-                                                .findByVerificationRequestId(request.getId());
+                                // Use provided documents instead of fetching from DB to avoid race condition
 
                                 VerificationDocument selfieDoc = documents.stream()
                                                 .filter(d -> "selfie".equals(d.getDocumentType()))
@@ -119,10 +118,47 @@ public class ExternalKycServiceClient {
 
                         } catch (Exception e) {
                                 log.error("Verification failed", e);
+
+                                String failureReason = "SystemError";
+                                String errorMessage = e.getMessage();
+
+                                // Parse FeignException to extract error details
+                                if (e instanceof feign.FeignException) {
+                                        feign.FeignException feignException = (feign.FeignException) e;
+                                        try {
+                                                String responseBody = feignException.contentUTF8();
+                                                if (responseBody != null && !responseBody.isEmpty()) {
+                                                        // Parse JSON response
+                                                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                                                        com.fasterxml.jackson.databind.JsonNode errorJson = mapper
+                                                                        .readTree(responseBody);
+
+                                                        if (errorJson.has("error")) {
+                                                                failureReason = errorJson.get("error").asText();
+                                                        }
+                                                        if (errorJson.has("message")) {
+                                                                errorMessage = errorJson.get("message").asText();
+                                                        }
+                                                }
+                                        } catch (Exception parseEx) {
+                                                log.warn("Failed to parse error response", parseEx);
+                                        }
+                                }
+
+                                List<CheckResult> checks = new ArrayList<>();
+                                checks.add(CheckResult.builder()
+                                                .stepName("system_check")
+                                                .status("failed")
+                                                .errorMessage(errorMessage)
+                                                .build());
+
                                 return VerificationResult.builder()
                                                 .verificationId(request.getId())
                                                 .status("failed")
+                                                .checks(checks)
                                                 .overallDecision("error")
+                                                .failureReason(failureReason)
+                                                .errorDetails(errorMessage)
                                                 .build();
                         }
                 });
@@ -145,6 +181,8 @@ public class ExternalKycServiceClient {
                 private List<CheckResult> checks;
                 private String overallDecision;
                 private Double riskScore;
+                private String failureReason;
+                private String errorDetails;
         }
 
         @Data
@@ -154,5 +192,6 @@ public class ExternalKycServiceClient {
                 private String status;
                 private Double confidenceScore;
                 private Map<String, Object> result;
+                private String errorMessage;
         }
 }
