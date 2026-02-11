@@ -19,4 +19,5 @@ public class LoginResponseDto {
     private List<String> roles;
     private List<String> permissions;
     private LocalDateTime loginAt;
+    private Boolean mustChangePassword;
 }

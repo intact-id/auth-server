@@ -39,7 +39,7 @@ public class ApplicationExceptions {
         }
     }
 
-    @ResponseStatus(HttpStatus.FORBIDDEN)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public static class IntactUnauthorizedException extends RuntimeException {
         public IntactUnauthorizedException(String message) {
             super(message);
@@ -56,6 +56,27 @@ public class ApplicationExceptions {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public static class IntactBadRequestException extends RuntimeException {
         public IntactBadRequestException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public static class IntactResourceNotFoundException extends RuntimeException {
+        public IntactResourceNotFoundException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public static class InvalidCredentialsException extends RuntimeException {
+        public InvalidCredentialsException(String message) {
+            super(message);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public static class InvalidRequestException extends RuntimeException {
+        public InvalidRequestException(String message) {
             super(message);
         }
     }

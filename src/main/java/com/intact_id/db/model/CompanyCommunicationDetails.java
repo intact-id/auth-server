@@ -23,7 +23,7 @@ import java.util.Map;
 @Entity
 @Getter
 @Setter
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = false, exclude = "company")
 @Table(name = "company_communications", indexes = {
         @Index(name = "idx_comm_email", columnList = "email"),
         @Index(name = "idx_comm_phone", columnList = "phone")

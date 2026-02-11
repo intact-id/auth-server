@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Suspended</title>
+</head>
+
+<body
+    style="margin: 0; padding: 0; background-color: #0f1115; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <div
+        style="max-width: 600px; margin: 40px auto; background: #161b22; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.4); border: 1px solid #30363d;">
+        <!-- Header -->
+        <div
+            style="background: linear-gradient(135deg, rgba(210, 153, 34, 0.1) 0%, rgba(217, 119, 6, 0.05) 100%); padding: 40px 30px; text-align: center; border-bottom: 1px solid #30363d;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.02em;">🔐
+                Intact<span style="color: #ffffff;">ID</span></h1>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 40px 30px;">
+            <h2 style="color: #ffffff; font-size: 22px; margin-top: 0; font-weight: 600;">⚠️ Account Suspended</h2>
+
+            <p style="color: #8b949e; margin: 15px 0; line-height: 1.6;">Hi <strong style="color: #f0f6fc;"
+                    th:text="${companyName}">Company Name</strong>,</p>
+
+            <p style="color: #8b949e; margin: 15px 0; line-height: 1.6;">
+                We're writing to notify you that your Intact ID account has been <strong
+                    style="color: #d29922;">temporarily suspended</strong>.
+                During this period, all API access has been disabled.
+            </p>
+
+            <!-- Reason Box -->
+            <div
+                style="background: rgba(210, 153, 34, 0.1); border: 1px solid rgba(210, 153, 34, 0.2); border-left: 4px solid #d29922; padding: 20px; margin: 25px 0; border-radius: 8px;">
+                <h3 style="margin-top: 0; color: #d29922; font-size: 16px; font-weight: 600;">📋 Reason for Suspension
+                </h3>
+                <p style="color: #f0f6fc; margin: 10px 0 0 0;" th:text="${suspensionReason}">
+                    Suspension reason will appear here.
+                </p>
+            </div>
+
+            <h3 style="color: #f0f6fc; font-size: 18px; margin-top: 30px; font-weight: 600;">Impact of Suspension</h3>
+
+            <ul style="color: #8b949e; line-height: 1.8;">
+                <li>All API requests will be rejected</li>
+                <li>Existing verifications are not affected</li>
+                <li>Dashboard access remains available</li>
+                <li>Webhooks are temporarily disabled</li>
+            </ul>
+
+            <h3 style="color: #f0f6fc; font-size: 18px; margin-top: 30px; font-weight: 600;">Next Steps</h3>
+
+            <p style="color: #8b949e; margin: 15px 0; line-height: 1.6;">
+                To resolve this suspension, please contact our support team immediately. We're here to help you get back
+                on track.
+            </p>
+
+            <div style="text-align: center; margin: 35px 0;">
+                <a href="mailto:${supportEmail}" th:href="'mailto:' + ${supportEmail}"
+                    style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #d29922 0%, #b45309 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 12px rgba(210, 153, 34, 0.3);">
+                    Contact Support
+                </a>
+            </div>
+
+            <p style="color: #8b949e; margin: 25px 0 0 0; font-size: 14px; font-style: italic;">
+                Please respond promptly to avoid further action on your account.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div
+            style="background: #0d1117; padding: 30px; text-align: center; color: #484f58; font-size: 13px; border-top: 1px solid #30363d;">
+            <p style="margin: 0 0 10px 0;">
+                This is an automated message from Intact ID<br>
+                <a href="https://intact-id.com" style="color: #d29922; text-decoration: none;">intact-id.com</a> |
+                <a href="mailto:support@intact-id.com"
+                    style="color: #d29922; text-decoration: none;">support@intact-id.com</a>
+            </p>
+            <p style="font-size: 11px; color: #484f58; margin: 0;">
+                © 2025 Intact ID. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

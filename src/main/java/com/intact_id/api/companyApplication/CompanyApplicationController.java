@@ -19,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,7 +31,6 @@ import org.springframework.web.bind.annotation.*;
 public class CompanyApplicationController {
     private final CompanyApplicationService companyApplicationService;
 
-    // ============ PUBLIC ENDPOINTS ============
 
     @PostMapping("/api/public/companies/register")
     @Operation(summary = "Submit company registration application (Public)")
@@ -88,6 +88,7 @@ public class CompanyApplicationController {
     // ============ ADMIN ENDPOINTS ============
 
     @GetMapping("/api/admin/applications")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Get all applications (Admin)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<Page<CompanyApplicationResponseDto>>> getAllApplications(
@@ -120,6 +121,7 @@ public class CompanyApplicationController {
     }
 
     @GetMapping("/api/admin/applications/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Get application by ID (Admin)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<CompanyApplicationResponseDto>> getApplicationById(
@@ -147,6 +149,7 @@ public class CompanyApplicationController {
     }
 
     @DeleteMapping("/api/admin/applications/{applicationId}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Delete application (Admin)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<Void>> deleteApplication(

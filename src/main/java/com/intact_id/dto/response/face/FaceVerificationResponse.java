@@ -9,6 +9,7 @@ import java.util.Map;
 @Data
 @NoArgsConstructor
 public class FaceVerificationResponse {
+    @JsonProperty("match")
     private boolean verified;
     private double distance;
     @JsonProperty("threshold")
@@ -19,5 +20,6 @@ public class FaceVerificationResponse {
     private String similarityMetric;
     @JsonProperty("facial_areas")
     private Map<String, Object> facialAreas;
+    @JsonProperty("duration_ms")
     private double time;
 }

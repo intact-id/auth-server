@@ -2,6 +2,7 @@ package com.intact_id.db.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.intact_id.constant.base.Auditable;
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.util.converter.PgJsonbToMapConverter;
 import jakarta.persistence.*;
@@ -24,7 +25,7 @@ import java.util.Map;
 @Entity
 @Getter
 @Setter
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = false, exclude = "company")
 public class CompanyCredentials extends Auditable {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", nullable = false, unique = true)
@@ -37,15 +38,47 @@ public class CompanyCredentials extends Auditable {
     @Column(name = "api_secret_hash")
     private String apiSecretHash;
 
+    @Column(name = "dev_api_key_hash", unique = true)
+    private String devApiKeyHash;
+
+    @Column(name = "dev_api_secret_hash")
+    private String devApiSecretHash;
+
+    @Column(name = "prod_api_key_hash", unique = true)
+    private String prodApiKeyHash;
+
+    @Column(name = "prod_api_secret_hash")
+    private String prodApiSecretHash;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private GlobalStatuses status = GlobalStatuses.ACTIVE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "dev_status")
+    private GlobalStatuses devStatus = GlobalStatuses.ACTIVE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "prod_status")
+    private GlobalStatuses prodStatus = GlobalStatuses.ACTIVE;
+
     @Column(name = "last_used_at")
     private LocalDateTime lastUsedAt;
 
+    @Column(name = "dev_last_used_at")
+    private LocalDateTime devLastUsedAt;
+
+    @Column(name = "prod_last_used_at")
+    private LocalDateTime prodLastUsedAt;
+
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
+
+    @Column(name = "dev_expires_at")
+    private LocalDateTime devExpiresAt;
+
+    @Column(name = "prod_expires_at")
+    private LocalDateTime prodExpiresAt;
 
     @Column(name = "rate_limit_per_hour")
     private Integer rateLimitPerHour;
@@ -56,6 +89,24 @@ public class CompanyCredentials extends Auditable {
     @Column(name = "rate_limit_per_month")
     private Integer rateLimitPerMonth;
 
+    @Column(name = "dev_rate_limit_per_hour")
+    private Integer devRateLimitPerHour;
+
+    @Column(name = "dev_rate_limit_per_day")
+    private Integer devRateLimitPerDay;
+
+    @Column(name = "dev_rate_limit_per_month")
+    private Integer devRateLimitPerMonth;
+
+    @Column(name = "prod_rate_limit_per_hour")
+    private Integer prodRateLimitPerHour;
+
+    @Column(name = "prod_rate_limit_per_day")
+    private Integer prodRateLimitPerDay;
+
+    @Column(name = "prod_rate_limit_per_month")
+    private Integer prodRateLimitPerMonth;
+
     @Column(name = "total_requests")
     private Long totalRequests = 0L;
 
@@ -64,6 +115,24 @@ public class CompanyCredentials extends Auditable {
 
     @Column(name = "total_failed_requests")
     private Long totalFailedRequests = 0L;
+
+    @Column(name = "dev_total_requests")
+    private Long devTotalRequests = 0L;
+
+    @Column(name = "dev_total_successful_requests")
+    private Long devTotalSuccessfulRequests = 0L;
+
+    @Column(name = "dev_total_failed_requests")
+    private Long devTotalFailedRequests = 0L;
+
+    @Column(name = "prod_total_requests")
+    private Long prodTotalRequests = 0L;
+
+    @Column(name = "prod_total_successful_requests")
+    private Long prodTotalSuccessfulRequests = 0L;
+
+    @Column(name = "prod_total_failed_requests")
+    private Long prodTotalFailedRequests = 0L;
 
     @Column(name = "security_settings", columnDefinition = "jsonb")
     @Convert(converter = PgJsonbToMapConverter.class)
@@ -87,6 +156,19 @@ public class CompanyCredentials extends Auditable {
     public boolean isActive() {
         return this.status == GlobalStatuses.ACTIVE &&
                 (this.expiresAt == null || this.expiresAt.isAfter(LocalDateTime.now()));
+    }
+
+    public boolean isActive(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            GlobalStatuses effectiveStatus = devStatus != null ? devStatus : status;
+            LocalDateTime effectiveExpiresAt = devExpiresAt != null ? devExpiresAt : expiresAt;
+            return effectiveStatus == GlobalStatuses.ACTIVE &&
+                    (effectiveExpiresAt == null || effectiveExpiresAt.isAfter(LocalDateTime.now()));
+        }
+        GlobalStatuses effectiveStatus = prodStatus != null ? prodStatus : status;
+        LocalDateTime effectiveExpiresAt = prodExpiresAt != null ? prodExpiresAt : expiresAt;
+        return effectiveStatus == GlobalStatuses.ACTIVE &&
+                (effectiveExpiresAt == null || effectiveExpiresAt.isAfter(LocalDateTime.now()));
     }
 
     public boolean hasExpired() {
@@ -115,12 +197,84 @@ public class CompanyCredentials extends Auditable {
         this.lastUsedAt = LocalDateTime.now();
     }
 
+    public void recordUsage(ApiKeyEnvironment environment, boolean success) {
+        recordUsage(success);
+        if (environment == ApiKeyEnvironment.DEV) {
+            this.devTotalRequests++;
+            if (success) {
+                this.devTotalSuccessfulRequests++;
+            } else {
+                this.devTotalFailedRequests++;
+            }
+            this.devLastUsedAt = LocalDateTime.now();
+        } else {
+            this.prodTotalRequests++;
+            if (success) {
+                this.prodTotalSuccessfulRequests++;
+            } else {
+                this.prodTotalFailedRequests++;
+            }
+            this.prodLastUsedAt = LocalDateTime.now();
+        }
+    }
+
+    public String getApiKeyHash(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            return devApiKeyHash;
+        }
+        return prodApiKeyHash != null ? prodApiKeyHash : apiKeyHash;
+    }
+
+    public String getApiSecretHash(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            return devApiSecretHash;
+        }
+        return prodApiSecretHash != null ? prodApiSecretHash : apiSecretHash;
+    }
+
+    public LocalDateTime getExpiresAt(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            return devExpiresAt != null ? devExpiresAt : expiresAt;
+        }
+        return prodExpiresAt != null ? prodExpiresAt : expiresAt;
+    }
+
     public double getSuccessRate() {
         if (totalRequests == 0) return 0.0;
         return (totalSuccessfulRequests * 100.0) / totalRequests;
     }
 
+    public double getSuccessRate(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            if (devTotalRequests == 0) return 0.0;
+            return (devTotalSuccessfulRequests * 100.0) / devTotalRequests;
+        }
+        if (prodTotalRequests == 0) return 0.0;
+        return (prodTotalSuccessfulRequests * 100.0) / prodTotalRequests;
+    }
+
     public boolean isWithinRateLimit(int requestsInLastHour) {
         return requestsInLastHour < rateLimitPerHour;
+    }
+
+    public Integer getRateLimitPerHour(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            return devRateLimitPerHour != null ? devRateLimitPerHour : rateLimitPerHour;
+        }
+        return prodRateLimitPerHour != null ? prodRateLimitPerHour : rateLimitPerHour;
+    }
+
+    public Integer getRateLimitPerDay(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            return devRateLimitPerDay != null ? devRateLimitPerDay : rateLimitPerDay;
+        }
+        return prodRateLimitPerDay != null ? prodRateLimitPerDay : rateLimitPerDay;
+    }
+
+    public Integer getRateLimitPerMonth(ApiKeyEnvironment environment) {
+        if (environment == ApiKeyEnvironment.DEV) {
+            return devRateLimitPerMonth != null ? devRateLimitPerMonth : rateLimitPerMonth;
+        }
+        return prodRateLimitPerMonth != null ? prodRateLimitPerMonth : rateLimitPerMonth;
     }
 }

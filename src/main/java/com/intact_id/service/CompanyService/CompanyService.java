@@ -3,7 +3,9 @@ package com.intact_id.service.CompanyService;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.model.CompanyApplication;
+import com.intact_id.db.model.CompanyCommunicationDetails;
 import com.intact_id.dto.request.CompanyUpdateRequestDto;
+import com.intact_id.dto.request.WebhookSettingsRequestDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,11 +25,18 @@ public interface CompanyService {
 
     Company getCompanyByCustomerId(String customerId);
 
-    void suspendCompany(String companyId, String adminId, String reason);
+    Company suspendCompany(String companyId, String adminId, String reason);
 
-    void activateCompany(String companyId, String adminId);
+    Company activateCompany(String companyId, String adminId);
 
     Company updateCompany(String companyId, CompanyUpdateRequestDto request);
 
     Page<Company> getAllCompanies(GlobalStatuses status, String country, String businessType, Pageable pageable);
+
+    // Webhook/Communication methods
+    CompanyCommunicationDetails getCompanyCommunication(String companyId);
+
+    CompanyCommunicationDetails updateWebhookSettings(String companyId, WebhookSettingsRequestDto request);
+
+    void deleteCompany(String companyId);
 }

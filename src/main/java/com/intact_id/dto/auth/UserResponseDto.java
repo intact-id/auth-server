@@ -17,7 +17,9 @@ public class UserResponseDto {
     private String phone;
     private String status;
     private Boolean emailVerified;
+    private Boolean mustChangePassword;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private List<String> roles;
+    private String companyId;
 }

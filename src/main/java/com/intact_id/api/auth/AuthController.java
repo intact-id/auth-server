@@ -1,9 +1,6 @@
 package com.intact_id.api.auth;
 
-import com.intact_id.dto.auth.LoginRequestDto;
-import com.intact_id.dto.auth.LoginResponseDto;
-import com.intact_id.dto.auth.RefreshTokenRequestDto;
-import com.intact_id.dto.auth.TokenResponseDto;
+import com.intact_id.dto.auth.*;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.service.auth.AuthenticationService;
 import com.intact_id.util.exception.ApplicationExceptions;
@@ -15,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -66,6 +64,7 @@ public class AuthController {
         }
     }
 
+    @Deprecated(since = "2026-02-01",forRemoval = true)
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token using refresh token")
     public ResponseEntity<ApiResponse<TokenResponseDto>> refreshToken(
@@ -131,5 +130,11 @@ public class AuthController {
                             .isInternalError(true)
                             .build());
         }
+    }
+
+    @GetMapping("/current-user")
+    public String  getCurrentUser() {
+       return authenticationService.getAuthorizedUsername();
+
     }
 }

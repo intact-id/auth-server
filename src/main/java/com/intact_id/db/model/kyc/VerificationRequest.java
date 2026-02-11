@@ -1,6 +1,7 @@
 package com.intact_id.db.model.kyc;
 
 import com.intact_id.constant.base.Auditable;
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
 import com.intact_id.util.converter.PgJsonbToMapConverter;
@@ -36,6 +37,10 @@ public class VerificationRequest extends Auditable {
     @Column(name = "status", nullable = false)
     private GlobalStatuses status = GlobalStatuses.SUBMITTED;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "environment", nullable = false, length = 10)
+    private ApiKeyEnvironment environment = ApiKeyEnvironment.PROD;
+
     @Column(name = "customer_data", columnDefinition = "jsonb")
     @Convert(converter = PgJsonbToMapConverter.class)
     @JdbcTypeCode(SqlTypes.JSON)
@@ -58,6 +63,12 @@ public class VerificationRequest extends Auditable {
     @Column(name = "webhook_url")
     private String webhookUrl;
 
+    @Column(name = "failure_reason", length = 100)
+    private String failureReason; // e.g., "FaceNotDetectedError"
+
+    @Column(name = "error_details", columnDefinition = "text")
+    private String errorDetails; // Detailed error message
+
     // Helper methods
     public boolean isCompleted() {
         return status == GlobalStatuses.COMPLETED ||
@@ -78,6 +89,13 @@ public class VerificationRequest extends Auditable {
 
     public void markAsFailed() {
         this.status = GlobalStatuses.FAILED;
+        this.completedAt = LocalDateTime.now();
+    }
+
+    public void markAsFailed(String failureReason, String errorDetails) {
+        this.status = GlobalStatuses.FAILED;
+        this.failureReason = failureReason;
+        this.errorDetails = errorDetails;
         this.completedAt = LocalDateTime.now();
     }
 }

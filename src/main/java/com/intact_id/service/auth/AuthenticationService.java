@@ -1,7 +1,9 @@
 package com.intact_id.service.auth;
 
 import com.intact_id.constant.enums.GlobalStatuses;
+import com.intact_id.db.model.user.Permission;
 import com.intact_id.db.model.user.RefreshToken;
+import com.intact_id.db.model.user.Role;
 import com.intact_id.db.model.user.User;
 import com.intact_id.db.repository.user.RefreshTokenRepository;
 import com.intact_id.db.repository.user.UserRepository;
@@ -16,11 +18,12 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -32,12 +35,12 @@ public class AuthenticationService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final GeneratorUtils generatorUtils;
-
     @Value("${jwt.access-token-expiration}")
     private Long accessTokenExpiration;
 
     @Value("${jwt.refresh-token-expiration}")
     private Long refreshTokenExpiration;
+
 
     /**
      * Authenticate user and generate tokens
@@ -45,7 +48,6 @@ public class AuthenticationService {
     @Transactional
     public LoginResponseDto login(LoginRequestDto request, HttpServletRequest httpRequest) {
         log.info("Login attempt for username: {}", request.getUsername());
-
         // Find user
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> {
@@ -100,15 +102,14 @@ public class AuthenticationService {
                 .userId(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .roles(user.getRoles().stream()
-                        .map(role -> role.getName())
-                        .collect(Collectors.toList()))
+                .roles(user.getRoles().stream().map(Role::getName).toList())
                 .permissions(user.getRoles().stream()
                         .flatMap(role -> role.getPermissions().stream())
-                        .map(permission -> permission.getName())
+                        .map(Permission::getName)
                         .distinct()
-                        .collect(Collectors.toList()))
+                        .toList())
                 .loginAt(LocalDateTime.now())
+                .mustChangePassword(user.getMustChangePassword())
                 .build();
     }
 
@@ -147,10 +148,34 @@ public class AuthenticationService {
         // Generate new access token
         String newAccessToken = jwtService.generateAccessToken(user);
 
-        // Optionally rotate refresh token (recommended for security)
-        String newRefreshToken = jwtService.generateRefreshToken(user);
-        refreshToken.revoke(); // Revoke old token
-        refreshTokenRepository.save(refreshToken);
+        // Generate new refresh token with retry logic for uniqueness
+        String newRefreshToken = null;
+        int maxRetries = 3;
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                newRefreshToken = jwtService.generateRefreshToken(user);
+                String newTokenHash = generatorUtils.hashString(newRefreshToken);
+
+                // Check if this token hash already exists
+                if (refreshTokenRepository.findByTokenHash(newTokenHash).isEmpty()) {
+                    break; // Token is unique, proceed
+                }
+
+                // Token exists, wait a bit and try again
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ApplicationExceptions.IntactUnauthorizedException("Token generation interrupted");
+            }
+        }
+
+        if (newRefreshToken == null) {
+            throw new ApplicationExceptions.IntactUnauthorizedException("Failed to generate unique refresh token");
+        }
+
+        // Revoke old token first
+        refreshToken.revoke();
+        refreshTokenRepository.saveAndFlush(refreshToken); // Use saveAndFlush to ensure immediate persistence
 
         // Save new refresh token
         saveRefreshToken(user, newRefreshToken, null);
@@ -180,6 +205,15 @@ public class AuthenticationService {
                     refreshTokenRepository.save(token);
                     log.info("Refresh token revoked for user: {}", token.getUser().getUsername());
                 });
+    }
+
+    public String getAuthorizedUsername(){
+
+        Authentication authentication= SecurityContextHolder.getContext().getAuthentication();
+
+        var response = authentication.getPrincipal() instanceof String ? ((String) authentication.getPrincipal()) : null;
+        log.info("Authentication principal: {}", response);
+        return (String) authentication.getPrincipal();
     }
 
     /**

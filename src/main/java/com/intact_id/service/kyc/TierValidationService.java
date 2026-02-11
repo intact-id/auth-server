@@ -5,6 +5,8 @@ import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
+
 @Slf4j
 @Service
 public class TierValidationService {
@@ -83,8 +85,8 @@ public class TierValidationService {
     }
 
     private void validateIdType(String idType) {
-        String[] validTypes = { "national_id", "passport", "drivers_license", "alien_card" };
-        boolean isValid = java.util.Arrays.asList(validTypes).contains(idType.toLowerCase());
+        String[] validTypes = {"national_id", "passport", "drivers_license", "alien_card"};
+        boolean isValid = Arrays.asList(validTypes).contains(idType.toLowerCase());
 
         if (!isValid) {
             throw new ApplicationExceptions.IntactBadRequestException(

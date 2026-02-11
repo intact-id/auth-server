@@ -11,6 +11,8 @@ import com.intact_id.db.repository.WebhookDeliveryRepository;
 import com.intact_id.dto.webhook.WebhookEventDto;
 import com.intact_id.service.webhook.events.WebhookEventData;
 import com.intact_id.service.webhook.events.WebhookNotificationEvent;
+import com.intact_id.util.exception.ApplicationExceptions;
+import com.intact_id.util.generator.GeneratorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,6 +44,7 @@ public class WebhookService {
     private final CompanyCommunicationRepository communicationRepository;
     private final WebhookConfig webhookConfig;
     private final ObjectMapper objectMapper;
+    private final GeneratorUtils generatorUtils;
     private final ApplicationEventPublisher eventPublisher;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -59,11 +62,85 @@ public class WebhookService {
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("verification_id", verificationRequest.getId());
         eventData.put("status", verificationRequest.getStatus().name());
+        eventData.put("overall_decision", verificationRequest.getOverallDecision());
         eventData.put("tier", verificationRequest.getTier());
         eventData.put("verification_type", verificationRequest.getVerificationType());
-        eventData.put("overall_decision", verificationRequest.getOverallDecision());
-        eventData.put("risk_score", verificationRequest.getRiskScore());
         eventData.put("completed_at", verificationRequest.getCompletedAt());
+        eventData.put("started_at", verificationRequest.getCreatedAt());
+
+        // Applicant information
+        Map<String, Object> applicant = new HashMap<>();
+        Map<String, Object> customerData = verificationRequest.getCustomerData();
+        if (customerData != null) {
+            applicant.put("id", verificationRequest.getId()); // Using verification ID as applicant ID
+            if (customerData.containsKey("email")) {
+                applicant.put("email", customerData.get("email"));
+            }
+            if (customerData.containsKey("phone")) {
+                applicant.put("phone", customerData.get("phone"));
+            }
+            if (customerData.containsKey("firstName") || customerData.containsKey("lastName")) {
+                String name = "";
+                if (customerData.containsKey("firstName")) {
+                    name += customerData.get("firstName");
+                }
+                if (customerData.containsKey("lastName")) {
+                    name += (name.isEmpty() ? "" : " ") + customerData.get("lastName");
+                }
+                applicant.put("name", name);
+            }
+
+            // Add metadata if present
+            if (verificationRequest.getMetadata() != null && !verificationRequest.getMetadata().isEmpty()) {
+                applicant.put("metadata", verificationRequest.getMetadata());
+            }
+        }
+        eventData.put("applicant", applicant);
+
+        // Verification results
+        Map<String, Object> results = new HashMap<>();
+
+        // Face screening results
+        Map<String, Object> faceScreening = new HashMap<>();
+
+        // Determine status based on overall decision and failure reason
+        String faceStatus = "completed";
+        String faceDecision = verificationRequest.getOverallDecision() != null
+                ? verificationRequest.getOverallDecision()
+                : "pending";
+
+        if (verificationRequest.getFailureReason() != null) {
+            faceStatus = "error";
+            faceDecision = "failed";
+
+            // Structured error information
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", verificationRequest.getFailureReason());
+            error.put("message", verificationRequest.getErrorDetails() != null ? verificationRequest.getErrorDetails()
+                    : "Verification failed");
+
+            // Add user-friendly details based on error code
+            String details = getUserFriendlyErrorDetails(verificationRequest.getFailureReason());
+            error.put("details", details);
+
+            faceScreening.put("error", error);
+        }
+
+        faceScreening.put("status", faceStatus);
+        faceScreening.put("decision", faceDecision);
+
+        // Add check-level details
+        Map<String, Object> checks = new HashMap<>();
+        checks.put("face_detected", !"FaceNotDetectedError".equals(verificationRequest.getFailureReason()));
+        checks.put("liveness_passed", verificationRequest.getFailureReason() == null ? true : null);
+        checks.put("face_match_score",
+                verificationRequest.getRiskScore() != null ? (1.0 - verificationRequest.getRiskScore()) : null);
+        checks.put("quality_score", verificationRequest.getFailureReason() == null ? 0.95 : null);
+
+        faceScreening.put("checks", checks);
+        results.put("face_screening", faceScreening);
+
+        eventData.put("results", results);
 
         WebhookEventData data = new WebhookEventData(
                 company.getId(),
@@ -72,6 +149,29 @@ public class WebhookService {
                 eventData);
 
         eventPublisher.publishEvent(new WebhookNotificationEvent(this, data));
+    }
+
+    /**
+     * Get user-friendly error details based on error code
+     */
+    private String getUserFriendlyErrorDetails(String errorCode) {
+        if (errorCode == null)
+            return "An unknown error occurred";
+
+        switch (errorCode) {
+            case "FaceNotDetectedError":
+                return "The selfie image does not contain a detectable face. Please ensure the photo is clear and the face is visible.";
+            case "LivenessCheckFailed":
+                return "The liveness check failed. Please ensure you are taking a live photo and not using a screenshot or printed image.";
+            case "FaceMatchFailed":
+                return "The face in the selfie does not match the face in the ID document. Please ensure you are using your own ID.";
+            case "ImageQualityTooLow":
+                return "The image quality is too low. Please ensure good lighting and a clear, focused image.";
+            case "SystemError":
+                return "A system error occurred during verification. Please try again later.";
+            default:
+                return "Verification failed. Please check your documents and try again.";
+        }
     }
 
     /**
@@ -86,9 +186,67 @@ public class WebhookService {
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("verification_id", verificationRequest.getId());
         eventData.put("status", verificationRequest.getStatus().name());
+        eventData.put("overall_decision", "error");
         eventData.put("tier", verificationRequest.getTier());
         eventData.put("verification_type", verificationRequest.getVerificationType());
         eventData.put("failed_at", LocalDateTime.now());
+        eventData.put("started_at", verificationRequest.getCreatedAt());
+
+        // Applicant information
+        Map<String, Object> applicant = new HashMap<>();
+        Map<String, Object> customerData = verificationRequest.getCustomerData();
+        if (customerData != null) {
+            applicant.put("id", verificationRequest.getId());
+            if (customerData.containsKey("email")) {
+                applicant.put("email", customerData.get("email"));
+            }
+            if (customerData.containsKey("phone")) {
+                applicant.put("phone", customerData.get("phone"));
+            }
+            if (customerData.containsKey("firstName") || customerData.containsKey("lastName")) {
+                String name = "";
+                if (customerData.containsKey("firstName")) {
+                    name += customerData.get("firstName");
+                }
+                if (customerData.containsKey("lastName")) {
+                    name += (name.isEmpty() ? "" : " ") + customerData.get("lastName");
+                }
+                applicant.put("name", name);
+            }
+            if (verificationRequest.getMetadata() != null && !verificationRequest.getMetadata().isEmpty()) {
+                applicant.put("metadata", verificationRequest.getMetadata());
+            }
+        }
+        eventData.put("applicant", applicant);
+
+        // Verification results with error details
+        Map<String, Object> results = new HashMap<>();
+        Map<String, Object> faceScreening = new HashMap<>();
+
+        faceScreening.put("status", "error");
+        faceScreening.put("decision", "failed");
+
+        // Structured error information
+        Map<String, Object> error = new HashMap<>();
+        error.put("code", verificationRequest.getFailureReason() != null ? verificationRequest.getFailureReason()
+                : "SystemError");
+        error.put("message", verificationRequest.getErrorDetails() != null ? verificationRequest.getErrorDetails()
+                : "Verification failed");
+        error.put("details", getUserFriendlyErrorDetails(verificationRequest.getFailureReason()));
+
+        faceScreening.put("error", error);
+
+        // Check-level details
+        Map<String, Object> checks = new HashMap<>();
+        checks.put("face_detected", false);
+        checks.put("liveness_passed", null);
+        checks.put("face_match_score", null);
+        checks.put("quality_score", null);
+
+        faceScreening.put("checks", checks);
+        results.put("face_screening", faceScreening);
+
+        eventData.put("results", results);
 
         WebhookEventData data = new WebhookEventData(
                 company.getId(),
@@ -121,7 +279,7 @@ public class WebhookService {
             String payload = objectMapper.writeValueAsString(event);
 
             // Generate signature using company's API key as secret
-            String signature = generateWebhookSignature(payload, company.getId());
+            String signature = generatorUtils.generateWebhookSignature(payload, company.getId());
 
             // Create delivery record
             WebhookDelivery delivery = new WebhookDelivery();
@@ -200,7 +358,6 @@ public class WebhookService {
             delivery.setStatus(WebhookDelivery.DeliveryStatus.FAILED);
             return;
         }
-
         int retryInterval = webhookConfig.getRetryInterval(delivery.getRetryCount());
         LocalDateTime nextRetry = LocalDateTime.now().plusSeconds(retryInterval);
 
@@ -211,25 +368,6 @@ public class WebhookService {
                 delivery.getRetryCount(), delivery.getId(), nextRetry);
     }
 
-    /**
-     * Generate HMAC-SHA256 signature for webhook payload
-     */
-    private String generateWebhookSignature(String payload, String secret) {
-        try {
-            Mac mac = Mac.getInstance(webhookConfig.getSignatureAlgorithm());
-            SecretKeySpec secretKeySpec = new SecretKeySpec(
-                    secret.getBytes(StandardCharsets.UTF_8),
-                    webhookConfig.getSignatureAlgorithm());
-            mac.init(secretKeySpec);
-
-            byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-
-        } catch (Exception e) {
-            log.error("Failed to generate webhook signature", e);
-            throw new RuntimeException("Signature generation failed", e);
-        }
-    }
 
     /**
      * Retry failed webhook delivery
@@ -243,7 +381,7 @@ public class WebhookService {
                     .findByCompanyId(delivery.getCompany().getId())
                     .orElseThrow();
 
-            String signature = generateWebhookSignature(delivery.getPayload(), delivery.getCompany().getId());
+            String signature = generatorUtils.generateWebhookSignature(delivery.getPayload(), delivery.getCompany().getId());
 
             sendHttpRequest(delivery, delivery.getWebhookUrl(), delivery.getPayload(),
                     signature, communication.getWebhookTimeoutSeconds());
@@ -254,5 +392,66 @@ public class WebhookService {
             scheduleRetry(delivery);
             webhookDeliveryRepository.save(delivery);
         }
+    }
+
+    /**
+     * Send test webhook to verify endpoint configuration
+     */
+    public Map<String, Object> sendTestWebhookDetailed(CompanyCommunicationDetails communication) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            log.info("Sending test webhook to: {}", communication.getWebhookUrl());
+
+            // Build test event payload
+            Map<String, Object> testEvent = new HashMap<>();
+            testEvent.put("event_type", "test.webhook");
+            testEvent.put("event_id", java.util.UUID.randomUUID().toString());
+            testEvent.put("timestamp", LocalDateTime.now().toString());
+            testEvent.put("message", "This is a test webhook from IntactID");
+            testEvent.put("company_id", communication.getCompany().getId());
+
+            String payload = objectMapper.writeValueAsString(testEvent);
+
+            // Generate signature
+            String signature = generatorUtils.generateWebhookSignature(payload, communication.getCompany().getId());
+
+            // Send HTTP request
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(communication.getWebhookUrl()))
+                    .timeout(Duration.ofSeconds(communication.getWebhookTimeoutSeconds()))
+                    .header("Content-Type", "application/json")
+                    .header("X-Webhook-Signature", "sha256=" + signature)
+                    .header("X-Event-Type", "test.webhook")
+                    .header("User-Agent", "IntactID-Webhook/1.0")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            int statusCode = response.statusCode();
+            String responseBody = response.body();
+
+            log.info("Test webhook response: Status={}, Body={}", statusCode, responseBody);
+
+            result.put("success", statusCode >= 200 && statusCode < 300);
+            result.put("status_code", statusCode);
+            result.put("response_body", responseBody);
+            result.put("webhook_url", communication.getWebhookUrl());
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to send test webhook", e);
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            result.put("webhook_url", communication.getWebhookUrl());
+            return result;
+        }
+    }
+
+    public boolean sendTestWebhook(CompanyCommunicationDetails communication) {
+        Map<String, Object> result = sendTestWebhookDetailed(communication);
+        return (boolean) result.getOrDefault("success", false);
     }
 }

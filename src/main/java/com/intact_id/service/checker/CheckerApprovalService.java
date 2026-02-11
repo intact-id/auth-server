@@ -10,6 +10,7 @@ import com.intact_id.db.repository.CompanyRepository;
 import com.intact_id.dto.request.ApplicationApprovalDecisionDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.service.CompanyService.CompanyService;
+import com.intact_id.service.email.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.mapper.MapperUtils;
 import jakarta.transaction.Transactional;
@@ -35,7 +36,7 @@ public class CheckerApprovalService {
     private final CompanyService companyService;
     private final MapperUtils mapperUtils;
     private final CompanyRepository companyRepository;
-    // TODO:  EmailService
+    private final EmailService emailService;
 
     @Transactional
     public ApplicationApprovalResponseDto performCheckerApproval(ApplicationApprovalDecisionDto request) {
@@ -46,8 +47,7 @@ public class CheckerApprovalService {
                 .orElseThrow(() -> {
                     log.error("Approval not found: {}", request.getApprovalId());
                     return new ApplicationExceptions.IntactCompanyNotFoundException(
-                            "Approval not found: " + request.getApprovalId()
-                    );
+                            "Approval not found: " + request.getApprovalId());
                 });
 
         // 2. Get the application
@@ -55,8 +55,7 @@ public class CheckerApprovalService {
                 .orElseThrow(() -> {
                     log.error("Application not found: {}", makerApproval.getApplicationId());
                     return new ApplicationExceptions.IntactCompanyNotFoundException(
-                            "Application not found"
-                    );
+                            "Application not found");
                 });
 
         // 3. Validate application is in correct state
@@ -64,8 +63,8 @@ public class CheckerApprovalService {
             log.error("Application {} not in PENDING_APPROVAL state. Current: {}",
                     application.getId(), application.getApplicationStatus());
             throw new ApplicationExceptions.InvalidActionException(
-                    "Application is not pending approval. Current status: " + application.getApplicationStatus()
-            );
+                    "Application is not pending approval. Current status: "
+                            + application.getApplicationStatus());
         }
 
         // 4. CRITICAL: Ensure checker != maker (different person)
@@ -73,8 +72,7 @@ public class CheckerApprovalService {
             log.error("Checker {} cannot be same as Maker {}",
                     request.getApprovedBy(), makerApproval.getPerformedBy());
             throw new ApplicationExceptions.InvalidActionException(
-                    "Checker cannot be the same person as Maker"
-            );
+                    "Checker cannot be the same person as Maker");
         }
 
         // 5. Handle checker decision
@@ -84,26 +82,24 @@ public class CheckerApprovalService {
             return handleRejection(makerApproval, application, request);
         } else {
             throw new ApplicationExceptions.InvalidActionException(
-                    "Invalid checker action: " + request.getFinalAction()
-            );
+                    "Invalid checker action: " + request.getFinalAction());
         }
     }
 
     private ApplicationApprovalResponseDto handleApproval(
             CompanyApplicationApproval makerApproval,
             CompanyApplication application,
-            ApplicationApprovalDecisionDto request
-    ) {
+            ApplicationApprovalDecisionDto request) {
         log.info("Checker approving application: {}", application.getId());
 
         // 1. Create the company (Company + Communication + Credentials)
+        // This will also trigger the approval email with API keys
         Company company = companyService.createCompanyFromApplication(application);
 
         makerApproval.setApprovedBy(request.getApprovedBy());
         makerApproval.setFinalAction(GlobalStatuses.APPROVED);
         makerApproval.setApproverNote(
-                makerApproval.getApproverNote() + "\n[CHECKER]: " + request.getApproverNote()
-        );
+                makerApproval.getApproverNote() + "\n[CHECKER]: " + request.getApproverNote());
         makerApproval.setActionApprovedAt(LocalDateTime.now());
 
         // 3. Update application status and link to company
@@ -120,25 +116,21 @@ public class CheckerApprovalService {
         company.setApprovedBy(savedApproval.getApprovedBy());
         company.setApplicationId(savedApproval.getApplicationId());
         companyRepository.save(company);
-        // 5. TODO: Send email with API keys
 
         return mapperUtils.toApplicationApprovalResponseDto(savedApproval);
     }
 
-
     private ApplicationApprovalResponseDto handleRejection(
             CompanyApplicationApproval makerApproval,
             CompanyApplication application,
-            ApplicationApprovalDecisionDto request
-    ) {
+            ApplicationApprovalDecisionDto request) {
         log.info("Checker rejecting application: {}", application.getId());
 
         // 1. Update maker approval with rejection
         makerApproval.setApprovedBy(request.getApprovedBy());
         makerApproval.setFinalAction(GlobalStatuses.REJECTED);
         makerApproval.setApproverNote(
-                makerApproval.getApproverNote() + "\n[CHECKER REJECTED]: " + request.getApproverNote()
-        );
+                makerApproval.getApproverNote() + "\n[CHECKER REJECTED]: " + request.getApproverNote());
         makerApproval.setActionApprovedAt(LocalDateTime.now());
 
         // 2. Update application status
@@ -150,7 +142,16 @@ public class CheckerApprovalService {
 
         log.info("Application {} rejected by checker", application.getId());
 
-        // 4. TODO: Send rejection email
+        // 4. Send rejection email
+        try {
+            emailService.sendCompanyRejectionEmail(
+                    application.getEmail(),
+                    application.getLegalName(),
+                    request.getApproverNote());
+            log.info("Rejection email sent to {}", application.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to send rejection email to {}", application.getEmail(), e);
+        }
 
         return mapperUtils.toApplicationApprovalResponseDto(savedApproval);
     }

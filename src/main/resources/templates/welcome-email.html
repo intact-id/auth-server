@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Intact ID</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .header p {
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            font-size: 15px;
+            color: #555;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+
+        .credentials-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 4px;
+        }
+
+        .credentials-box h3 {
+            margin: 0 0 15px;
+            color: #333;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .credential-item {
+            margin: 12px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .credential-label {
+            font-weight: 600;
+            color: #555;
+            min-width: 100px;
+        }
+
+        .credential-value {
+            font-family: 'Courier New', monospace;
+            background: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box p {
+            margin: 0;
+            color: #856404;
+            font-size: 14px;
+        }
+
+        .warning-box strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 15px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            padding: 14px 32px;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: transform 0.2s;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .steps {
+            margin: 30px 0;
+        }
+
+        .step {
+            margin: 15px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .step::before {
+            content: attr(data-step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #667eea;
+            color: #fff;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .footer p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .support-info {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Welcome to Intact ID</h1>
+            <p>Your Account Has Been Created</p>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <p class="greeting">Hello <strong th:text="${fullName}">User</strong>,</p>
+
+            <p class="message">
+                Your Intact ID account has been successfully created! We're excited to have you on board.
+                Below are your temporary login credentials to access the admin dashboard.
+            </p>
+
+            <!-- Credentials Box -->
+            <div class="credentials-box">
+                <h3>🔐 Your Login Credentials</h3>
+                <div class="credential-item">
+                    <span class="credential-label">Username:</span>
+                    <span class="credential-value" th:text="${username}">username</span>
+                </div>
+                <div class="credential-item">
+                    <span class="credential-label">Password:</span>
+                    <span class="credential-value" th:text="${password}">temporary-password</span>
+                </div>
+                <div class="credential-item">
+                    <span class="credential-label">Dashboard URL:</span>
+                    <span class="credential-value" th:text="${dashboardUrl}">https://dashboard.intact-id.com</span>
+                </div>
+            </div>
+
+            <!-- Warning Box -->
+            <div class="warning-box">
+                <strong>⚠️ Important Security Notice</strong>
+                <p>
+                    For security reasons, you will be required to change your password upon first login.
+                    Please choose a strong password that you haven't used elsewhere.
+                </p>
+            </div>
+
+            <!-- Getting Started Steps -->
+            <div class="steps">
+                <h3 style="margin-bottom: 20px; color: #333;">Getting Started:</h3>
+                <div class="step" data-step="1">
+                    <strong>Access the Dashboard</strong><br>
+                    Click the button below or visit the dashboard URL provided above.
+                </div>
+                <div class="step" data-step="2">
+                    <strong>Login with Your Credentials</strong><br>
+                    Use the username and temporary password provided in this email.
+                </div>
+                <div class="step" data-step="3">
+                    <strong>Change Your Password</strong><br>
+                    You'll be prompted to set a new, secure password immediately after login.
+                </div>
+                <div class="step" data-step="4">
+                    <strong>Explore the Platform</strong><br>
+                    Start managing identity verifications and accessing powerful features.
+                </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div style="text-align: center; margin: 30px 0;">
+                <a th:href="${dashboardUrl}" class="cta-button">Access Dashboard →</a>
+            </div>
+
+            <p class="message">
+                If you have any questions or need assistance, please don't hesitate to reach out to our support team.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Intact ID</strong> - Identity Verification Platform</p>
+            <p>
+                <a href="mailto:support@intact-id.com">support@intact-id.com</a> |
+                <a href="https://intact-id.com">intact-id.com</a>
+            </p>
+
+            <div class="support-info">
+                <p style="font-size: 12px; color: #999;">
+                    This is an automated message. Please do not reply to this email.<br>
+                    If you didn't request this account, please contact us immediately.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
