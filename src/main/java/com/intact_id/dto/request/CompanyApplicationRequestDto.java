@@ -4,7 +4,6 @@ import com.intact_id.constant.enums.Country;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,7 +42,7 @@ public class CompanyApplicationRequestDto {
     @Schema(example = "https://intact.com", description = "Company website URL")
     private String website;
 
-    @Schema(example = "KE", description = "ISO-2 country code (default KE)")
+    @Schema(example = "KENYA", description = "ISO-2 country code (default KE)")
     private Country country;
 
     @Schema(example = "digital_lender", description = "Business type e.g. digital_lender, crypto_exchange, neobank")

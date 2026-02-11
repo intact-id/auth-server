@@ -22,4 +22,10 @@ public interface CompanyCredentialsRepository extends JpaRepository<CompanyCrede
 
     @Query("SELECT cc FROM CompanyCredentials cc JOIN FETCH cc.company WHERE cc.apiKeyHash = :apiKeyHash")
     Optional<CompanyCredentials> findCompanyCredentialsByApiKeyHash(@Param("apiKeyHash") String apiKeyHash);
+
+    @Query("SELECT cc FROM CompanyCredentials cc JOIN FETCH cc.company WHERE cc.devApiKeyHash = :apiKeyHash")
+    Optional<CompanyCredentials> findCompanyCredentialsByDevApiKeyHash(@Param("apiKeyHash") String apiKeyHash);
+
+    @Query("SELECT cc FROM CompanyCredentials cc JOIN FETCH cc.company WHERE cc.prodApiKeyHash = :apiKeyHash")
+    Optional<CompanyCredentials> findCompanyCredentialsByProdApiKeyHash(@Param("apiKeyHash") String apiKeyHash);
 }

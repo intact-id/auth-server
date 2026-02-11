@@ -18,35 +18,27 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow dashboard origins
+        // Allow specific origins
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173", // Vite dev server (default)
-                "http://localhost:51746", // Vite dev server (default)
-                "http://localhost:3000", // Alternative React dev server
-                "http://localhost:4173", // Vite preview mode
-                "http://127.0.0.1:5173", // Localhost alternative
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:4173"));
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://localhost:5175", // Added for dev server
+                "https://dashboard.intact-id.com",
+                "https://intact-id-backoffice.vercel.app",
+                "https://intact-id.com"));
 
         // Allow all HTTP methods
         configuration.setAllowedMethods(Arrays.asList(
-                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"));
 
         // Allow all headers
-        configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "X-Requested-With",
-                "Accept",
-                "Origin",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"));
-
-        // Expose headers to the client
-        configuration.setExposedHeaders(Arrays.asList(
-                "Access-Control-Allow-Origin",
-                "Access-Control-Allow-Credentials",
-                "Authorization"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
 
         // Allow credentials (cookies, authorization headers)
         configuration.setAllowCredentials(true);

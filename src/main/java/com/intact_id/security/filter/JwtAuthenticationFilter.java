@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -52,8 +53,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Extract username from token
             username = jwtService.extractUsername(jwt);
 
-            // If username exists and no authentication is set
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            // Always revalidate the JWT — never skip based on existing context state.
+            // Using createEmptyContext() + setContext() is the Spring Security recommended
+            // pattern to avoid stale authentication leaking between requests on reused threads.
+            if (username != null) {
                 // Load user from database
                 User user = userRepository.findByUsername(username).orElse(null);
 
@@ -81,8 +84,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    // Set authentication in security context
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    // Use a fresh context to prevent any stale auth from a previous request
+                    // on this thread from being visible
+                    SecurityContext context = SecurityContextHolder.createEmptyContext();
+                    context.setAuthentication(authToken);
+                    SecurityContextHolder.setContext(context);
 
                     log.debug("JWT authentication successful for user: {}", username);
                 }

@@ -2,10 +2,15 @@ package com.intact_id.api.company;
 
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
+import com.intact_id.db.model.CompanyCommunicationDetails;
 import com.intact_id.dto.request.CompanyUpdateRequestDto;
+import com.intact_id.dto.request.WebhookSettingsRequestDto;
 import com.intact_id.dto.response.ApiResponse;
+import com.intact_id.dto.response.CompanyCommunicationResponseDto;
 import com.intact_id.dto.response.CompanyResponseDto;
 import com.intact_id.service.CompanyService.CompanyService;
+import com.intact_id.service.webhook.WebhookService;
+import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,7 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.PageImpl;
 
 @Slf4j
 @RestController
@@ -25,12 +32,15 @@ import org.springframework.web.bind.annotation.*;
 public class CompanyController {
 
     private final CompanyService companyService;
+    private final WebhookService webhookService;
 
     @GetMapping("/{id}")
     @Operation(summary = "Get company by ID")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> getCompanyById(@PathVariable String id) {
         try {
-            Company company = companyService.getCompanyById(id);
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            Company company = companyService.getCompanyById(resolvedCompanyId);
             CompanyResponseDto response = mapToDto(company);
 
             return ResponseEntity.ok(
@@ -52,20 +62,23 @@ public class CompanyController {
 
     @GetMapping("/me")
     @Operation(summary = "Get current company details")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> getCurrentCompany(
-            @RequestParam String companyId) { // In real app, get from auth context
+            @RequestParam(required = false) String companyId) {
 
-        return getCompanyById(companyId);
+        return getCompanyById(SecurityContextUtil.resolveCompanyId(companyId));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update company details")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> updateCompany(
             @PathVariable String id,
             @Valid @RequestBody CompanyUpdateRequestDto request) {
 
         try {
-            Company company = companyService.updateCompany(id, request);
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            Company company = companyService.updateCompany(resolvedCompanyId, request);
             CompanyResponseDto response = mapToDto(company);
 
             return ResponseEntity.ok(
@@ -87,6 +100,7 @@ public class CompanyController {
 
     @GetMapping
     @Operation(summary = "Get all companies with filters (Admin)")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Page<CompanyResponseDto>>> getAllCompanies(
             @RequestParam(required = false) GlobalStatuses status,
             @RequestParam(required = false) String country,
@@ -94,9 +108,25 @@ public class CompanyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        log.info("Fetching companies - Status: {}, Country: {}, BusinessType: {}", status, country, businessType);
+        if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
+            Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
+            CompanyResponseDto response = mapToDto(company);
+            Page<CompanyResponseDto> pageResponse = new PageImpl<>(java.util.List.of(response));
 
-        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+            return ResponseEntity.ok(
+                    ApiResponse.<Page<CompanyResponseDto>>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Companies retrieved successfully")
+                            .success(true)
+                            .data(pageResponse)
+                            .build());
+        }
+
+        log.info("Fetching companies - Status: {}, Country: {}, BusinessType: {}", status, country,
+                businessType);
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page,
+                size);
 
         Page<Company> companies = companyService.getAllCompanies(status, country, businessType, pageable);
         Page<CompanyResponseDto> response = companies.map(this::mapToDto);
@@ -110,6 +140,285 @@ public class CompanyController {
                         .build());
     }
 
+    // ========== Webhook/Communication Endpoints ==========
+
+    @GetMapping("/{id}/communication")
+    @Operation(summary = "Get company communication details")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> getCompanyCommunication(
+            @PathVariable String id) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            CompanyCommunicationDetails communication = companyService.getCompanyCommunication(resolvedCompanyId);
+            CompanyCommunicationResponseDto response = mapCommunicationToDto(communication);
+
+            return ResponseEntity.ok(
+                    ApiResponse.<CompanyCommunicationResponseDto>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Communication details retrieved successfully")
+                            .success(true)
+                            .data(response)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<CompanyCommunicationResponseDto>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    @PutMapping("/{id}/communication/webhook")
+    @Operation(summary = "Update webhook settings")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> updateWebhookSettings(
+            @PathVariable String id,
+            @Valid @RequestBody WebhookSettingsRequestDto request) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            CompanyCommunicationDetails communication = companyService.updateWebhookSettings(resolvedCompanyId, request);
+            CompanyCommunicationResponseDto response = mapCommunicationToDto(communication);
+
+            return ResponseEntity.ok(
+                    ApiResponse.<CompanyCommunicationResponseDto>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Webhook settings updated successfully")
+                            .success(true)
+                            .data(response)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<CompanyCommunicationResponseDto>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    @PostMapping("/{id}/communication/webhook/test")
+    @Operation(summary = "Test webhook endpoint")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<String>> testWebhook(@PathVariable String id) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            CompanyCommunicationDetails communication = companyService.getCompanyCommunication(resolvedCompanyId);
+
+            if (communication.getWebhookUrl() == null || communication.getWebhookUrl().isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                        ApiResponse.<String>builder()
+                                .responseCode(HttpStatus.BAD_REQUEST.value())
+                                .responseMessage("No webhook URL configured")
+                                .success(false)
+                                .build());
+            }
+
+            // Send test webhook
+            boolean success = webhookService.sendTestWebhook(communication);
+
+            if (success) {
+                return ResponseEntity.ok(
+                        ApiResponse.<String>builder()
+                                .responseCode(HttpStatus.OK.value())
+                                .responseMessage("Test webhook sent successfully")
+                                .success(true)
+                                .data("Webhook test completed. Check your endpoint logs.")
+                                .build());
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                        ApiResponse.<String>builder()
+                                .responseCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                                .responseMessage("Failed to send test webhook")
+                                .success(false)
+                                .build());
+            }
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    @PostMapping("/{id}/credentials/suspend")
+    @Operation(summary = "Suspend company credentials (Admin)")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<String>> suspendCredentials(
+            @PathVariable String id,
+            @RequestParam(required = false) String reason) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            companyService.suspendCompany(resolvedCompanyId, "admin",
+                    reason != null ? reason : "Suspended via API Management");
+
+            return ResponseEntity.ok(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Company credentials suspended successfully")
+                            .success(true)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        } catch (ApplicationExceptions.InvalidActionException e) {
+            return ResponseEntity.badRequest().body(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.BAD_REQUEST.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    @PostMapping("/{id}/credentials/activate")
+    @Operation(summary = "Activate company credentials (Admin)")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<String>> activateCredentials(@PathVariable String id) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            companyService.activateCompany(resolvedCompanyId, "admin");
+
+            return ResponseEntity.ok(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Company credentials activated successfully")
+                            .success(true)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        } catch (ApplicationExceptions.InvalidActionException e) {
+            return ResponseEntity.badRequest().body(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.BAD_REQUEST.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    // ========== Company Management Endpoints ==========
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete company (Admin)")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<String>> deleteCompany(@PathVariable String id) {
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            companyService.deleteCompany(resolvedCompanyId);
+
+            return ResponseEntity.ok(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Company deleted successfully")
+                            .success(true)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    ApiResponse.<String>builder()
+                            .responseCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                            .responseMessage("Failed to delete company: " + e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    @PostMapping("/{id}/suspend")
+    @Operation(summary = "Suspend company (Admin)")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CompanyResponseDto>> suspendCompany(
+            @PathVariable String id,
+            @RequestParam(required = false) String reason) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            Company company = companyService.suspendCompany(resolvedCompanyId, "admin",
+                    reason != null ? reason : "Suspended by admin");
+            CompanyResponseDto response = mapToDto(company);
+
+            return ResponseEntity.ok(
+                    ApiResponse.<CompanyResponseDto>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Company suspended successfully")
+                            .success(true)
+                            .data(response)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<CompanyResponseDto>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        } catch (ApplicationExceptions.InvalidActionException e) {
+            return ResponseEntity.badRequest().body(
+                    ApiResponse.<CompanyResponseDto>builder()
+                            .responseCode(HttpStatus.BAD_REQUEST.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    @PostMapping("/{id}/activate")
+    @Operation(summary = "Activate company (Admin)")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CompanyResponseDto>> activateCompany(@PathVariable String id) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            Company company = companyService.activateCompany(resolvedCompanyId, "admin");
+            CompanyResponseDto response = mapToDto(company);
+
+            return ResponseEntity.ok(
+                    ApiResponse.<CompanyResponseDto>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Company activated successfully")
+                            .success(true)
+                            .data(response)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<CompanyResponseDto>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        } catch (ApplicationExceptions.InvalidActionException e) {
+            return ResponseEntity.badRequest().body(
+                    ApiResponse.<CompanyResponseDto>builder()
+                            .responseCode(HttpStatus.BAD_REQUEST.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
+    // ========== Helper Methods ==========
+
     private CompanyResponseDto mapToDto(Company company) {
         return CompanyResponseDto.builder()
                 .id(company.getId())
@@ -122,6 +431,24 @@ public class CompanyController {
                 .status(company.getStatus().name())
                 .approvedAt(company.getApprovedAt())
                 .createdAt(company.getCreatedAt())
+                .build();
+    }
+
+    private CompanyCommunicationResponseDto mapCommunicationToDto(CompanyCommunicationDetails communication) {
+        return CompanyCommunicationResponseDto.builder()
+                .id(communication.getId())
+                .email(communication.getEmail())
+                .phone(communication.getPhone())
+                .website(communication.getWebsite())
+                .secondaryEmail(communication.getSecondaryEmail())
+                .secondaryPhone(communication.getSecondaryPhone())
+                .supportEmail(communication.getSupportEmail())
+                .billingEmail(communication.getBillingEmail())
+                .webhookUrl(communication.getWebhookUrl())
+                .webhookEnabled(communication.getWebhookEnabled())
+                .emailNotifications(communication.getEmailNotifications())
+                .smsNotifications(communication.getSmsNotifications())
+                .notificationSettings(communication.getNotificationSettings())
                 .build();
     }
 }

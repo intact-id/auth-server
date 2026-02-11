@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application` Status Update</title>
+</head>
+
+<body
+    style="margin: 0; padding: 0; background-color: #0f1115; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <div
+        style="max-width: 600px; margin: 40px auto; background: #161b22; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.4); border: 1px solid #30363d;">
+        <!-- Header -->
+        <div
+            style="background: linear-gradient(135deg, rgba(248, 81, 73, 0.1) 0%, rgba(153, 27, 27, 0.05) 100%); padding: 40px 30px; text-align: center; border-bottom: 1px solid #30363d;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.02em;">
+                Intact<span style="color: #ffffff;">ID</span></h1>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 40px 30px;">
+            <h2 style="color: #ffffff; font-size: 22px; margin-top: 0; font-weight: 600;">Application Status Update</h2>
+
+            <p style="color: #8b949e; margin: 15px 0; line-height: 1.6;">Hi <strong style="color: #f0f6fc;"
+                    th:text="${companyName}">Company Name</strong>,</p>
+
+            <p style="color: #8b949e; margin: 15px 0; line-height: 1.6;">
+                Thank you for your interest in Intact ID. After careful review, we regret to inform you that we are
+                unable to approve your application at this time.
+            </p>
+
+            <!-- Reason Box -->
+            <div
+                style="background: rgba(248, 81, 73, 0.1); border: 1px solid rgba(248, 81, 73, 0.2); border-left: 4px solid #f85149; padding: 20px; margin: 25px 0; border-radius: 8px;">
+                <h3 style="margin-top: 0; color: #f85149; font-size: 16px; font-weight: 600;">📋 Reason for Rejection
+                </h3>
+                <p style="color: #f0f6fc; margin: 10px 0 0 0;" th:text="${rejectionReason}">
+                    Rejection reason will appear here.
+                </p>
+            </div>
+
+            <h3 style="color: #f0f6fc; font-size: 18px; margin-top: 30px; font-weight: 600;">What You Can Do</h3>
+
+            <ul style="color: #8b949e; line-height: 1.8;">
+                <li>Review the rejection reason carefully</li>
+                <li>Address any issues mentioned</li>
+                <li>Reapply once requirements are met</li>
+                <li>Contact our support team for clarification</li>
+            </ul>
+
+            <p style="color: #8b949e; margin: 25px 0 0 0; line-height: 1.6;">
+                If you have any questions or would like to discuss this decision, please reach out to our support team
+                at
+                <a href="mailto:${supportEmail}" th:href="'mailto:' + ${supportEmail}"
+                    style="color: #f85149; text-decoration: none;" th:text="${supportEmail}">support@intact-id.com</a>
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div
+            style="background: #0d1117; padding: 30px; text-align: center; color: #484f58; font-size: 13px; border-top: 1px solid #30363d;">
+            <p style="margin: 0 0 10px 0;">
+                This is an automated message from Intact ID<br>
+                <a href="https://intact-id.com" style="color: #f85149; text-decoration: none;">intact-id.com</a> |
+                <a href="mailto:support@intact-id.com"
+                    style="color: #f85149; text-decoration: none;">support@intact-id.com</a>
+            </p>
+            <p style="font-size: 11px; color: #484f58; margin: 0;">
+                © 2025 Intact ID. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

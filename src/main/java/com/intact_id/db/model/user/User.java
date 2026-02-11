@@ -2,6 +2,7 @@ package com.intact_id.db.model.user;
 
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.GlobalStatuses;
+import com.intact_id.db.model.Company;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -17,7 +18,10 @@ import java.util.Set;
 @Table(name = "users", indexes = {
         @Index(name = "idx_username", columnList = "username"),
         @Index(name = "idx_email", columnList = "email"),
-        @Index(name = "idx_status", columnList = "status")
+        @Index(name = "idx_status", columnList = "status"),
+        @Index(name = "idx_company_id", columnList = "company_id")
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uk_email_company", columnNames = {"email", "company_id"})
 })
 @EqualsAndHashCode(callSuper = false)
 public class User extends Auditable {
@@ -25,7 +29,7 @@ public class User extends Auditable {
     @Column(name = "username", unique = true, nullable = false, length = 100)
     private String username;
 
-    @Column(name = "email", unique = true, nullable = false)
+    @Column(name = "email", nullable = false)
     private String email;
 
     @Column(name = "password_hash", nullable = false)
@@ -65,6 +69,10 @@ public class User extends Auditable {
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "company_id")
+    private Company company;
 
     // Helper methods
     public boolean isLocked() {

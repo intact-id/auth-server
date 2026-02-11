@@ -1,5 +1,6 @@
 package com.intact_id.api.kyc;
 
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
 import com.intact_id.dto.request.KycVerificationRequestDto;
@@ -7,6 +8,7 @@ import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.dto.response.KycVerificationResponseDto;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
 import com.intact_id.service.kyc.VerificationService;
+import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -39,7 +41,8 @@ public class KycVerificationController {
         private final VerificationService verificationService;
 
         @PostMapping(value = "/verify/{tier}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        @Operation(summary = "Submit KYC verification request", description = "Submit a new KYC verification with tier-specific requirements")
+        @PreAuthorize("hasRole('COMPANY')")
+        @Operation(summary = "Submit KYC verification request (PROD)", description = "Submit a new KYC verification with tier-specific requirements")
         public ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerification(
                         @PathVariable String tier,
                         @RequestParam String firstName,
@@ -57,6 +60,85 @@ public class KycVerificationController {
                         @RequestParam MultipartFile idFront,
                         @RequestParam(required = false) MultipartFile idBack,
                         @RequestParam(required = false) MultipartFile proofOfAddress,
+                        Authentication authentication) {
+
+                return submitVerificationInternal(ApiKeyEnvironment.PROD, tier, firstName, lastName, dateOfBirth,
+                                idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
+                                webhookUrl, selfie, idFront, idBack, proofOfAddress, authentication);
+        }
+
+        @PostMapping(value = "/dev/verify/{tier}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        @PreAuthorize("hasRole('COMPANY')")
+        @Operation(summary = "Submit KYC verification request (DEV)", description = "Submit a new DEV KYC verification with tier-specific requirements")
+        public ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerificationDev(
+                        @PathVariable String tier,
+                        @RequestParam String firstName,
+                        @RequestParam String lastName,
+                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateOfBirth,
+                        @RequestParam String idNumber,
+                        @RequestParam(required = false) String idType,
+                        @RequestParam(required = false) String nationality,
+                        @RequestParam(required = false) String countryOfResidence,
+                        @RequestParam(required = false) String phone,
+                        @RequestParam(required = false) String email,
+                        @RequestParam(required = false) String verificationType,
+                        @RequestParam(required = false) String webhookUrl,
+                        @RequestParam MultipartFile selfie,
+                        @RequestParam MultipartFile idFront,
+                        @RequestParam(required = false) MultipartFile idBack,
+                        @RequestParam(required = false) MultipartFile proofOfAddress,
+                        Authentication authentication) {
+
+                return submitVerificationInternal(ApiKeyEnvironment.DEV, tier, firstName, lastName, dateOfBirth,
+                                idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
+                                webhookUrl, selfie, idFront, idBack, proofOfAddress, authentication);
+        }
+
+        @PostMapping(value = "/prod/verify/{tier}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        @PreAuthorize("hasRole('COMPANY')")
+        @Operation(summary = "Submit KYC verification request (PROD)", description = "Submit a new PROD KYC verification with tier-specific requirements")
+        public ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerificationProd(
+                        @PathVariable String tier,
+                        @RequestParam String firstName,
+                        @RequestParam String lastName,
+                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateOfBirth,
+                        @RequestParam String idNumber,
+                        @RequestParam(required = false) String idType,
+                        @RequestParam(required = false) String nationality,
+                        @RequestParam(required = false) String countryOfResidence,
+                        @RequestParam(required = false) String phone,
+                        @RequestParam(required = false) String email,
+                        @RequestParam(required = false) String verificationType,
+                        @RequestParam(required = false) String webhookUrl,
+                        @RequestParam MultipartFile selfie,
+                        @RequestParam MultipartFile idFront,
+                        @RequestParam(required = false) MultipartFile idBack,
+                        @RequestParam(required = false) MultipartFile proofOfAddress,
+                        Authentication authentication) {
+
+                return submitVerificationInternal(ApiKeyEnvironment.PROD, tier, firstName, lastName, dateOfBirth,
+                                idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
+                                webhookUrl, selfie, idFront, idBack, proofOfAddress, authentication);
+        }
+
+        private ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerificationInternal(
+                        ApiKeyEnvironment environment,
+                        String tier,
+                        String firstName,
+                        String lastName,
+                        LocalDate dateOfBirth,
+                        String idNumber,
+                        String idType,
+                        String nationality,
+                        String countryOfResidence,
+                        String phone,
+                        String email,
+                        String verificationType,
+                        String webhookUrl,
+                        MultipartFile selfie,
+                        MultipartFile idFront,
+                        MultipartFile idBack,
+                        MultipartFile proofOfAddress,
                         Authentication authentication) {
 
                 try {
@@ -84,7 +166,7 @@ public class KycVerificationController {
                         request.setProofOfAddress(proofOfAddress);
 
                         KycVerificationResponseDto response = verificationService.submitVerification(tier, request,
-                                        company);
+                                        company, environment);
 
                         return ResponseEntity.status(HttpStatus.CREATED).body(
                                         ApiResponse.<KycVerificationResponseDto>builder()
@@ -96,34 +178,106 @@ public class KycVerificationController {
 
                 } catch (ApplicationExceptions.IntactBadRequestException e) {
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                                        ApiResponse.<KycVerificationResponseDto>builder()
-                                                        .responseCode(HttpStatus.BAD_REQUEST.value())
+                                ApiResponse.<KycVerificationResponseDto>builder()
+                                        .responseCode(HttpStatus.BAD_REQUEST.value())
                                                         .responseMessage(e.getMessage())
                                                         .success(false)
                                                         .build());
                 } catch (Exception e) {
                         log.error("Error submitting verification", e);
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                                        ApiResponse.<KycVerificationResponseDto>builder()
-                                                        .responseCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                                                        .responseMessage("Failed to submit verification")
-                                                        .success(false)
-                                                        .errorMessage(e.getMessage())
-                                                        .build());
+                                ApiResponse.<KycVerificationResponseDto>builder()
+                                        .responseCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                                        .responseMessage("Failed to submit verification")
+                                        .success(false)
+                                        .errorMessage(e.getMessage())
+                                        .build());
                 }
         }
 
         @GetMapping("/verify/{verificationId}")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
         @Operation(summary = "Get verification status", description = "Retrieve the status and results of a verification request")
         public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getVerificationStatus(
                         @PathVariable String verificationId,
                         Authentication authentication) {
 
                 try {
-                        Company company = (Company) authentication.getPrincipal();
+                        String companyId = SecurityContextUtil.isSuperAdminAuthenticated()
+                                        ? null
+                                        : SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
 
                         VerificationStatusResponseDto response = verificationService.getVerificationStatus(
-                                        verificationId, company.getId());
+                                        verificationId, companyId, ApiKeyEnvironment.PROD);
+
+                        return ResponseEntity.ok(
+                                        ApiResponse.<VerificationStatusResponseDto>builder()
+                                                        .responseCode(HttpStatus.OK.value())
+                                                        .responseMessage("Verification status retrieved successfully")
+                                                        .success(true)
+                                                        .data(response)
+                                                        .build());
+
+                } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                                ApiResponse.<VerificationStatusResponseDto>builder()
+                                        .responseCode(HttpStatus.NOT_FOUND.value())
+                                        .responseMessage(e.getMessage())
+                                        .success(false)
+                                        .build());
+                }
+        }
+
+        @GetMapping("/verifications")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @Operation(summary = "List verifications", description = "Get a paginated list of verification requests with optional filters")
+        public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerifications(
+                        @Parameter(description = "Filter by status") @RequestParam(required = false) GlobalStatuses status,
+                        @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
+                        @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+                        @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+                        @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "10") int size,
+                        Authentication authentication) {
+
+                String resolvedCompanyId;
+                if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+                        resolvedCompanyId = (companyId != null && !companyId.isBlank())
+                                        ? SecurityContextUtil.resolveCompanyId(companyId)
+                                        : null;
+                } else {
+                        resolvedCompanyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
+                }
+
+                Pageable pageable = PageRequest.of(page, size);
+
+                Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, pageable);
+
+                return ResponseEntity.ok(
+                                ApiResponse.<Page<VerificationStatusResponseDto>>builder()
+                                                .responseCode(HttpStatus.OK.value())
+                                                .responseMessage("Verifications retrieved successfully")
+                                                .success(true)
+                                                .data(verifications)
+                                                .build());
+        }
+
+        @GetMapping("/dev/verify/{verificationId}")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @Operation(summary = "Get DEV verification status", description = "Retrieve DEV verification status")
+        public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getVerificationStatusDev(
+                        @PathVariable String verificationId,
+                        Authentication authentication) {
+
+                try {
+                        String companyId = SecurityContextUtil.isSuperAdminAuthenticated()
+                                        ? null
+                                        : SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
+
+                        VerificationStatusResponseDto response = verificationService.getVerificationStatus(
+                                        verificationId, companyId, ApiKeyEnvironment.DEV);
 
                         return ResponseEntity.ok(
                                         ApiResponse.<VerificationStatusResponseDto>builder()
@@ -143,35 +297,101 @@ public class KycVerificationController {
                 }
         }
 
-        @GetMapping("/verifications")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or authentication.principal instanceof T(com.intact_id.db.model.Company)")
-        @Operation(summary = "List verifications", description = "Get a paginated list of verification requests with optional filters")
-        public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerifications(
+        @GetMapping("/prod/verify/{verificationId}")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @Operation(summary = "Get PROD verification status", description = "Retrieve PROD verification status")
+        public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getVerificationStatusProd(
+                        @PathVariable String verificationId,
+                        Authentication authentication) {
+
+                try {
+                        String companyId = SecurityContextUtil.isSuperAdminAuthenticated()
+                                        ? null
+                                        : SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
+
+                        VerificationStatusResponseDto response = verificationService.getVerificationStatus(
+                                        verificationId, companyId, ApiKeyEnvironment.PROD);
+
+                        return ResponseEntity.ok(
+                                        ApiResponse.<VerificationStatusResponseDto>builder()
+                                                        .responseCode(HttpStatus.OK.value())
+                                                        .responseMessage("Verification status retrieved successfully")
+                                                        .success(true)
+                                                        .data(response)
+                                                        .build());
+
+                } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                                        ApiResponse.<VerificationStatusResponseDto>builder()
+                                                        .responseCode(HttpStatus.NOT_FOUND.value())
+                                                        .responseMessage(e.getMessage())
+                                                        .success(false)
+                                                        .build());
+                }
+        }
+
+        @GetMapping("/dev/verifications")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @Operation(summary = "List DEV verifications", description = "Get a paginated list of DEV verification requests with optional filters")
+        public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerificationsDev(
                         @Parameter(description = "Filter by status") @RequestParam(required = false) GlobalStatuses status,
                         @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+                        @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "10") int size,
                         Authentication authentication) {
 
-                // Handle both Company (API Key) and User (JWT) authentication
-                String companyId = null;
-                Object principal = authentication.getPrincipal();
-
-                if (principal instanceof Company) {
-                        // API Key authentication
-                        companyId = ((Company) principal).getId();
-                } else if (principal instanceof com.intact_id.db.model.user.User) {
-                        // JWT authentication - fetch all verifications (admin access)
-                        // Admins can see all verifications regardless of company
-                        companyId = null;
+                String resolvedCompanyId;
+                if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+                        resolvedCompanyId = (companyId != null && !companyId.isBlank())
+                                        ? SecurityContextUtil.resolveCompanyId(companyId)
+                                        : null;
+                } else {
+                        resolvedCompanyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
                 }
 
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                companyId, status, tier, fromDate, toDate, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.DEV, status, tier, fromDate, toDate, pageable);
+
+                return ResponseEntity.ok(
+                                ApiResponse.<Page<VerificationStatusResponseDto>>builder()
+                                                .responseCode(HttpStatus.OK.value())
+                                                .responseMessage("Verifications retrieved successfully")
+                                                .success(true)
+                                                .data(verifications)
+                                                .build());
+        }
+
+        @GetMapping("/prod/verifications")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @Operation(summary = "List PROD verifications", description = "Get a paginated list of PROD verification requests with optional filters")
+        public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerificationsProd(
+                        @Parameter(description = "Filter by status") @RequestParam(required = false) GlobalStatuses status,
+                        @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
+                        @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+                        @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+                        @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "10") int size,
+                        Authentication authentication) {
+
+                String resolvedCompanyId;
+                if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+                        resolvedCompanyId = (companyId != null && !companyId.isBlank())
+                                        ? SecurityContextUtil.resolveCompanyId(companyId)
+                                        : null;
+                } else {
+                        resolvedCompanyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
+                }
+
+                Pageable pageable = PageRequest.of(page, size);
+
+                Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()

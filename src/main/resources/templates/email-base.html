@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Template</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #f0f6fc;
+            margin: 0;
+            padding: 0;
+            background-color: #0f1115;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #161b22;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            border: 1px solid #30363d;
+        }
+
+        .header {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.05) 100%);
+            padding: 40px 30px;
+            text-align: center;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .content h2 {
+            color: #ffffff;
+            font-size: 22px;
+            margin-top: 0;
+            font-weight: 600;
+        }
+
+        .content p {
+            color: #8b949e;
+            margin: 15px 0;
+        }
+
+        .box {
+            background: #21262d;
+            border: 1px solid #30363d;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 8px;
+        }
+
+        .box h3 {
+            margin-top: 0;
+            color: #f0f6fc;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .label {
+            font-weight: 600;
+            color: #8b949e;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .value {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+            background: #0d1117;
+            padding: 12px;
+            margin-top: 8px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+            word-break: break-all;
+            font-size: 14px;
+            color: #58a6ff;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+            font-size: 15px;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .button:hover {
+            opacity: 0.9;
+        }
+
+        .footer {
+            background: #0d1117;
+            padding: 30px;
+            text-align: center;
+            color: #484f58;
+            font-size: 13px;
+            border-top: 1px solid #30363d;
+        }
+
+        .footer a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+
+        strong {
+            color: #f0f6fc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Intact<span style="color: #3b82f6;">ID</span></h1>
+        </div>
+
+        <div class="content" th:fragment="content">
+            <!-- Content will be inserted here -->
+        </div>
+
+        <div class="footer">
+            <p>
+                This is an automated message from Intact ID<br>
+                <a href="https://intact-id.com">intact-id.com</a> |
+                <a href="mailto:support@intact-id.com">support@intact-id.com</a>
+            </p>
+            <p style="font-size: 11px; color: #484f58; margin-top: 15px;">
+                © 2025 Intact ID. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

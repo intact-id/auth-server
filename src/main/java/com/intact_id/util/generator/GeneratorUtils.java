@@ -1,21 +1,33 @@
 package com.intact_id.util.generator;
 
+import com.intact_id.config.WebhookConfig;
+import com.intact_id.util.exception.ApplicationExceptions;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.UUID;
 
 @Slf4j
 @Component
+@AllArgsConstructor
 public class GeneratorUtils {
 
+    private static final String PASSWORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@$!%*?&";
+    private static final int PASSWORD_LENGTH = 12;
+    private static final SecureRandom random = new SecureRandom();
+
     private final SecureRandom secureRandom = new SecureRandom();
+    private final WebhookConfig webhookConfig;
 
     /**
      * Generate application number
@@ -25,6 +37,42 @@ public class GeneratorUtils {
         int year = LocalDateTime.now().getYear();
         String randomPart = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         return String.format("APP-%d-%s", year, randomPart);
+    }
+
+    /**
+     * Generate a secure random password
+     */
+    public String generateRandomPassword() {
+        StringBuilder password = new StringBuilder(PASSWORD_LENGTH);
+
+        // Ensure at least one of each required character type
+        password.append(getRandomChar("ABCDEFGHIJKLMNOPQRSTUVWXYZ")); // Uppercase
+        password.append(getRandomChar("abcdefghijklmnopqrstuvwxyz")); // Lowercase
+        password.append(getRandomChar("0123456789")); // Digit
+        password.append(getRandomChar("@$!%*?&")); // Special char
+
+        // Fill the rest randomly
+        for (int i = 4; i < PASSWORD_LENGTH; i++) {
+            password.append(getRandomChar(PASSWORD_CHARS));
+        }
+
+        // Shuffle the password
+        return shuffleString(password.toString());
+    }
+
+    private char getRandomChar(String chars) {
+        return chars.charAt(random.nextInt(chars.length()));
+    }
+
+    private String shuffleString(String input) {
+        char[] chars = input.toCharArray();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            char temp = chars[i];
+            chars[i] = chars[j];
+            chars[j] = temp;
+        }
+        return new String(chars);
     }
 
     /**
@@ -51,7 +99,7 @@ public class GeneratorUtils {
             byte[] hashedBytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hashedBytes);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not found", e);
+            throw new ApplicationExceptions.IntactResourceNotFoundException("SHA-256 algorithm not found" + e);
         }
     }
 
@@ -59,7 +107,7 @@ public class GeneratorUtils {
      * Validate plain string against hashed value
      */
     public boolean validateHash(String plain, String hashed) {
-        log.info("{} {} from util",plain,hashed);
+        log.info("{} {} from util", plain, hashed);
         String hashedPlain = hashString(plain);
         return hashedPlain.equals(hashed);
     }
@@ -84,5 +132,22 @@ public class GeneratorUtils {
                 .encodeToString(randomBytes)
                 .substring(0, length)
                 .toLowerCase();
+    }
+
+    public String generateWebhookSignature(String payload, String secret) {
+        try {
+            Mac mac = Mac.getInstance(webhookConfig.getSignatureAlgorithm());
+            SecretKeySpec secretKeySpec = new SecretKeySpec(
+                    secret.getBytes(StandardCharsets.UTF_8),
+                    webhookConfig.getSignatureAlgorithm());
+            mac.init(secretKeySpec);
+
+            byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+
+        } catch (Exception e) {
+            log.error("Failed to generate webhook signature", e);
+            throw new ApplicationExceptions.IntactInternalServerException("Signature generation failed" + e);
+        }
     }
 }

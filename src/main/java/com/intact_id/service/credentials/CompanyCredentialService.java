@@ -1,5 +1,6 @@
 package com.intact_id.service.credentials;
 
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.CompanyCredentials;
 import org.springframework.stereotype.Service;
@@ -12,7 +13,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public interface CompanyCredentialService {
-    CompanyCredentials getByApiKeyCompanyCredentials(String apiKey);
-    CompanyCredentials getByApiKeyCompanyCredentialsWithStatusActive(String apiKey);
-    void updateStatus(String apiKey, GlobalStatuses globalStatus);
+    CompanyCredentials getByApiKeyCompanyCredentials(String apiKey, ApiKeyEnvironment environment);
+    CompanyCredentials getByApiKeyCompanyCredentialsWithStatusActive(String apiKey, ApiKeyEnvironment environment);
+    void updateStatus(String apiKey, ApiKeyEnvironment environment, GlobalStatuses globalStatus);
+    void recordUsageAsync(String credentialsId, ApiKeyEnvironment environment, boolean success);
 }

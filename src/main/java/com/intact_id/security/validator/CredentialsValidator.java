@@ -1,5 +1,6 @@
 package com.intact_id.security.validator;
 
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.service.credentials.CompanyCredentialService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
@@ -22,14 +23,17 @@ public class CredentialsValidator {
     private final CompanyCredentialService companyCredentialService;
     private final GeneratorUtils generatorUtils;
 
-//    API KEY (SEND VIA EMAIL): ak_live_dae_nlmexjpqp-xnpkhxrl6-tytfikdm
-//⚠️ API SECRET (SEND VIA EMAIL): as_live_t2gcsr4rfrzan5_hq0kcf_7lhmuakapp
     public boolean validateCredentials(HttpServletRequest httpServletRequest) {
         try {
+            ApiKeyEnvironment environment = resolveEnvironment(httpServletRequest);
             var headers = getCredentials(httpServletRequest);
-            var companyCredentials = companyCredentialService.getByApiKeyCompanyCredentialsWithStatusActive(headers.apiKey);
+            var companyCredentials = companyCredentialService
+                    .getByApiKeyCompanyCredentialsWithStatusActive(headers.apiKey, environment);
 
-            return compareAndValidate(companyCredentials.getApiKeyHash(), companyCredentials.getApiSecretHash(), headers);
+            return compareAndValidate(
+                    companyCredentials.getApiKeyHash(environment),
+                    companyCredentials.getApiSecretHash(environment),
+                    headers);
 
         } catch (ApplicationExceptions.IntactUnauthorizedException e) {
             throw new ApplicationExceptions.IntactUnauthorizedException(e.getMessage());
@@ -37,8 +41,9 @@ public class CredentialsValidator {
     }
 
     private boolean compareAndValidate(String apiKeyHash, String apiSecretHash, Credentials headers) {
-        log.info("{} {}",headers.apiKey ,apiKeyHash);
-        log.info("{},{}",headers.apiSecret,apiSecretHash);
+        if (apiKeyHash == null || apiSecretHash == null) {
+            return false;
+        }
         boolean hashedRequestApikey = generatorUtils.validateHash(headers.apiKey, apiKeyHash);
         boolean hashedRequestApiSecret = generatorUtils.validateHash(headers.apiSecret, apiSecretHash);
         return hashedRequestApikey && hashedRequestApiSecret;
@@ -53,6 +58,17 @@ public class CredentialsValidator {
                     .build();
         } else
             throw new ApplicationExceptions.IntactUnauthorizedException("no credentials provided");
+    }
+
+    public ApiKeyEnvironment resolveEnvironment(HttpServletRequest httpServletRequest) {
+        String path = httpServletRequest.getRequestURI();
+        if (path != null && path.contains("/api/v1/kyc/dev")) {
+            return ApiKeyEnvironment.DEV;
+        }
+        if (path != null && path.contains("/api/v1/kyc/prod")) {
+            return ApiKeyEnvironment.PROD;
+        }
+        return ApiKeyEnvironment.PROD;
     }
 
 

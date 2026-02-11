@@ -9,12 +9,16 @@ import com.intact_id.db.repository.CompanyCommunicationRepository;
 import com.intact_id.db.repository.CompanyCredentialsRepository;
 import com.intact_id.db.repository.CompanyRepository;
 import com.intact_id.dto.request.CompanyUpdateRequestDto;
+import com.intact_id.dto.request.WebhookSettingsRequestDto;
+import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +39,8 @@ public class CompanyServiceImpl implements CompanyService {
         private final CompanyCommunicationRepository communicationRepository;
         private final CompanyCredentialsRepository credentialsRepository;
         private final GeneratorUtils generatorUtils;
+        private final com.intact_id.service.email.EmailService emailService;
+        private final com.intact_id.service.NotificationService.NotificationService notificationService;
 
         @Transactional
         public Company createCompanyFromApplication(CompanyApplication application) {
@@ -61,7 +67,7 @@ public class CompanyServiceImpl implements CompanyService {
                 log.info("Communication details saved for company: {}", savedCompany.getCompanyIdentifierCode());
 
                 // 3. Create Credentials with API keys
-                CompanyCredentials credentials = createCredentials(savedCompany);
+                CompanyCredentials credentials = createCredentials(savedCompany, communication.getEmail());
                 credentialsRepository.save(credentials);
                 log.info("API credentials generated for company: {}", savedCompany.getCompanyIdentifierCode());
 
@@ -82,7 +88,7 @@ public class CompanyServiceImpl implements CompanyService {
                 return communication;
         }
 
-        private CompanyCredentials createCredentials(Company company) {
+        private CompanyCredentials createCredentials(Company company, String email) {
                 // Generate API key and secret
                 String apiKey = generatorUtils.generateApiKey();
                 String apiSecret = generatorUtils.generateApiSecret();
@@ -93,11 +99,24 @@ public class CompanyServiceImpl implements CompanyService {
 
                 CompanyCredentials credentials = getCompanyCredentials(company, apiKeyHash, apiSecretHash);
 
-                // TODO: Store plaintext keys in a secure way to send via email
-                // For now, log them (ONLY FOR DEVELOPMENT)
-                log.warn("⚠️ API KEY (SEND VIA EMAIL): {}", apiKey);
-                log.warn("⚠️ API SECRET (SEND VIA EMAIL): {}", apiSecret);
-                log.info("⚠️ These keys are hashed in database and cannot be retrieved");
+                // Send email with plaintext keys
+                try {
+                        emailService.sendCompanyApprovalEmail(email, company.getLegalName(), apiKey, apiSecret);
+                        log.info("Approval email sent to {} with API keys", email);
+
+                        // Persist notification to database
+                        try {
+                                notificationService.persistNotification(
+                                                company.getId(),
+                                                "Application Approved",
+                                                "Your company application has been approved. API credentials have been sent to your email.",
+                                                "SUCCESS");
+                        } catch (Exception ne) {
+                                log.error("Failed to persist approval notification", ne);
+                        }
+                } catch (Exception e) {
+                        log.error("Failed to send approval email to {}", email, e);
+                }
 
                 return credentials;
         }
@@ -118,20 +137,29 @@ public class CompanyServiceImpl implements CompanyService {
 
         @Override
         public Company getCompanyById(String companyId) {
-                return companyRepository.findById(companyId)
+                String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+                return companyRepository.findById(resolvedCompanyId)
                                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
-                                                "Company not found: " + companyId));
+                                                "Company not found: " + resolvedCompanyId));
         }
 
         @Override
         public Company getCompanyByCustomerId(String companyIdentifierCode) {
+                if (!TenantContext.isSuperAdmin()) {
+                        Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
+                        if (company.getCompanyIdentifierCode() == null ||
+                                        !company.getCompanyIdentifierCode().equals(companyIdentifierCode)) {
+                                throw new ApplicationExceptions.IntactUnauthorizedException("Access denied");
+                        }
+                }
+
                 return companyRepository.findByCompanyIdentifierCode(companyIdentifierCode)
                                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                                                 "Company not found: " + companyIdentifierCode));
         }
 
         @Override
-        public void suspendCompany(String id, String adminId, String reason) {
+        public Company suspendCompany(String id, String adminId, String reason) {
                 Company company = getCompanyById(id);
 
                 if (company.getStatus() == GlobalStatuses.SUSPENDED) {
@@ -140,7 +168,7 @@ public class CompanyServiceImpl implements CompanyService {
                 }
 
                 company.setStatus(GlobalStatuses.SUSPENDED);
-                companyRepository.save(company);
+                Company savedCompany = companyRepository.save(company);
 
                 // Also suspend credentials
                 CompanyCredentials credentials = credentialsRepository.findByCompanyId(id)
@@ -153,12 +181,30 @@ public class CompanyServiceImpl implements CompanyService {
                 log.info("Company {} suspended by admin {}. Reason: {}",
                                 company.getId(), adminId, reason);
 
-                // TODO: Send suspension email
-                // emailService.sendSuspensionEmail(company, reason);
+                // Send suspension email
+                try {
+                        CompanyCommunicationDetails comms = getCompanyCommunication(id);
+                        emailService.sendCompanySuspensionEmail(comms.getEmail(), company.getLegalName(), reason);
+
+                        // Persist notification to database
+                        try {
+                                notificationService.persistNotification(
+                                                company.getId(),
+                                                "Account Suspended",
+                                                "Your account has been suspended. Reason: " + reason,
+                                                "WARNING");
+                        } catch (Exception ne) {
+                                log.error("Failed to persist suspension notification", ne);
+                        }
+                } catch (Exception e) {
+                        log.error("Failed to send suspension email", e);
+                }
+
+                return savedCompany;
         }
 
         @Override
-        public void activateCompany(String companyId, String adminId) {
+        public Company activateCompany(String companyId, String adminId) {
                 Company company = getCompanyById(companyId);
 
                 if (company.getStatus() == GlobalStatuses.ACTIVE) {
@@ -167,7 +213,7 @@ public class CompanyServiceImpl implements CompanyService {
                 }
 
                 company.setStatus(GlobalStatuses.ACTIVE);
-                companyRepository.save(company);
+                Company savedCompany = companyRepository.save(company);
 
                 // Also activate credentials
                 CompanyCredentials credentials = credentialsRepository.findByCompanyId(companyId)
@@ -179,18 +225,37 @@ public class CompanyServiceImpl implements CompanyService {
 
                 log.info("Company {} activated by admin {}", company.getCompanyIdentifierCode(), adminId);
 
-                // TODO: Send activation email
-                // emailService.sendActivationEmail(company);
+                // Send activation email
+                try {
+                        CompanyCommunicationDetails comms = getCompanyCommunication(companyId);
+                        emailService.sendCompanyActivationEmail(comms.getEmail(), company.getLegalName());
+
+                        // Persist notification to database
+                        try {
+                                notificationService.persistNotification(
+                                                company.getId(),
+                                                "Account Activated",
+                                                "Your account has been activated and is now ready to use.",
+                                                "SUCCESS");
+                        } catch (Exception ne) {
+                                log.error("Failed to persist activation notification", ne);
+                        }
+                } catch (Exception e) {
+                        log.error("Failed to send activation email", e);
+                }
+
+                return savedCompany;
         }
 
         @Override
         @Transactional
         public Company updateCompany(String companyId, CompanyUpdateRequestDto request) {
-                log.info("Updating company: {}", companyId);
+                String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+                log.info("Updating company: {}", resolvedCompanyId);
 
-                Company company = getCompanyById(companyId);
+                Company company = getCompanyById(resolvedCompanyId);
 
-                // Update allowed fields
+                // Update company fields
                 if (request.getTradingName() != null) {
                         company.setTradingName(request.getTradingName());
                 }
@@ -198,21 +263,62 @@ public class CompanyServiceImpl implements CompanyService {
                         company.setBusinessType(request.getBusinessType());
                 }
 
-                // Update communication details if website is provided
-                if (request.getWebsite() != null) {
-                        CompanyCommunicationDetails communication = communicationRepository.findByCompanyId(companyId)
+                // Update communication details if any communication field is provided
+                if (hasAnyCommunicationUpdate(request)) {
+                        CompanyCommunicationDetails communication = communicationRepository.findByCompanyId(resolvedCompanyId)
                                         .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                                                         "Communication details not found for company"));
-                        communication.setWebsite(request.getWebsite());
+
+                        if (request.getEmail() != null) {
+                                communication.setEmail(request.getEmail());
+                        }
+                        if (request.getPhone() != null) {
+                                communication.setPhone(request.getPhone());
+                        }
+                        if (request.getWebsite() != null) {
+                                communication.setWebsite(request.getWebsite());
+                        }
+                        if (request.getSecondaryEmail() != null) {
+                                communication.setSecondaryEmail(request.getSecondaryEmail());
+                        }
+                        if (request.getSecondaryPhone() != null) {
+                                communication.setSecondaryPhone(request.getSecondaryPhone());
+                        }
+                        if (request.getSupportEmail() != null) {
+                                communication.setSupportEmail(request.getSupportEmail());
+                        }
+                        if (request.getBillingEmail() != null) {
+                                communication.setBillingEmail(request.getBillingEmail());
+                        }
+
                         communicationRepository.save(communication);
+                        log.info("Communication details updated for company: {}", resolvedCompanyId);
                 }
 
                 return companyRepository.save(company);
         }
 
+        private boolean hasAnyCommunicationUpdate(CompanyUpdateRequestDto request) {
+                return request.getEmail() != null ||
+                                request.getPhone() != null ||
+                                request.getWebsite() != null ||
+                                request.getSecondaryEmail() != null ||
+                                request.getSecondaryPhone() != null ||
+                                request.getSupportEmail() != null ||
+                                request.getBillingEmail() != null;
+        }
+
         @Override
         public Page<Company> getAllCompanies(GlobalStatuses status, String country, String businessType,
                         Pageable pageable) {
+                String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(null);
+                if (resolvedCompanyId != null) {
+                        Company company = companyRepository.findById(resolvedCompanyId)
+                                        .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                                                        "Company not found: " + resolvedCompanyId));
+                        return new PageImpl<>(java.util.List.of(company), pageable, 1);
+                }
+
                 log.info("Fetching companies with filters - Status: {}, Country: {}, BusinessType: {}", status, country,
                                 businessType);
 
@@ -235,5 +341,93 @@ public class CompanyServiceImpl implements CompanyService {
 
                         return criteriaBuilder.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
                 }, pageable);
+        }
+
+        // ========== Webhook/Communication Methods ==========
+
+        @Override
+        public CompanyCommunicationDetails getCompanyCommunication(String companyId) {
+                String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+                log.info("Fetching communication details for company: {}", resolvedCompanyId);
+
+                // Verify company exists
+                getCompanyById(resolvedCompanyId);
+
+                return communicationRepository.findByCompanyId(resolvedCompanyId)
+                                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                                                "Communication details not found for company: " + resolvedCompanyId));
+        }
+
+        @Override
+        @Transactional
+        public CompanyCommunicationDetails updateWebhookSettings(String companyId, WebhookSettingsRequestDto request) {
+                String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+                log.info("Updating webhook settings for company: {}", resolvedCompanyId);
+
+                // Verify company exists
+                getCompanyById(resolvedCompanyId);
+
+                CompanyCommunicationDetails communication = communicationRepository.findByCompanyId(resolvedCompanyId)
+                                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                                                "Communication details not found for company: " + resolvedCompanyId));
+
+                // Update webhook settings
+                if (request.getWebhookUrl() != null) {
+                        communication.setWebhookUrl(request.getWebhookUrl().trim());
+                }
+                if (request.getWebhookEnabled() != null) {
+                        communication.setWebhookEnabled(request.getWebhookEnabled());
+                }
+                if (request.getEmailNotifications() != null) {
+                        communication.setEmailNotifications(request.getEmailNotifications());
+                }
+                if (request.getSmsNotifications() != null) {
+                        communication.setSmsNotifications(request.getSmsNotifications());
+                }
+
+                CompanyCommunicationDetails saved = communicationRepository.save(communication);
+                log.info("Webhook settings updated successfully for company: {}", resolvedCompanyId);
+
+                return saved;
+        }
+
+        @Override
+        @Transactional
+        public void deleteCompany(String companyId) {
+                String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+                log.info("Deleting company: {}", resolvedCompanyId);
+
+                Company company = getCompanyById(resolvedCompanyId);
+                CompanyCommunicationDetails comms = getCompanyCommunication(resolvedCompanyId);
+
+                // Delete communication details
+                communicationRepository.findByCompanyId(resolvedCompanyId)
+                                .ifPresent(communication -> {
+                                        communicationRepository.delete(communication);
+                                        log.info("Communication details deleted for company: {}", resolvedCompanyId);
+                                });
+
+                // Delete credentials
+                credentialsRepository.findByCompanyId(resolvedCompanyId)
+                                .ifPresent(credentials -> {
+                                        credentialsRepository.delete(credentials);
+                                        log.info("Credentials deleted for company: {}", resolvedCompanyId);
+                                });
+
+                // Delete company
+                companyRepository.delete(company);
+
+                log.info("Company {} deleted successfully", resolvedCompanyId);
+
+//                 Send deletion notification email (Simple email for now)
+                 emailService.sendSimpleEmail(  comms.getEmail(), "Account Deleted", "Your account has been deleted.");
+        }
+
+        private String resolveCompanyIdForAction(String companyId) {
+                String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
+                if (resolvedCompanyId == null || resolvedCompanyId.isBlank()) {
+                        throw new ApplicationExceptions.IntactUnauthorizedException("Company access denied");
+                }
+                return resolvedCompanyId;
         }
 }

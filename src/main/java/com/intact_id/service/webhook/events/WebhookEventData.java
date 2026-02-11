@@ -2,6 +2,7 @@ package com.intact_id.service.webhook.events;
 
 import lombok.Getter;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -9,6 +10,7 @@ import java.io.Serializable;
  */
 @Getter
 public class WebhookEventData implements Serializable {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final String companyId;

@@ -5,6 +5,7 @@ import com.intact_id.db.model.Company;
 import com.intact_id.db.repository.CompanyRepository;
 import com.intact_id.dto.webhook.WebhookEventDto;
 import com.intact_id.service.webhook.WebhookService;
+import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -36,7 +37,7 @@ public class WebhookNotificationEventHandler implements InternalEventHandler<Web
         try {
             // Fetch company
             Company company = companyRepository.findById(data.getCompanyId())
-                    .orElseThrow(() -> new IllegalArgumentException(
+                    .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                             "Company not found: " + data.getCompanyId()));
 
             // Build webhook event DTO

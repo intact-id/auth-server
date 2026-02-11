@@ -10,5 +10,5 @@ public class LoginRequestDto {
     private String username;
 
     @NotBlank(message = "Password is required")
-    private String password;
+    private transient String password;
 }

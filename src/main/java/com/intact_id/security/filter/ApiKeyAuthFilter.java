@@ -1,5 +1,6 @@
 package com.intact_id.security.filter;
 
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.db.model.CompanyCredentials;
 import com.intact_id.security.authentication.CompanyAuthentication;
 import com.intact_id.security.validator.CredentialsValidator;
@@ -9,6 +10,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponseWrapper;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -80,8 +82,9 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
             // Get company from credentials
             String apiKey = request.getHeader("X-API-Key");
+            ApiKeyEnvironment environment = credentialsValidator.resolveEnvironment(request);
             CompanyCredentials credentials = companyCredentialService
-                    .getByApiKeyCompanyCredentialsWithStatusActive(apiKey);
+                    .getByApiKeyCompanyCredentialsWithStatusActive(apiKey, environment);
 
             // Set company in security context
             CompanyAuthentication authentication = new CompanyAuthentication(credentials.getCompany());
@@ -90,13 +93,18 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             log.info("Authenticated company: {} for path: {}",
                     credentials.getCompany().getLegalName(), requestPath);
 
-            // TODO: Check rate limits here
-            // if (!rateLimitService.checkLimit(credentials.getCompanyId())) {
-            // response.sendError(429, "Rate limit exceeded");
-            // return;
-            // }
 
-            filterChain.doFilter(request, response);
+            StatusCaptureResponse wrappedResponse = new StatusCaptureResponse(response);
+            boolean success = false;
+            try {
+                filterChain.doFilter(request, wrappedResponse);
+                success = wrappedResponse.getStatus() < 400;
+            } catch (Exception e) {
+                success = false;
+                throw e;
+            } finally {
+                companyCredentialService.recordUsageAsync(credentials.getId(), environment, success);
+            }
 
         } catch (ApplicationExceptions.IntactUnauthorizedException e) {
             log.error("Unauthorized attempt: {}", e.getMessage());
@@ -112,5 +120,42 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     private boolean shouldSkipAuthentication(String requestPath) {
         return EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith);
+    }
+
+    private static class StatusCaptureResponse extends HttpServletResponseWrapper {
+        private int status = HttpServletResponse.SC_OK;
+
+        StatusCaptureResponse(HttpServletResponse response) {
+            super(response);
+        }
+
+        @Override
+        public void setStatus(int sc) {
+            super.setStatus(sc);
+            this.status = sc;
+        }
+
+        @Override
+        public void sendError(int sc) throws IOException {
+            super.sendError(sc);
+            this.status = sc;
+        }
+
+        @Override
+        public void sendError(int sc, String msg) throws IOException {
+            super.sendError(sc, msg);
+            this.status = sc;
+        }
+
+        @Override
+        public void sendRedirect(String location) throws IOException {
+            super.sendRedirect(location);
+            this.status = HttpServletResponse.SC_FOUND;
+        }
+
+        @Override
+        public int getStatus() {
+            return status;
+        }
     }
 }

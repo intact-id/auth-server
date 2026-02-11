@@ -25,7 +25,7 @@ import java.util.UUID;
 @Setter
 @Table(name = "company_tbl")
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = false, exclude = {"communication", "credentials"})
 public class Company extends Auditable {
 
 

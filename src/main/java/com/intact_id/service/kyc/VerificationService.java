@@ -1,5 +1,6 @@
 package com.intact_id.service.kyc;
 
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.model.kyc.VerificationDocument;
@@ -11,6 +12,7 @@ import com.intact_id.db.repository.kyc.VerificationStepRepository;
 import com.intact_id.dto.request.KycVerificationRequestDto;
 import com.intact_id.dto.response.KycVerificationResponseDto;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
+import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,9 +45,10 @@ public class VerificationService {
     public KycVerificationResponseDto submitVerification(
             String tier,
             KycVerificationRequestDto request,
-            Company company) {
+            Company company,
+            ApiKeyEnvironment environment) {
 
-        log.info("Submitting verification for company: {}, tier: {}", company.getId(), tier);
+        log.info("Submitting {} verification for company: {}, tier: {}", environment.name(), company.getId(), tier);
 
         // Validate tier-specific requirements
         tierValidationService.validateTier(tier, request);
@@ -57,6 +60,7 @@ public class VerificationService {
         verificationRequest.setVerificationType(request.getVerificationType());
         verificationRequest.setStatus(GlobalStatuses.SUBMITTED);
         verificationRequest.setWebhookUrl(request.getWebhookUrl());
+        verificationRequest.setEnvironment(environment);
 
         // Store customer data
         Map<String, Object> customerData = new HashMap<>();
@@ -81,14 +85,20 @@ public class VerificationService {
 
         VerificationRequest savedRequest = verificationRequestRepository.save(verificationRequest);
 
-        // Start async verification immediately - file saving happens in background
-        processVerificationAsync(savedRequest, request);
+        // Save documents immediately — MultipartFile objects are tied to the HTTP request
+        // lifecycle and won't be available when the scheduler processes them later
+        saveDocument(savedRequest, request.getSelfie(), "selfie");
+        saveDocument(savedRequest, request.getIdFront(), "id_front");
+        if (request.getIdBack() != null)
+            saveDocument(savedRequest, request.getIdBack(), "id_back");
+        if (request.getProofOfAddress() != null)
+            saveDocument(savedRequest, request.getProofOfAddress(), "proof_of_address");
 
         return KycVerificationResponseDto.builder()
                 .verificationId(savedRequest.getId())
                 .status(savedRequest.getStatus().name())
                 .tier(tier)
-                .estimatedCompletion(LocalDateTime.now().plusMinutes(5))
+                .estimatedCompletion(LocalDateTime.now().plusMinutes(10))
                 .webhookUrl(savedRequest.getWebhookUrl())
                 .message("Verification submitted successfully and is being processed")
                 .build();
@@ -220,17 +230,36 @@ public class VerificationService {
         }
     }
 
-    public VerificationStatusResponseDto getVerificationStatus(String verificationId, String companyId) {
-        VerificationRequest request = verificationRequestRepository
-                .findByIdAndCompanyId(verificationId, companyId)
-                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
-                        "Verification not found: " + verificationId));
+    public VerificationStatusResponseDto getVerificationStatus(
+            String verificationId,
+            String companyId,
+            ApiKeyEnvironment environment) {
+        VerificationRequest request;
+        String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
+
+        if (resolvedCompanyId != null) {
+            // Company-specific access (API key authentication)
+            request = verificationRequestRepository
+                    .findByIdAndCompanyIdAndEnvironment(verificationId, resolvedCompanyId, environment)
+                    .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                            "Verification not found: " + verificationId));
+        } else {
+            // Admin access (JWT authentication) - can view any verification
+            request = verificationRequestRepository
+                    .findByIdAndEnvironment(verificationId, environment)
+                    .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                            "Verification not found: " + verificationId));
+        }
 
         List<VerificationStep> steps = verificationStepRepository
                 .findByVerificationRequestIdOrderByCreatedAtAsc(verificationId);
 
+        List<VerificationDocument> documents = verificationDocumentRepository
+                .findByVerificationRequestId(verificationId);
+
         return VerificationStatusResponseDto.builder()
                 .verificationId(request.getId())
+                .companyName(request.getCompany() != null ? request.getCompany().getLegalName() : null)
                 .status(request.getStatus().name())
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
@@ -240,22 +269,26 @@ public class VerificationService {
                 .completedAt(request.getCompletedAt())
                 .customerData(request.getCustomerData())
                 .steps(steps.stream().map(this::mapStepToDto).collect(Collectors.toList()))
+                .documents(documents.stream().map(this::mapDocumentToDto).collect(Collectors.toList()))
                 .build();
     }
 
     public Page<VerificationStatusResponseDto> listVerifications(
             String companyId,
+            ApiKeyEnvironment environment,
             GlobalStatuses status,
             String tier,
             LocalDateTime fromDate,
             LocalDateTime toDate,
             Pageable pageable) {
 
+        String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
         Page<VerificationRequest> requests = verificationRequestRepository.findByFilters(
-                companyId, status, tier, fromDate, toDate, pageable);
+                resolvedCompanyId, environment, status, tier, fromDate, toDate, pageable);
 
         return requests.map(request -> VerificationStatusResponseDto.builder()
                 .verificationId(request.getId())
+                .companyName(request.getCompany() != null ? request.getCompany().getLegalName() : null)
                 .status(request.getStatus().name())
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
@@ -276,6 +309,17 @@ public class VerificationService {
                 .result(step.getResult())
                 .executedAt(step.getExecutedAt())
                 .errorMessage(step.getErrorMessage())
+                .build();
+    }
+
+    private VerificationStatusResponseDto.DocumentDto mapDocumentToDto(VerificationDocument document) {
+        return VerificationStatusResponseDto.DocumentDto.builder()
+                .id(document.getId())
+                .documentType(document.getDocumentType())
+                .originalFilename(document.getOriginalFilename())
+                .fileSize(document.getFileSize())
+                .mimeType(document.getMimeType())
+                .uploadedAt(document.getCreatedAt())
                 .build();
     }
 }

@@ -11,6 +11,7 @@ import java.util.Map;
 @Builder
 public class VerificationStatusResponseDto {
     private String verificationId;
+    private String companyName;
     private String status;
     private String tier;
     private String verificationType;
@@ -21,6 +22,7 @@ public class VerificationStatusResponseDto {
     private LocalDateTime completedAt;
     private Map<String, Object> customerData;
     private List<VerificationStepDto> steps;
+    private List<DocumentDto> documents;
 
     @Data
     @Builder
@@ -31,5 +33,16 @@ public class VerificationStatusResponseDto {
         private Map<String, Object> result;
         private LocalDateTime executedAt;
         private String errorMessage;
+    }
+
+    @Data
+    @Builder
+    public static class DocumentDto {
+        private String id;
+        private String documentType;
+        private String originalFilename;
+        private Long fileSize;
+        private String mimeType;
+        private LocalDateTime uploadedAt;
     }
 }

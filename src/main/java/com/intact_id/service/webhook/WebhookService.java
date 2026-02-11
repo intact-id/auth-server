@@ -11,6 +11,8 @@ import com.intact_id.db.repository.WebhookDeliveryRepository;
 import com.intact_id.dto.webhook.WebhookEventDto;
 import com.intact_id.service.webhook.events.WebhookEventData;
 import com.intact_id.service.webhook.events.WebhookNotificationEvent;
+import com.intact_id.util.exception.ApplicationExceptions;
+import com.intact_id.util.generator.GeneratorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,6 +44,7 @@ public class WebhookService {
     private final CompanyCommunicationRepository communicationRepository;
     private final WebhookConfig webhookConfig;
     private final ObjectMapper objectMapper;
+    private final GeneratorUtils generatorUtils;
     private final ApplicationEventPublisher eventPublisher;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -276,7 +279,7 @@ public class WebhookService {
             String payload = objectMapper.writeValueAsString(event);
 
             // Generate signature using company's API key as secret
-            String signature = generateWebhookSignature(payload, company.getId());
+            String signature = generatorUtils.generateWebhookSignature(payload, company.getId());
 
             // Create delivery record
             WebhookDelivery delivery = new WebhookDelivery();
@@ -355,7 +358,6 @@ public class WebhookService {
             delivery.setStatus(WebhookDelivery.DeliveryStatus.FAILED);
             return;
         }
-
         int retryInterval = webhookConfig.getRetryInterval(delivery.getRetryCount());
         LocalDateTime nextRetry = LocalDateTime.now().plusSeconds(retryInterval);
 
@@ -366,25 +368,6 @@ public class WebhookService {
                 delivery.getRetryCount(), delivery.getId(), nextRetry);
     }
 
-    /**
-     * Generate HMAC-SHA256 signature for webhook payload
-     */
-    private String generateWebhookSignature(String payload, String secret) {
-        try {
-            Mac mac = Mac.getInstance(webhookConfig.getSignatureAlgorithm());
-            SecretKeySpec secretKeySpec = new SecretKeySpec(
-                    secret.getBytes(StandardCharsets.UTF_8),
-                    webhookConfig.getSignatureAlgorithm());
-            mac.init(secretKeySpec);
-
-            byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-
-        } catch (Exception e) {
-            log.error("Failed to generate webhook signature", e);
-            throw new RuntimeException("Signature generation failed", e);
-        }
-    }
 
     /**
      * Retry failed webhook delivery
@@ -398,7 +381,7 @@ public class WebhookService {
                     .findByCompanyId(delivery.getCompany().getId())
                     .orElseThrow();
 
-            String signature = generateWebhookSignature(delivery.getPayload(), delivery.getCompany().getId());
+            String signature = generatorUtils.generateWebhookSignature(delivery.getPayload(), delivery.getCompany().getId());
 
             sendHttpRequest(delivery, delivery.getWebhookUrl(), delivery.getPayload(),
                     signature, communication.getWebhookTimeoutSeconds());
@@ -409,5 +392,66 @@ public class WebhookService {
             scheduleRetry(delivery);
             webhookDeliveryRepository.save(delivery);
         }
+    }
+
+    /**
+     * Send test webhook to verify endpoint configuration
+     */
+    public Map<String, Object> sendTestWebhookDetailed(CompanyCommunicationDetails communication) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            log.info("Sending test webhook to: {}", communication.getWebhookUrl());
+
+            // Build test event payload
+            Map<String, Object> testEvent = new HashMap<>();
+            testEvent.put("event_type", "test.webhook");
+            testEvent.put("event_id", java.util.UUID.randomUUID().toString());
+            testEvent.put("timestamp", LocalDateTime.now().toString());
+            testEvent.put("message", "This is a test webhook from IntactID");
+            testEvent.put("company_id", communication.getCompany().getId());
+
+            String payload = objectMapper.writeValueAsString(testEvent);
+
+            // Generate signature
+            String signature = generatorUtils.generateWebhookSignature(payload, communication.getCompany().getId());
+
+            // Send HTTP request
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(communication.getWebhookUrl()))
+                    .timeout(Duration.ofSeconds(communication.getWebhookTimeoutSeconds()))
+                    .header("Content-Type", "application/json")
+                    .header("X-Webhook-Signature", "sha256=" + signature)
+                    .header("X-Event-Type", "test.webhook")
+                    .header("User-Agent", "IntactID-Webhook/1.0")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            int statusCode = response.statusCode();
+            String responseBody = response.body();
+
+            log.info("Test webhook response: Status={}, Body={}", statusCode, responseBody);
+
+            result.put("success", statusCode >= 200 && statusCode < 300);
+            result.put("status_code", statusCode);
+            result.put("response_body", responseBody);
+            result.put("webhook_url", communication.getWebhookUrl());
+
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to send test webhook", e);
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            result.put("webhook_url", communication.getWebhookUrl());
+            return result;
+        }
+    }
+
+    public boolean sendTestWebhook(CompanyCommunicationDetails communication) {
+        Map<String, Object> result = sendTestWebhookDetailed(communication);
+        return (boolean) result.getOrDefault("success", false);
     }
 }
