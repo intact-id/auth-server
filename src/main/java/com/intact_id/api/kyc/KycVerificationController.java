@@ -142,8 +142,8 @@ public class KycVerificationController {
                         Authentication authentication) {
 
                 try {
-                        // Get company from authentication context
-                        Company company = (Company) authentication.getPrincipal();
+                        // Resolve tenant company for either API-key company auth or JWT user auth
+                        Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
 
                         log.info("Verification request from company: {}, tier: {}", company.getId(), tier);
 
@@ -236,6 +236,7 @@ public class KycVerificationController {
                         @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+                        @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
                         @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "10") int size,
@@ -253,7 +254,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()
@@ -338,6 +339,7 @@ public class KycVerificationController {
                         @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+                        @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
                         @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "10") int size,
@@ -355,7 +357,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.DEV, status, tier, fromDate, toDate, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.DEV, status, tier, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()
@@ -374,6 +376,7 @@ public class KycVerificationController {
                         @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+                        @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
                         @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "10") int size,
@@ -391,7 +394,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()

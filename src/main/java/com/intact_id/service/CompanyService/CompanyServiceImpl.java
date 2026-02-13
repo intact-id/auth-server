@@ -161,6 +161,7 @@ public class CompanyServiceImpl implements CompanyService {
         @Override
         public Company suspendCompany(String id, String adminId, String reason) {
                 Company company = getCompanyById(id);
+                String resolvedCompanyId = company.getId();
 
                 if (company.getStatus() == GlobalStatuses.SUSPENDED) {
                         throw new ApplicationExceptions.InvalidActionException(
@@ -171,7 +172,7 @@ public class CompanyServiceImpl implements CompanyService {
                 Company savedCompany = companyRepository.save(company);
 
                 // Also suspend credentials
-                CompanyCredentials credentials = credentialsRepository.findByCompanyId(id)
+                CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
                                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                                                 "Credentials not found for company"));
 
@@ -183,7 +184,7 @@ public class CompanyServiceImpl implements CompanyService {
 
                 // Send suspension email
                 try {
-                        CompanyCommunicationDetails comms = getCompanyCommunication(id);
+                        CompanyCommunicationDetails comms = getCompanyCommunication(resolvedCompanyId);
                         emailService.sendCompanySuspensionEmail(comms.getEmail(), company.getLegalName(), reason);
 
                         // Persist notification to database
@@ -206,6 +207,7 @@ public class CompanyServiceImpl implements CompanyService {
         @Override
         public Company activateCompany(String companyId, String adminId) {
                 Company company = getCompanyById(companyId);
+                String resolvedCompanyId = company.getId();
 
                 if (company.getStatus() == GlobalStatuses.ACTIVE) {
                         throw new ApplicationExceptions.InvalidActionException(
@@ -216,7 +218,7 @@ public class CompanyServiceImpl implements CompanyService {
                 Company savedCompany = companyRepository.save(company);
 
                 // Also activate credentials
-                CompanyCredentials credentials = credentialsRepository.findByCompanyId(companyId)
+                CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
                                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                                                 "Credentials not found for company"));
 
@@ -227,7 +229,7 @@ public class CompanyServiceImpl implements CompanyService {
 
                 // Send activation email
                 try {
-                        CompanyCommunicationDetails comms = getCompanyCommunication(companyId);
+                        CompanyCommunicationDetails comms = getCompanyCommunication(resolvedCompanyId);
                         emailService.sendCompanyActivationEmail(comms.getEmail(), company.getLegalName());
 
                         // Persist notification to database

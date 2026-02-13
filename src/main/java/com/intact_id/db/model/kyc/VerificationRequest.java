@@ -98,4 +98,13 @@ public class VerificationRequest extends Auditable {
         this.errorDetails = errorDetails;
         this.completedAt = LocalDateTime.now();
     }
+
+    public void markAsRejected(String failureReason, String errorDetails, Double riskScore) {
+        this.status = GlobalStatuses.REJECTED;
+        this.overallDecision = "rejected";
+        this.failureReason = failureReason;
+        this.errorDetails = errorDetails;
+        this.riskScore = riskScore;
+        this.completedAt = LocalDateTime.now();
+    }
 }

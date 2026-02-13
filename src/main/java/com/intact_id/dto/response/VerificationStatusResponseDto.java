@@ -17,6 +17,7 @@ public class VerificationStatusResponseDto {
     private String verificationType;
     private String overallDecision;
     private String failureReason;
+    private String errorDetails;
     private Double riskScore;
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;

@@ -22,20 +22,44 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
 
         Page<VerificationRequest> findByCompanyIdAndStatus(String companyId, GlobalStatuses status, Pageable pageable);
 
-        @Query("SELECT v FROM VerificationRequest v WHERE (:companyId IS NULL OR v.company.id = :companyId) " +
+        @Query(value = "SELECT v.* FROM verification_requests v " +
+                        "LEFT JOIN company_tbl c ON c.id = v.company_id " +
+                        "WHERE (:companyId IS NULL OR v.company_id = :companyId) " +
                         "AND (:environment IS NULL OR v.environment = :environment) " +
                         "AND (:status IS NULL OR v.status = :status) " +
                         "AND (:tier IS NULL OR v.tier = :tier) " +
-                        "AND (CAST(:fromDate AS timestamp) IS NULL OR v.createdAt >= :fromDate) " +
-                        "AND (CAST(:toDate AS timestamp) IS NULL OR v.createdAt <= :toDate) " +
-                        "ORDER BY v.createdAt DESC")
+                        "AND (CAST(:fromDate AS timestamp) IS NULL OR v.created_at >= :fromDate) " +
+                        "AND (CAST(:toDate AS timestamp) IS NULL OR v.created_at <= :toDate) " +
+                        "AND (:search IS NULL OR (" +
+                        "LOWER(v.id) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                        "LOWER(COALESCE(c.legal_name, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                        "LOWER(COALESCE(v.overall_decision, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                        "LOWER(COALESCE(v.customer_data::text, '')) LIKE LOWER(CONCAT('%', :search, '%'))" +
+                        ")) " +
+                        "ORDER BY v.created_at DESC",
+                        countQuery = "SELECT COUNT(*) FROM verification_requests v " +
+                                        "LEFT JOIN company_tbl c ON c.id = v.company_id " +
+                                        "WHERE (:companyId IS NULL OR v.company_id = :companyId) " +
+                                        "AND (:environment IS NULL OR v.environment = :environment) " +
+                                        "AND (:status IS NULL OR v.status = :status) " +
+                                        "AND (:tier IS NULL OR v.tier = :tier) " +
+                                        "AND (CAST(:fromDate AS timestamp) IS NULL OR v.created_at >= :fromDate) " +
+                                        "AND (CAST(:toDate AS timestamp) IS NULL OR v.created_at <= :toDate) " +
+                                        "AND (:search IS NULL OR (" +
+                                        "LOWER(v.id) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                                        "LOWER(COALESCE(c.legal_name, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                                        "LOWER(COALESCE(v.overall_decision, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                                        "LOWER(COALESCE(v.customer_data::text, '')) LIKE LOWER(CONCAT('%', :search, '%'))" +
+                                        "))",
+                        nativeQuery = true)
         Page<VerificationRequest> findByFilters(
                         @Param("companyId") String companyId,
-                        @Param("environment") com.intact_id.constant.enums.ApiKeyEnvironment environment,
-                        @Param("status") GlobalStatuses status,
+                        @Param("environment") String environment,
+                        @Param("status") String status,
                         @Param("tier") String tier,
                         @Param("fromDate") LocalDateTime fromDate,
                         @Param("toDate") LocalDateTime toDate,
+                        @Param("search") String search,
                         Pageable pageable);
 
         long countByCompanyIdAndCreatedAtAfter(String companyId, LocalDateTime after);

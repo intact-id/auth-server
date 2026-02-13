@@ -95,9 +95,9 @@ webhook:
 verification:
   processing:
     enabled: true
-    poll-interval-ms: 25000
-    batch-size: 5
-    delay-between-calls-ms: 10000
+    poll-interval-ms: 15000
+    batch-size: 7
+    delay-between-calls-ms: 7000
 
 # Face Screening Service
 face-service:

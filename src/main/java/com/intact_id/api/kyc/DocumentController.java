@@ -5,6 +5,7 @@ import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -24,6 +25,9 @@ import java.nio.file.Paths;
 public class DocumentController {
 
     private final VerificationDocumentRepository documentRepository;
+
+    @Value("${app.documents.base-dir:${user.dir}/uploads}")
+    private String documentsBaseDir;
 
     /**
      * Get document image by verification ID and document ID
@@ -47,16 +51,8 @@ public class DocumentController {
         }
 
         try {
-            // Load file from filesystem
-            // Handle both absolute and relative paths
-            Path filePath;
-            if (Paths.get(document.getFilePath()).isAbsolute()) {
-                filePath = Paths.get(document.getFilePath());
-            } else {
-                // Resolve relative to application directory
-                String workingDir = System.getProperty("user.dir");
-                filePath = Paths.get(workingDir, document.getFilePath());
-            }
+            // Load from absolute path if present, otherwise resolve from configured base directory.
+            Path filePath = resolveDocumentPath(document.getFilePath());
 
             File file = filePath.toFile();
 
@@ -94,5 +90,21 @@ public class DocumentController {
             throw new ApplicationExceptions.IntactBadRequestException(
                     "Failed to serve document: " + e.getMessage());
         }
+    }
+
+    private Path resolveDocumentPath(String storedPath) {
+        Path rawPath = Paths.get(storedPath);
+        if (rawPath.isAbsolute()) {
+            return rawPath.normalize();
+        }
+
+        Path basePath = Paths.get(documentsBaseDir).toAbsolutePath().normalize();
+        Path resolved = basePath.resolve(rawPath).normalize();
+        if (Files.exists(resolved)) {
+            return resolved;
+        }
+
+        // Backward compatibility: older records may be relative to process working directory.
+        return Paths.get(System.getProperty("user.dir"), storedPath).toAbsolutePath().normalize();
     }
 }

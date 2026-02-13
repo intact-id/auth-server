@@ -16,6 +16,7 @@ import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
@@ -26,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -40,6 +42,9 @@ public class VerificationService {
     private final TierValidationService tierValidationService;
     private final ExternalKycServiceClient externalKycServiceClient;
     private final com.intact_id.service.webhook.WebhookService webhookService;
+
+    @Value("${app.documents.base-dir:${user.dir}/uploads}")
+    private String documentsBaseDir;
 
     @Transactional
     public KycVerificationResponseDto submitVerification(
@@ -144,15 +149,18 @@ public class VerificationService {
                 verificationStepRepository.save(step);
             }
 
-            // Update verification request with final result
-            request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
+            // Map business-level document failures to REJECTED instead of FAILED.
+            if (shouldRejectVerification(result.getFailureReason(), result.getErrorDetails(), result.getOverallDecision())) {
+                request.markAsRejected(result.getFailureReason(), result.getErrorDetails(), result.getRiskScore());
+            } else {
+                request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
 
-            // Store error details if present
-            if (result.getFailureReason() != null) {
-                request.setFailureReason(result.getFailureReason());
-            }
-            if (result.getErrorDetails() != null) {
-                request.setErrorDetails(result.getErrorDetails());
+                if (result.getFailureReason() != null) {
+                    request.setFailureReason(result.getFailureReason());
+                }
+                if (result.getErrorDetails() != null) {
+                    request.setErrorDetails(result.getErrorDetails());
+                }
             }
 
             verificationRequestRepository.save(request);
@@ -189,7 +197,11 @@ public class VerificationService {
                 }
             }
 
-            request.markAsFailed(failureReason, errorDetails);
+            if (shouldRejectVerification(failureReason, errorDetails, null)) {
+                request.markAsRejected(failureReason, errorDetails, 0.95);
+            } else {
+                request.markAsFailed(failureReason, errorDetails);
+            }
             verificationRequestRepository.save(request);
 
             // Send webhook notification for failure
@@ -202,15 +214,15 @@ public class VerificationService {
             return null;
 
         try {
-            // Create uploads directory if not exists
-            java.nio.file.Path uploadPath = java.nio.file.Paths.get(System.getProperty("user.dir"), "uploads");
+            // Persist all documents under a configurable base directory.
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(documentsBaseDir).toAbsolutePath().normalize();
             if (!java.nio.file.Files.exists(uploadPath)) {
                 java.nio.file.Files.createDirectories(uploadPath);
             }
 
             // Generate unique filename
             String filename = request.getId() + "_" + documentType + "_" + file.getOriginalFilename();
-            java.nio.file.Path filePath = uploadPath.resolve(filename);
+            java.nio.file.Path filePath = uploadPath.resolve(filename).normalize();
 
             // Save file
             file.transferTo(filePath.toFile());
@@ -264,6 +276,8 @@ public class VerificationService {
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
                 .overallDecision(request.getOverallDecision())
+                .failureReason(request.getFailureReason())
+                .errorDetails(request.getErrorDetails())
                 .riskScore(request.getRiskScore())
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
@@ -280,11 +294,15 @@ public class VerificationService {
             String tier,
             LocalDateTime fromDate,
             LocalDateTime toDate,
+            String search,
             Pageable pageable) {
 
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
+        String normalizedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+        String environmentName = environment != null ? environment.name() : null;
+        String statusName = status != null ? status.name() : null;
         Page<VerificationRequest> requests = verificationRequestRepository.findByFilters(
-                resolvedCompanyId, environment, status, tier, fromDate, toDate, pageable);
+                resolvedCompanyId, environmentName, statusName, tier, fromDate, toDate, normalizedSearch, pageable);
 
         return requests.map(request -> VerificationStatusResponseDto.builder()
                 .verificationId(request.getId())
@@ -295,6 +313,7 @@ public class VerificationService {
                 .overallDecision(request.getOverallDecision())
                 .riskScore(request.getRiskScore())
                 .failureReason(request.getFailureReason())
+                .errorDetails(request.getErrorDetails())
                 .customerData(request.getCustomerData())
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
@@ -321,5 +340,20 @@ public class VerificationService {
                 .mimeType(document.getMimeType())
                 .uploadedAt(document.getCreatedAt())
                 .build();
+    }
+
+    private boolean shouldRejectVerification(String failureReason, String errorDetails, String overallDecision) {
+        if ("rejected".equalsIgnoreCase(overallDecision)) {
+            return true;
+        }
+
+        String failure = failureReason == null ? "" : failureReason.toLowerCase(Locale.ROOT);
+        String details = errorDetails == null ? "" : errorDetails.toLowerCase(Locale.ROOT);
+
+        return failure.contains("face not detected")
+                || failure.contains("facenotdetected")
+                || details.contains("face not detected")
+                || details.contains("no face detected")
+                || details.contains("no face found");
     }
 }

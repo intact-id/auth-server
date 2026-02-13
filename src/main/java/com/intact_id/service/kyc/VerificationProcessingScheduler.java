@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -132,14 +133,18 @@ public class VerificationProcessingScheduler {
             verificationStepRepository.save(step);
         }
 
-        // Update verification request with final result
-        request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
+        // Map business-level document failures to REJECTED.
+        if (shouldRejectVerification(result.getFailureReason(), result.getErrorDetails(), result.getOverallDecision())) {
+            request.markAsRejected(result.getFailureReason(), result.getErrorDetails(), result.getRiskScore());
+        } else {
+            request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
 
-        if (result.getFailureReason() != null) {
-            request.setFailureReason(result.getFailureReason());
-        }
-        if (result.getErrorDetails() != null) {
-            request.setErrorDetails(result.getErrorDetails());
+            if (result.getFailureReason() != null) {
+                request.setFailureReason(result.getFailureReason());
+            }
+            if (result.getErrorDetails() != null) {
+                request.setErrorDetails(result.getErrorDetails());
+            }
         }
 
         verificationRequestRepository.save(request);
@@ -151,7 +156,26 @@ public class VerificationProcessingScheduler {
     }
 
     private void markAsFailed(VerificationRequest request, String failureReason, String errorDetails) {
-        request.markAsFailed(failureReason, errorDetails);
+        if (shouldRejectVerification(failureReason, errorDetails, null)) {
+            request.markAsRejected(failureReason, errorDetails, 0.95);
+        } else {
+            request.markAsFailed(failureReason, errorDetails);
+        }
         verificationRequestRepository.save(request);
+    }
+
+    private boolean shouldRejectVerification(String failureReason, String errorDetails, String overallDecision) {
+        if ("rejected".equalsIgnoreCase(overallDecision)) {
+            return true;
+        }
+
+        String failure = failureReason == null ? "" : failureReason.toLowerCase(Locale.ROOT);
+        String details = errorDetails == null ? "" : errorDetails.toLowerCase(Locale.ROOT);
+
+        return failure.contains("face not detected")
+                || failure.contains("facenotdetected")
+                || details.contains("face not detected")
+                || details.contains("no face detected")
+                || details.contains("no face found");
     }
 }

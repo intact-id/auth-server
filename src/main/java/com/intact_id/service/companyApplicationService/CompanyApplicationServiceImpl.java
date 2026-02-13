@@ -126,6 +126,9 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     public ApplicationApprovalResponseDto performMakerAction(CompanyApplicationApprovalRequestDto request) {
 
         log.info("Maker action initiated for application: {}", request.getApplicationId());
+        if (request.getPerformedBy() == null || request.getPerformedBy().isBlank()) {
+            throw new ApplicationExceptions.IntactUnauthorizedException("Authenticated maker is required");
+        }
 
         CompanyApplication application = applicationRepository.findById(request.getApplicationId())
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
