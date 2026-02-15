@@ -62,7 +62,11 @@ public class EmailServiceImpl implements EmailService {
             return true;
 
         } catch (MessagingException e) {
-            log.error("Failed to send email to: {}", emailDTO.getTo(), e);
+            log.error("Failed to build email to {}: {}", emailDTO.getTo(), e.getMessage(), e);
+            return false;
+        } catch (Exception e) {
+            // Catches MailSendException (RuntimeException) from SMTP auth/connection failures
+            log.error("Failed to send email to {} via SMTP: {}", emailDTO.getTo(), e.getMessage(), e);
             return false;
         }
     }
@@ -151,6 +155,25 @@ public class EmailServiceImpl implements EmailService {
                 .to(companyEmail)
                 .subject("Good News! Your Intact ID Account Has Been Reactivated")
                 .templateName("company-activated")
+                .variables(variables)
+                .build();
+
+        return sendTemplatedEmail(emailDTO);
+    }
+
+    @Override
+    public boolean sendApplicationReceivedEmail(String companyEmail, String companyName,
+            String applicationNumber, String trackUrl) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("companyName", companyName);
+        variables.put("applicationNumber", applicationNumber);
+        variables.put("trackUrl", trackUrl);
+        variables.put("supportEmail", "support@intact-id.com");
+
+        EmailDTO emailDTO = EmailDTO.builder()
+                .to(companyEmail)
+                .subject("Application Received – " + applicationNumber)
+                .templateName("application-received")
                 .variables(variables)
                 .build();
 

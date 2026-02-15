@@ -85,13 +85,14 @@ public class CompanyServiceImpl implements CompanyService {
                 communication.setSecondaryPhone(application.getContactPersonPhone());
                 communication.setEmailNotifications(true); // Default enabled
                 communication.setWebhookEnabled(false); // Will be configured later
+                communication.setWebhookSecret(generatorUtils.generateWebhookSecret());
                 return communication;
         }
 
         private CompanyCredentials createCredentials(Company company, String email) {
-                // Generate API key and secret
-                String apiKey = generatorUtils.generateApiKey();
-                String apiSecret = generatorUtils.generateApiSecret();
+                // On approval issue DEV credentials only — PROD keys are generated on demand
+                String apiKey = generatorUtils.generateDevApiKey();
+                String apiSecret = generatorUtils.generateDevApiSecret();
 
                 // Hash them for storage
                 String apiKeyHash = generatorUtils.hashString(apiKey);
@@ -121,17 +122,20 @@ public class CompanyServiceImpl implements CompanyService {
                 return credentials;
         }
 
-        private CompanyCredentials getCompanyCredentials(Company company, String apiKeyHash, String apiSecretHash) {
+        private CompanyCredentials getCompanyCredentials(Company company, String devApiKeyHash, String devApiSecretHash) {
                 CompanyCredentials credentials = new CompanyCredentials();
                 credentials.setCompany(company);
-                credentials.setApiKeyHash(apiKeyHash);
-                credentials.setApiSecretHash(apiSecretHash);
-                credentials.setStatus(GlobalStatuses.ACTIVE);
-                credentials.setRateLimitPerHour(100); // Default limits
-                credentials.setRateLimitPerDay(1000);
-                credentials.setTotalRequests(0L);
-                credentials.setTotalSuccessfulRequests(0L);
-                credentials.setTotalFailedRequests(0L);
+                // DEV keys — issued on approval
+                credentials.setDevApiKeyHash(devApiKeyHash);
+                credentials.setDevApiSecretHash(devApiSecretHash);
+                credentials.setDevStatus(GlobalStatuses.ACTIVE);
+                credentials.setDevRateLimitPerHour(100);
+                credentials.setDevRateLimitPerDay(1000);
+                credentials.setDevTotalRequests(0L);
+                credentials.setDevTotalSuccessfulRequests(0L);
+                credentials.setDevTotalFailedRequests(0L);
+                // PROD keys are null — generated on demand
+                credentials.setProdStatus(GlobalStatuses.ACTIVE); // ready to activate once keys generated
                 return credentials;
         }
 
@@ -386,10 +390,29 @@ public class CompanyServiceImpl implements CompanyService {
                 if (request.getSmsNotifications() != null) {
                         communication.setSmsNotifications(request.getSmsNotifications());
                 }
+                if (request.getPayloadFields() != null) {
+                        communication.setPayloadFields(request.getPayloadFields());
+                }
 
                 CompanyCommunicationDetails saved = communicationRepository.save(communication);
                 log.info("Webhook settings updated successfully for company: {}", resolvedCompanyId);
 
+                return saved;
+        }
+
+        @Override
+        @Transactional
+        public CompanyCommunicationDetails rotateWebhookSecret(String companyId) {
+                String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+                log.info("Rotating webhook secret for company: {}", resolvedCompanyId);
+
+                CompanyCommunicationDetails communication = communicationRepository.findByCompanyId(resolvedCompanyId)
+                                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                                                "Communication details not found for company: " + resolvedCompanyId));
+
+                communication.setWebhookSecret(generatorUtils.generateWebhookSecret());
+                CompanyCommunicationDetails saved = communicationRepository.save(communication);
+                log.info("Webhook secret rotated for company: {}", resolvedCompanyId);
                 return saved;
         }
 

@@ -76,4 +76,16 @@ public interface EmailService {
      */
     boolean sendVerificationCompletedEmail(String applicantEmail, String applicantName,
             String verificationStatus, String verificationId);
+
+    /**
+     * Send application received confirmation email
+     *
+     * @param companyEmail      Company email address
+     * @param companyName       Company legal name
+     * @param applicationNumber Generated application number (e.g. APP-2026-XXXXXXXX)
+     * @param trackUrl          Public URL where applicant can track their status
+     * @return true if sent successfully
+     */
+    boolean sendApplicationReceivedEmail(String companyEmail, String companyName,
+            String applicationNumber, String trackUrl);
 }

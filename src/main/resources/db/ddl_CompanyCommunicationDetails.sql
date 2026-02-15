@@ -14,10 +14,12 @@ CREATE TABLE company_communications
     support_email         VARCHAR(255),
     billing_email         VARCHAR(255),
     webhook_url           VARCHAR(255),
+    webhook_secret        VARCHAR(255),
     webhook_enabled       BOOLEAN,
     email_notifications   BOOLEAN,
     sms_notifications     BOOLEAN,
     notification_settings JSONB,
+    payload_fields        JSONB,
     CONSTRAINT pk_company_communications PRIMARY KEY (id)
 );
 

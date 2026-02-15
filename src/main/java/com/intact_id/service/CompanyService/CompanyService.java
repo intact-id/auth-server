@@ -38,5 +38,7 @@ public interface CompanyService {
 
     CompanyCommunicationDetails updateWebhookSettings(String companyId, WebhookSettingsRequestDto request);
 
+    CompanyCommunicationDetails rotateWebhookSecret(String companyId);
+
     void deleteCompany(String companyId);
 }

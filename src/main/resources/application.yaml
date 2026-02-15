@@ -27,10 +27,10 @@ spring:
       file-size-threshold: 2MB
 
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${EMAIL_USERNAME:thetechguy499@gmail.com}
-    password: ${EMAIL_PASSWORD:cedvskpysytywqmp}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:intaactid@gmail.com}
+    password: ${MAIL_PASSWORD:djtazwljxwtbxkqv}
     properties:
       mail:
         smtp:

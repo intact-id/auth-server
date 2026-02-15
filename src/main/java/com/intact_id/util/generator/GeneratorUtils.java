@@ -76,18 +76,43 @@ public class GeneratorUtils {
     }
 
     /**
-     * Generate API key
+     * Generate DEV API key — issued automatically on company approval.
+     * Format: ak_dev_xxxxxxxxxxxxxxxxxxxxxxxx (32 chars after prefix)
+     */
+    public String generateDevApiKey() {
+        return "ak_dev_" + generateSecureRandomString(32);
+    }
+
+    /**
+     * Generate DEV API secret — issued automatically on company approval.
+     * Format: as_dev_xxxxxxxxxxxxxxxxxxxxxxxx
+     */
+    public String generateDevApiSecret() {
+        return "as_dev_" + generateSecureRandomString(32);
+    }
+
+    /**
+     * Generate PROD (live) API key — generated on demand by the company.
      * Format: ak_live_xxxxxxxxxxxxxxxxxxxxxxxx (32 chars after prefix)
      */
     public String generateApiKey() {
-        String randomPart = generateSecureRandomString(32);
-        return "ak_live_" + randomPart;
+        return "ak_live_" + generateSecureRandomString(32);
     }
 
-
+    /**
+     * Generate PROD (live) API secret — generated on demand by the company.
+     * Format: as_live_xxxxxxxxxxxxxxxxxxxxxxxx
+     */
     public String generateApiSecret() {
-        String randomPart = generateSecureRandomString(32);
-        return "as_live_" + randomPart;
+        return "as_live_" + generateSecureRandomString(32);
+    }
+
+    /**
+     * Generate a webhook signing secret.
+     * Format: whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (32 random chars after prefix)
+     */
+    public String generateWebhookSecret() {
+        return "whsec_" + generateSecureRandomString(32);
     }
 
     /**

@@ -72,7 +72,6 @@ public class WebhookService {
         Map<String, Object> applicant = new HashMap<>();
         Map<String, Object> customerData = verificationRequest.getCustomerData();
         if (customerData != null) {
-            applicant.put("id", verificationRequest.getId()); // Using verification ID as applicant ID
             if (customerData.containsKey("email")) {
                 applicant.put("email", customerData.get("email"));
             }
@@ -96,6 +95,14 @@ public class WebhookService {
             }
         }
         eventData.put("applicant", applicant);
+
+        // Top-level rejection reason (present only when verification was rejected/failed)
+        if (verificationRequest.getFailureReason() != null) {
+            eventData.put("rejection_reason", verificationRequest.getFailureReason());
+            eventData.put("rejection_details", verificationRequest.getErrorDetails() != null
+                    ? verificationRequest.getErrorDetails()
+                    : getUserFriendlyErrorDetails(verificationRequest.getFailureReason()));
+        }
 
         // Verification results
         Map<String, Object> results = new HashMap<>();
@@ -196,7 +203,6 @@ public class WebhookService {
         Map<String, Object> applicant = new HashMap<>();
         Map<String, Object> customerData = verificationRequest.getCustomerData();
         if (customerData != null) {
-            applicant.put("id", verificationRequest.getId());
             if (customerData.containsKey("email")) {
                 applicant.put("email", customerData.get("email"));
             }
@@ -218,6 +224,13 @@ public class WebhookService {
             }
         }
         eventData.put("applicant", applicant);
+
+        // Top-level rejection reason
+        eventData.put("rejection_reason", verificationRequest.getFailureReason() != null
+                ? verificationRequest.getFailureReason() : "SystemError");
+        eventData.put("rejection_details", verificationRequest.getErrorDetails() != null
+                ? verificationRequest.getErrorDetails()
+                : getUserFriendlyErrorDetails(verificationRequest.getFailureReason()));
 
         // Verification results with error details
         Map<String, Object> results = new HashMap<>();
@@ -275,11 +288,16 @@ public class WebhookService {
             String webhookUrl = communication.getWebhookUrl();
             log.info("Sending webhook to: {} for event: {}", webhookUrl, event.getEventType());
 
-            // Build payload
-            String payload = objectMapper.writeValueAsString(event);
+            // Build payload with field-level filtering applied
+            String payload = objectMapper.writeValueAsString(buildFilteredPayload(event, communication));
 
-            // Generate signature using company's API key as secret
-            String signature = generatorUtils.generateWebhookSignature(payload, company.getId());
+            // Generate signature using the company's dedicated webhook secret
+            String secret = communication.getWebhookSecret();
+            if (secret == null || secret.isBlank()) {
+                log.error("No webhook secret configured for company: {} — skipping delivery", company.getId());
+                return;
+            }
+            String signature = generatorUtils.generateWebhookSignature(payload, secret);
 
             // Create delivery record
             WebhookDelivery delivery = new WebhookDelivery();
@@ -298,6 +316,66 @@ public class WebhookService {
         } catch (Exception e) {
             log.error("Failed to send webhook notification for company: {}", company.getId(), e);
         }
+    }
+
+    /**
+     * Build a filtered payload map based on the company's payloadFields configuration.
+     * Sensitive fields (raw scores, applicant info, IDs) are stripped when disabled.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> buildFilteredPayload(WebhookEventDto event, CompanyCommunicationDetails communication) {
+        Map<String, Object> payload = objectMapper.convertValue(event, Map.class);
+
+        if (!communication.isPayloadFieldEnabled("includeVerificationId")) {
+            payload.remove("verificationId");
+            Map<String, Object> d = (Map<String, Object>) payload.get("data");
+            if (d != null) d.remove("verification_id");
+        }
+        if (!communication.isPayloadFieldEnabled("includeCompanyId")) {
+            payload.remove("companyId");
+        }
+        if (!communication.isPayloadFieldEnabled("includeCompanyName")) {
+            payload.remove("companyName");
+        }
+
+        Map<String, Object> data = (Map<String, Object>) payload.get("data");
+        if (data != null) {
+            if (!communication.isPayloadFieldEnabled("includeRejectionReason")) {
+                data.remove("rejection_reason");
+                data.remove("rejection_details");
+                Map<String, Object> results = (Map<String, Object>) data.get("results");
+                if (results != null) {
+                    results.forEach((key, val) -> {
+                        if (val instanceof Map) ((Map<String, Object>) val).remove("error");
+                    });
+                }
+            }
+            if (!communication.isPayloadFieldEnabled("includeTier")) {
+                data.remove("tier");
+            }
+            if (!communication.isPayloadFieldEnabled("includeTimestamps")) {
+                data.remove("started_at");
+                data.remove("completed_at");
+                data.remove("failed_at");
+            }
+            if (!communication.isPayloadFieldEnabled("includeApplicant")) {
+                data.remove("applicant");
+            }
+            if (!communication.isPayloadFieldEnabled("includeResults")) {
+                data.remove("results");
+            } else if (!communication.isPayloadFieldEnabled("includeRawScores")) {
+                Map<String, Object> results = (Map<String, Object>) data.get("results");
+                if (results != null) {
+                    results.forEach((key, val) -> {
+                        if (val instanceof Map) {
+                            ((Map<String, Object>) val).remove("checks");
+                        }
+                    });
+                }
+            }
+        }
+
+        return payload;
     }
 
     /**
@@ -381,7 +459,7 @@ public class WebhookService {
                     .findByCompanyId(delivery.getCompany().getId())
                     .orElseThrow();
 
-            String signature = generatorUtils.generateWebhookSignature(delivery.getPayload(), delivery.getCompany().getId());
+            String signature = generatorUtils.generateWebhookSignature(delivery.getPayload(), communication.getWebhookSecret());
 
             sendHttpRequest(delivery, delivery.getWebhookUrl(), delivery.getPayload(),
                     signature, communication.getWebhookTimeoutSeconds());
@@ -413,8 +491,8 @@ public class WebhookService {
 
             String payload = objectMapper.writeValueAsString(testEvent);
 
-            // Generate signature
-            String signature = generatorUtils.generateWebhookSignature(payload, communication.getCompany().getId());
+            // Generate signature using the company's dedicated webhook secret
+            String signature = generatorUtils.generateWebhookSignature(payload, communication.getWebhookSecret());
 
             // Send HTTP request
             HttpRequest request = HttpRequest.newBuilder()

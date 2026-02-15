@@ -38,6 +38,11 @@ public class WebhookEventDto {
     private String companyId;
 
     /**
+     * Company legal name
+     */
+    private String companyName;
+
+    /**
      * Verification ID related to this event
      */
     private String verificationId;

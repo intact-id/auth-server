@@ -10,6 +10,7 @@ import com.intact_id.dto.request.CompanyApplicationRequestDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.dto.response.CompanyApplicationCreationResponseDto;
 import com.intact_id.dto.response.CompanyApplicationResponseDto;
+import com.intact_id.service.email.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import com.intact_id.util.mapper.MapperUtils;
@@ -36,6 +37,7 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     private final CompanyApplicationApprovalRepository approvalRepository;
     private final GeneratorUtils generatorUtils;
     private final MapperUtils mapperUtils;
+    private final EmailService emailService;
 
     // ================= SUBMIT APPLICATION =================
 
@@ -60,6 +62,22 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
         var saved = applicationRepository.save(application);
 
         log.info("Application submitted successfully: {}", saved.getApplicationNumber());
+
+        // Send confirmation email — fire-and-forget, never fail the submission
+        try {
+            String trackUrl = "https://intact-id.com/track?ref=" + saved.getApplicationNumber();
+            boolean emailSent = emailService.sendApplicationReceivedEmail(
+                    saved.getEmail(),
+                    saved.getLegalName(),
+                    saved.getApplicationNumber(),
+                    trackUrl);
+            if (!emailSent) {
+                log.warn("Confirmation email could not be delivered for application: {}", saved.getApplicationNumber());
+            }
+        } catch (Exception e) {
+            log.error("Unexpected error sending confirmation email for application {}: {}",
+                    saved.getApplicationNumber(), e.getMessage(), e);
+        }
 
         return CompanyApplicationCreationResponseDto.builder()
                 .applicationNumber(saved.getApplicationNumber())

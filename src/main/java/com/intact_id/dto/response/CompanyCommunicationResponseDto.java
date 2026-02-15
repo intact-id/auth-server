@@ -22,8 +22,10 @@ public class CompanyCommunicationResponseDto {
     private String supportEmail;
     private String billingEmail;
     private String webhookUrl;
+    private String webhookSecret;
     private Boolean webhookEnabled;
     private Boolean emailNotifications;
     private Boolean smsNotifications;
     private Map<String, Object> notificationSettings;
+    private Map<String, Object> payloadFields;
 }

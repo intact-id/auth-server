@@ -46,6 +46,7 @@ public class WebhookNotificationEventHandler implements InternalEventHandler<Web
                     .eventId(UUID.randomUUID().toString())
                     .timestamp(LocalDateTime.now())
                     .companyId(data.getCompanyId())
+                    .companyName(company.getLegalName())
                     .verificationId(data.getVerificationId())
                     .data(convertToMap(data.getEventData()))
                     .build();

@@ -27,7 +27,7 @@ public class ApiKeyController {
 
     @PostMapping("/generate")
     @Operation(summary = "Generate or regenerate API key for company")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ApiKeyGenerationResponseDto>> generateApiKey(
             @RequestParam(required = false) String companyId) {
 
@@ -53,7 +53,7 @@ public class ApiKeyController {
 
     @PostMapping("/generate/dev")
     @Operation(summary = "Generate or regenerate DEV API key for company (Admin only)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ApiKeyGenerationResponseDto>> generateDevApiKey(
             @RequestParam(required = false) String companyId) {
 
@@ -78,8 +78,8 @@ public class ApiKeyController {
     }
 
     @PostMapping("/generate/prod")
-    @Operation(summary = "Generate or regenerate PROD API key for company (Admin only)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Generate or regenerate PROlsD API key for company (Admin only)")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ApiKeyGenerationResponseDto>> generateProdApiKey(
             @RequestParam(required = false) String companyId) {
 
@@ -104,7 +104,7 @@ public class ApiKeyController {
     }
     @DeleteMapping("/{keyId}")
     @Operation(summary = "Revoke API key")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> revokeApiKey(
             @PathVariable String keyId,
             @RequestParam(required = false) String companyId) {
@@ -130,7 +130,7 @@ public class ApiKeyController {
 
     @GetMapping
     @Operation(summary = "Get company API keys")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<ApiKeyGenerationResponseDto>>> getApiKeys(
             @RequestParam(required = false) String companyId) {
 
@@ -147,7 +147,7 @@ public class ApiKeyController {
 
     @GetMapping("/usage")
     @Operation(summary = "Get API key usage metrics (Admin only)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ApiKeyUsageResponseDto>> getUsage(
             @RequestParam(required = false) String companyId) {
 
