@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -107,106 +106,6 @@ public class VerificationService {
                 .webhookUrl(savedRequest.getWebhookUrl())
                 .message("Verification submitted successfully and is being processed")
                 .build();
-    }
-
-    private void addDocument(List<VerificationDocument> list, VerificationDocument doc) {
-        if (doc != null)
-            list.add(doc);
-    }
-
-    @Async
-    @Transactional
-    public void processVerificationAsync(VerificationRequest request, KycVerificationRequestDto requestDto) {
-        try {
-            log.info("Starting async verification processing for: {}", request.getId());
-
-            // Update status to processing
-            request.markAsProcessing();
-            verificationRequestRepository.save(request);
-
-            // Save documents in background (this was blocking the API before)
-            List<VerificationDocument> documents = new java.util.ArrayList<>();
-            addDocument(documents, saveDocument(request, requestDto.getSelfie(), "selfie"));
-            addDocument(documents, saveDocument(request, requestDto.getIdFront(), "id_front"));
-            if (requestDto.getIdBack() != null)
-                addDocument(documents, saveDocument(request, requestDto.getIdBack(), "id_back"));
-            if (requestDto.getProofOfAddress() != null)
-                addDocument(documents, saveDocument(request, requestDto.getProofOfAddress(), "proof_of_address"));
-
-            // Call external KYC service (mocked)
-            ExternalKycServiceClient.VerificationResult result = externalKycServiceClient
-                    .performVerification(request.getTier(), request, documents).get();
-
-            // Save verification steps
-            for (ExternalKycServiceClient.CheckResult check : result.getChecks()) {
-                VerificationStep step = new VerificationStep();
-                step.setVerificationRequest(request);
-                step.setStepName(check.getStepName());
-                step.setStatus("passed".equals(check.getStatus()) ? GlobalStatuses.COMPLETED : GlobalStatuses.FAILED);
-                step.setConfidenceScore(check.getConfidenceScore());
-                step.setResult(check.getResult());
-                step.setExecutedAt(LocalDateTime.now());
-                verificationStepRepository.save(step);
-            }
-
-            // Map business-level document failures to REJECTED instead of FAILED.
-            if (shouldRejectVerification(result.getFailureReason(), result.getErrorDetails(), result.getOverallDecision())) {
-                request.markAsRejected(result.getFailureReason(), result.getErrorDetails(), result.getRiskScore());
-            } else {
-                request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
-
-                if (result.getFailureReason() != null) {
-                    request.setFailureReason(result.getFailureReason());
-                }
-                if (result.getErrorDetails() != null) {
-                    request.setErrorDetails(result.getErrorDetails());
-                }
-            }
-
-            verificationRequestRepository.save(request);
-
-            log.info("Verification completed successfully for: {}", request.getId());
-
-            // Send webhook notification
-            webhookService.sendVerificationCompletedWebhook(request.getCompany(), request);
-
-        } catch (Exception e) {
-            log.error("Verification processing failed for: {}", request.getId(), e);
-
-            String failureReason = "SystemError";
-            String errorDetails = e.getMessage();
-
-            // Extract more specific error information if available
-            if (e.getCause() != null && e.getCause() instanceof feign.FeignException) {
-                feign.FeignException feignException = (feign.FeignException) e.getCause();
-                try {
-                    String responseBody = feignException.contentUTF8();
-                    if (responseBody != null && !responseBody.isEmpty()) {
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        com.fasterxml.jackson.databind.JsonNode errorJson = mapper.readTree(responseBody);
-
-                        if (errorJson.has("error")) {
-                            failureReason = errorJson.get("error").asText();
-                        }
-                        if (errorJson.has("message")) {
-                            errorDetails = errorJson.get("message").asText();
-                        }
-                    }
-                } catch (Exception parseEx) {
-                    log.warn("Failed to parse error response", parseEx);
-                }
-            }
-
-            if (shouldRejectVerification(failureReason, errorDetails, null)) {
-                request.markAsRejected(failureReason, errorDetails, 0.95);
-            } else {
-                request.markAsFailed(failureReason, errorDetails);
-            }
-            verificationRequestRepository.save(request);
-
-            // Send webhook notification for failure
-            webhookService.sendVerificationFailedWebhook(request.getCompany(), request);
-        }
     }
 
     private VerificationDocument saveDocument(VerificationRequest request, MultipartFile file, String documentType) {

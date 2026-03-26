@@ -141,8 +141,8 @@
         <div class="footer">
             <p>
                 This is an automated message from Intact ID<br>
-                <a href="https://intact-id.com">intact-id.com</a> |
-                <a href="mailto:support@intact-id.com">support@intact-id.com</a>
+                <a th:href="${baseUrl}" th:text="${baseUrl}">intact-id.com</a> |
+                <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}">support@intact-id.com</a>
             </p>
             <p style="font-size: 11px; color: #484f58; margin-top: 15px;">
                 © 2025 Intact ID. All rights reserved.

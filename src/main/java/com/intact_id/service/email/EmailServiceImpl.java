@@ -30,6 +30,27 @@ public class EmailServiceImpl implements EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    @Value("${app.support-email}")
+    private String supportEmail;
+
+    @Value("${app.base-url}")
+    private String baseUrl;
+
+    @Value("${app.dashboard-url}")
+    private String dashboardUrl;
+
+    @Value("${app.docs-url}")
+    private String docsUrl;
+
+    private Map<String, Object> commonVars() {
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("supportEmail", supportEmail);
+        vars.put("baseUrl", baseUrl);
+        vars.put("dashboardUrl", dashboardUrl);
+        vars.put("docsUrl", docsUrl);
+        return vars;
+    }
+
     @Override
     public boolean sendTemplatedEmail(EmailDTO emailDTO) {
         try {
@@ -92,12 +113,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanyApprovalEmail(String companyEmail, String companyName, String apiKey, String apiSecret) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("apiKey", apiKey);
         variables.put("apiSecret", apiSecret);
-        variables.put("dashboardUrl", "https://dashboard.intact-id.com");
-        variables.put("docsUrl", "https://docs.intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -111,11 +130,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanyRejectionEmail(String companyEmail, String companyName, String rejectionReason) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("rejectionReason", rejectionReason != null ? rejectionReason
                 : "Your application did not meet our requirements at this time.");
-        variables.put("supportEmail", "support@intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -129,11 +147,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanySuspensionEmail(String companyEmail, String companyName, String suspensionReason) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("suspensionReason",
                 suspensionReason != null ? suspensionReason : "Violation of terms of service");
-        variables.put("supportEmail", "support@intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -147,9 +164,8 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanyActivationEmail(String companyEmail, String companyName) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
-        variables.put("dashboardUrl", "https://dashboard.intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -164,11 +180,10 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public boolean sendApplicationReceivedEmail(String companyEmail, String companyName,
             String applicationNumber, String trackUrl) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("applicationNumber", applicationNumber);
         variables.put("trackUrl", trackUrl);
-        variables.put("supportEmail", "support@intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -183,12 +198,11 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public boolean sendVerificationCompletedEmail(String applicantEmail, String applicantName,
             String verificationStatus, String verificationId) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("applicantName", applicantName);
         variables.put("verificationStatus", verificationStatus);
         variables.put("verificationId", verificationId);
         variables.put("isApproved", "APPROVED".equalsIgnoreCase(verificationStatus));
-        variables.put("supportEmail", "support@intact-id.com");
 
         String subject = "APPROVED".equalsIgnoreCase(verificationStatus)
                 ? "Your Identity Verification Has Been Approved"

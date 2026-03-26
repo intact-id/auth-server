@@ -8,9 +8,11 @@ import com.intact_id.db.model.kyc.VerificationStep;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
 import com.intact_id.db.repository.kyc.VerificationStepRepository;
-import com.intact_id.service.webhook.WebhookService;
+import com.intact_id.service.kyc.events.VerificationStatusChangedData;
+import com.intact_id.service.kyc.events.VerificationStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -29,7 +31,7 @@ public class VerificationProcessingScheduler {
     private final VerificationDocumentRepository verificationDocumentRepository;
     private final VerificationStepRepository verificationStepRepository;
     private final ExternalKycServiceClient externalKycServiceClient;
-    private final WebhookService webhookService;
+    private final ApplicationEventPublisher eventPublisher;
     private final VerificationProcessingConfig config;
 
     @Scheduled(fixedDelayString = "${verification.processing.poll-interval-ms:30000}")
@@ -57,6 +59,7 @@ public class VerificationProcessingScheduler {
                 } catch (Exception e) {
                     log.error("Verification processing failed for: {}", request.getId(), e);
                     markAsFailed(request, "SystemError", e.getMessage());
+                    publishStatusChanged(request);
                 }
 
                 // Delay between calls (skip after last request)
@@ -117,7 +120,7 @@ public class VerificationProcessingScheduler {
             }
 
             markAsFailed(request, failureReason, errorDetails);
-            webhookService.sendVerificationFailedWebhook(request.getCompany(), request);
+            publishStatusChanged(request);
             return;
         }
 
@@ -151,8 +154,13 @@ public class VerificationProcessingScheduler {
 
         log.info("Verification completed for: {} with decision: {}", request.getId(), result.getOverallDecision());
 
-        // Send webhook notification
-        webhookService.sendVerificationCompletedWebhook(request.getCompany(), request);
+        publishStatusChanged(request);
+    }
+
+    private void publishStatusChanged(VerificationRequest request) {
+        eventPublisher.publishEvent(new VerificationStatusChangedEvent(
+                this, new VerificationStatusChangedData(
+                        request.getId(), request.getCompany().getId(), request.getStatus())));
     }
 
     private void markAsFailed(VerificationRequest request, String failureReason, String errorDetails) {
