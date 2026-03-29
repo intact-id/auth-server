@@ -8,6 +8,7 @@ import com.intact_id.service.webhook.WebhookService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ public class WebhookNotificationEventHandler implements InternalEventHandler<Web
     private final CompanyRepository companyRepository;
 
     @Override
+    @EventListener
     public void handle(WebhookNotificationEvent event) {
         WebhookEventData data = event.getData();
 
