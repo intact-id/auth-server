@@ -22,7 +22,7 @@ public class VerificationStatusChangedEventHandler {
      * Fires after the scheduler's transaction commits, so the handler always
      * reads the final persisted status from the DB.
      */
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void handle(VerificationStatusChangedEvent event) {
         VerificationStatusChangedData data = event.getData();
 
