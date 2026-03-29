@@ -88,4 +88,19 @@ public interface EmailService {
      */
     boolean sendApplicationReceivedEmail(String companyEmail, String companyName,
             String applicationNumber, String trackUrl);
+
+    /**
+     * Notify the application's contact person that their application is under review (maker approved).
+     * Does NOT include any internal notes or end-user messages.
+     */
+    boolean sendApplicationUnderReviewEmail(String contactEmail, String contactPersonName,
+            String companyName, String applicationNumber);
+
+    /**
+     * Alert a checker/admin that an application is pending their approval.
+     * Includes the maker's end-user message and approver note.
+     */
+    boolean sendCheckerActionRequiredEmail(String checkerEmail, String checkerName,
+            String companyName, String applicationNumber,
+            String endUserMessage, String approverNote);
 }

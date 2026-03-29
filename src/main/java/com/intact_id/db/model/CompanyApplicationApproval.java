@@ -21,7 +21,7 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = false)
 public class CompanyApplicationApproval extends Auditable {
 
-    @Column(name = "company_id", nullable = false)
+    @Column(name = "company_id")
     private String companyId;
 
     @Column(name = "application_id", nullable = false)

@@ -196,6 +196,45 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    public boolean sendApplicationUnderReviewEmail(String contactEmail, String contactPersonName,
+            String companyName, String applicationNumber) {
+        Map<String, Object> variables = commonVars();
+        variables.put("contactPersonName", contactPersonName);
+        variables.put("companyName", companyName);
+        variables.put("applicationNumber", applicationNumber);
+
+        EmailDTO emailDTO = EmailDTO.builder()
+                .to(contactEmail)
+                .subject("Your Application is Under Review – " + applicationNumber)
+                .templateName("application-under-review")
+                .variables(variables)
+                .build();
+
+        return sendTemplatedEmail(emailDTO);
+    }
+
+    @Override
+    public boolean sendCheckerActionRequiredEmail(String checkerEmail, String checkerName,
+            String companyName, String applicationNumber,
+            String endUserMessage, String approverNote) {
+        Map<String, Object> variables = commonVars();
+        variables.put("checkerName", checkerName);
+        variables.put("companyName", companyName);
+        variables.put("applicationNumber", applicationNumber);
+        variables.put("endUserMessage", endUserMessage);
+        variables.put("approverNote", approverNote);
+
+        EmailDTO emailDTO = EmailDTO.builder()
+                .to(checkerEmail)
+                .subject("Action Required: Application " + applicationNumber + " Pending Your Approval")
+                .templateName("checker-action-required")
+                .variables(variables)
+                .build();
+
+        return sendTemplatedEmail(emailDTO);
+    }
+
+    @Override
     public boolean sendVerificationCompletedEmail(String applicantEmail, String applicantName,
             String verificationStatus, String verificationId) {
         Map<String, Object> variables = commonVars();

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, String> {
@@ -25,6 +26,9 @@ public interface UserRepository extends JpaRepository<User, String> {
     boolean existsByEmailAndCompanyIsNull(String email);
 
     Page<User> findByStatus(GlobalStatuses status, Pageable pageable);
+
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName AND u.status = 'ACTIVE' AND u.company IS NULL")
+    List<User> findActiveAdminUsersByRole(@Param("roleName") String roleName);
 
     @Query(value = "SELECT * FROM users u WHERE " +
             "(:companyId IS NULL OR u.company_id = :companyId) AND " +

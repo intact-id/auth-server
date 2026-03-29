@@ -3,8 +3,10 @@ package com.intact_id.service.companyApplicationService;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.CompanyApplication;
 import com.intact_id.db.model.CompanyApplicationApproval;
+import com.intact_id.db.model.user.User;
 import com.intact_id.db.repository.CompanyApplicationApprovalRepository;
 import com.intact_id.db.repository.CompanyApplicationRepository;
+import com.intact_id.db.repository.user.UserRepository;
 import com.intact_id.dto.request.CompanyApplicationApprovalRequestDto;
 import com.intact_id.dto.request.CompanyApplicationRequestDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
@@ -21,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * @Author frank
@@ -38,6 +41,7 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     private final GeneratorUtils generatorUtils;
     private final MapperUtils mapperUtils;
     private final EmailService emailService;
+    private final UserRepository userRepository;
 
     // ================= SUBMIT APPLICATION =================
 
@@ -175,7 +179,44 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
         var savedApproval = approvalRepository.save(approval);
         applicationRepository.save(application);
 
+        if (request.getPerformedByAction() == GlobalStatuses.APPROVED) {
+            sendMakerApprovalEmails(application, request);
+        }
+
         return mapperUtils.toApplicationApprovalResponseDto(savedApproval);
+    }
+
+    private void sendMakerApprovalEmails(CompanyApplication application, CompanyApplicationApprovalRequestDto request) {
+        // Notify contact person — no internal notes
+        String contactEmail = application.getContactPersonEmail() != null
+                ? application.getContactPersonEmail()
+                : application.getEmail();
+        String contactName = application.getContactPersonName() != null
+                ? application.getContactPersonName()
+                : application.getLegalName();
+        try {
+            emailService.sendApplicationUnderReviewEmail(
+                    contactEmail, contactName,
+                    application.getLegalName(), application.getApplicationNumber());
+        } catch (Exception e) {
+            log.warn("Failed to send under-review email for application {}: {}", application.getApplicationNumber(), e.getMessage());
+        }
+
+        // Alert all active checkers and admins
+        List<User> recipients = new java.util.ArrayList<>(userRepository.findActiveAdminUsersByRole("CHECKER"));
+        recipients.addAll(userRepository.findActiveAdminUsersByRole("ADMIN"));
+        for (User checker : recipients) {
+            try {
+                String checkerName = (checker.getFirstName() != null ? checker.getFirstName() : checker.getUsername());
+                emailService.sendCheckerActionRequiredEmail(
+                        checker.getEmail(), checkerName,
+                        application.getLegalName(), application.getApplicationNumber(),
+                        request.getEndUserMessage(), request.getApproverNote());
+            } catch (Exception e) {
+                log.warn("Failed to send checker alert to {} for application {}: {}",
+                        checker.getEmail(), application.getApplicationNumber(), e.getMessage());
+            }
+        }
     }
 
 
