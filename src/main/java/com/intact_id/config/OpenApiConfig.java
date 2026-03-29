@@ -32,7 +32,7 @@ public class OpenApiConfig {
                                 .name("Apache 2.0")
                                 .url("https://www.apache.org/licenses/LICENSE-2.0.html")))
                 .servers(List.of(
-                        new Server().url("http://auth.144-91-122-121.sslip.io").description("VPS Server"),
+                        new Server().url("https://auth.144-91-122-121.sslip.io").description("VPS Server"),
                         new Server().url("http://144.91.122.121:8080").description("VPS Server (Direct)"),
                         new Server().url("http://localhost:8080").description("Local Development Server"),
                         new Server().url("https://prod.api.intact-id.com").description("Production Server"),
