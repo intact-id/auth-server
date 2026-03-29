@@ -61,6 +61,13 @@ public class CredentialsValidator {
     }
 
     public ApiKeyEnvironment resolveEnvironment(HttpServletRequest httpServletRequest) {
+        // Resolve from the API key prefix first — most reliable signal
+        String apiKey = httpServletRequest.getHeader("X-API-Key");
+        if (apiKey != null && apiKey.startsWith("ak_dev_")) {
+            return ApiKeyEnvironment.DEV;
+        }
+
+        // Fall back to path-based resolution
         String path = httpServletRequest.getRequestURI();
         if (path != null && path.contains("/api/v1/kyc/dev")) {
             return ApiKeyEnvironment.DEV;
