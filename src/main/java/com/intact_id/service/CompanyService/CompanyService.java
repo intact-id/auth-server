@@ -29,6 +29,10 @@ public interface CompanyService {
 
     Company activateCompany(String companyId, String adminId);
 
+    void suspendCredentials(String companyId, String environment);
+
+    void activateCredentials(String companyId, String environment);
+
     Company updateCompany(String companyId, CompanyUpdateRequestDto request);
 
     Page<Company> getAllCompanies(GlobalStatuses status, String country, String businessType, Pageable pageable);
