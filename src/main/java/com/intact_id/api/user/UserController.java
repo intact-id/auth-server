@@ -1,6 +1,7 @@
 package com.intact_id.api.user;
 
 import com.intact_id.constant.enums.GlobalStatuses;
+import com.intact_id.dto.auth.RoleResponseDto;
 import com.intact_id.dto.auth.UserCreateDto;
 import com.intact_id.dto.auth.UserResponseDto;
 import com.intact_id.dto.response.ApiResponse;
@@ -302,6 +303,21 @@ public class UserController {
                                                 .success(true)
                                                 .responseCode(HttpStatus.OK.value())
                                                 .responseMessage("User deleted successfully")
+                                                .build());
+        }
+
+        @GetMapping("/roles")
+        @PreAuthorize("hasRole('SUPER_ADMIN')")
+        @Operation(summary = "Get all available roles")
+        public ResponseEntity<ApiResponse<List<RoleResponseDto>>> getAllRoles() {
+                List<RoleResponseDto> roles = userService.getAllRoles();
+
+                return ResponseEntity.ok(
+                                ApiResponse.<List<RoleResponseDto>>builder()
+                                                .success(true)
+                                                .responseCode(HttpStatus.OK.value())
+                                                .responseMessage("Roles retrieved successfully")
+                                                .data(roles)
                                                 .build());
         }
 }
