@@ -99,6 +99,10 @@ verification:
     batch-size: 5
     delay-between-calls-ms: 10000
 
+# Application URLs
+app:
+  dashboard-url: ${DASHBOARD_URL:http://localhost:5173}
+
 # Face Screening Service
 face-service:
   url: ${FACE_SERVICE_URL:http://localhost:8000}

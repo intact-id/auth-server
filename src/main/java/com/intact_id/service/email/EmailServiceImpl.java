@@ -30,6 +30,9 @@ public class EmailServiceImpl implements EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    @Value("${app.dashboard-url}")
+    private String dashboardUrl;
+
     @Override
     public boolean sendTemplatedEmail(EmailDTO emailDTO) {
         try {
@@ -92,7 +95,7 @@ public class EmailServiceImpl implements EmailService {
         variables.put("companyName", companyName);
         variables.put("apiKey", apiKey);
         variables.put("apiSecret", apiSecret);
-        variables.put("dashboardUrl", "https://dashboard.intact-id.com");
+        variables.put("dashboardUrl", dashboardUrl);
         variables.put("docsUrl", "https://docs.intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
@@ -145,7 +148,7 @@ public class EmailServiceImpl implements EmailService {
     public boolean sendCompanyActivationEmail(String companyEmail, String companyName) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("companyName", companyName);
-        variables.put("dashboardUrl", "https://dashboard.intact-id.com");
+        variables.put("dashboardUrl", dashboardUrl);
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)

@@ -17,6 +17,7 @@ import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +33,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    @Value("${app.dashboard-url}")
+    private String dashboardUrl;
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -148,7 +152,7 @@ public class UserService {
             variables.put("fullName", user.getFirstName() + " " + user.getLastName());
             variables.put("username", user.getUsername());
             variables.put("password", temporaryPassword);
-            variables.put("dashboardUrl", "http://localhost:5173/login");
+            variables.put("dashboardUrl", dashboardUrl + "/login");
 
             EmailDTO emailDTO = new EmailDTO();
             emailDTO.setTo(user.getEmail());
