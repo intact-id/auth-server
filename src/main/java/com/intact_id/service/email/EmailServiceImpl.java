@@ -86,7 +86,6 @@ public class EmailServiceImpl implements EmailService {
             log.error("Failed to build email to {}: {}", emailDTO.getTo(), e.getMessage(), e);
             return false;
         } catch (Exception e) {
-            // Catches MailSendException (RuntimeException) from SMTP auth/connection failures
             log.error("Failed to send email to {} via SMTP: {}", emailDTO.getTo(), e.getMessage(), e);
             return false;
         }

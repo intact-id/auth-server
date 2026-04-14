@@ -70,14 +70,12 @@ face-service:
 app:
   documents:
     base-dir: ${APP_DOCUMENTS_BASE_DIR:${user.dir}/uploads}
-  # Branding / contact — override these per environment
   support-email: ${SUPPORT_EMAIL:support@intact-id.com}
   base-url: ${APP_BASE_URL:https://intact-id.com}
   dashboard-url: ${DASHBOARD_URL:https://dashboard.intact-id.com}
   docs-url: ${DOCS_URL:https://docs.intact-id.com}
 
 # CORS — origins supplied via env var (comma-separated)
-# Dev profile provides localhost defaults; prod requires explicit CORS_ALLOWED_ORIGINS
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
