@@ -307,7 +307,7 @@ public class UserController {
         }
 
         @GetMapping("/roles")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasRole('SUPER_ADMIN')")
         @Operation(summary = "Get all available roles")
         public ResponseEntity<ApiResponse<List<RoleResponseDto>>> getAllRoles() {
                 List<RoleResponseDto> roles = userService.getAllRoles();
