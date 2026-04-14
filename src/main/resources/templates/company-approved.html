@@ -88,7 +88,7 @@
 
             <p style="color: #8b949e; margin: 25px 0 0 0; line-height: 1.6;">
                 If you have any questions, our support team is here to help at
-                <a href="mailto:support@intact-id.com"
+                <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}"
                     style="color: #58a6ff; text-decoration: none;">support@intact-id.com</a>
             </p>
         </div>
@@ -98,9 +98,9 @@
             style="background: #0d1117; padding: 30px; text-align: center; color: #484f58; font-size: 13px; border-top: 1px solid #30363d;">
             <p style="margin: 0 0 10px 0;">
                 This is an automated message from Intact ID<br>
-                <a href="https://intact-id.com" style="color: #58a6ff; text-decoration: none;">intact-id.com</a> |
-                <a href="mailto:support@intact-id.com"
-                    style="color: #58a6ff; text-decoration: none;">support@intact-id.com</a>
+                <a th:href="${baseUrl}" th:text="${baseUrl}" style="color: #58a6ff; text-decoration: none;"></a> |
+                <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}"
+                    style="color: #58a6ff; text-decoration: none;"></a>
             </p>
             <p style="font-size: 11px; color: #484f58; margin: 0;">
                 © 2025 Intact ID. All rights reserved.

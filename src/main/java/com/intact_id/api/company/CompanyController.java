@@ -71,7 +71,7 @@ public class CompanyController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update company details")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> updateCompany(
             @PathVariable String id,
             @Valid @RequestBody CompanyUpdateRequestDto request) {
@@ -172,7 +172,7 @@ public class CompanyController {
 
     @PutMapping("/{id}/communication/webhook")
     @Operation(summary = "Update webhook settings")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> updateWebhookSettings(
             @PathVariable String id,
             @Valid @RequestBody WebhookSettingsRequestDto request) {
@@ -201,7 +201,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/communication/webhook/test")
     @Operation(summary = "Test webhook endpoint")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> testWebhook(@PathVariable String id) {
 
         try {
@@ -246,9 +246,37 @@ public class CompanyController {
         }
     }
 
+    @PostMapping("/{id}/communication/webhook/rotate-secret")
+    @Operation(summary = "Rotate webhook signing secret")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> rotateWebhookSecret(@PathVariable String id) {
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            CompanyCommunicationDetails communication = companyService.rotateWebhookSecret(resolvedCompanyId);
+            // Return the full (unmasked) secret once — consumer must copy it now
+            CompanyCommunicationResponseDto response = mapCommunicationToDto(communication);
+            response.setWebhookSecret(communication.getWebhookSecret());
+
+            return ResponseEntity.ok(
+                    ApiResponse.<CompanyCommunicationResponseDto>builder()
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Webhook secret rotated. Copy it now — it will not be shown again in full.")
+                            .success(true)
+                            .data(response)
+                            .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<CompanyCommunicationResponseDto>builder()
+                            .responseCode(HttpStatus.NOT_FOUND.value())
+                            .responseMessage(e.getMessage())
+                            .success(false)
+                            .build());
+        }
+    }
+
     @PostMapping("/{id}/credentials/suspend")
     @Operation(summary = "Suspend company credentials (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> suspendCredentials(
             @PathVariable String id,
             @RequestParam(required = false) String reason) {
@@ -283,7 +311,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/credentials/activate")
     @Operation(summary = "Activate company credentials (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> activateCredentials(@PathVariable String id) {
 
         try {
@@ -317,7 +345,7 @@ public class CompanyController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete company (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> deleteCompany(@PathVariable String id) {
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
@@ -348,7 +376,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/suspend")
     @Operation(summary = "Suspend company (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> suspendCompany(
             @PathVariable String id,
             @RequestParam(required = false) String reason) {
@@ -434,6 +462,12 @@ public class CompanyController {
                 .build();
     }
 
+    /** Shows first 10 and last 4 chars: whsec_ab12...ef34 */
+    private String maskSecret(String secret) {
+        if (secret == null || secret.length() < 15) return secret;
+        return secret.substring(0, 10) + "..." + secret.substring(secret.length() - 4);
+    }
+
     private CompanyCommunicationResponseDto mapCommunicationToDto(CompanyCommunicationDetails communication) {
         return CompanyCommunicationResponseDto.builder()
                 .id(communication.getId())
@@ -445,10 +479,12 @@ public class CompanyController {
                 .supportEmail(communication.getSupportEmail())
                 .billingEmail(communication.getBillingEmail())
                 .webhookUrl(communication.getWebhookUrl())
+                .webhookSecret(maskSecret(communication.getWebhookSecret()))
                 .webhookEnabled(communication.getWebhookEnabled())
                 .emailNotifications(communication.getEmailNotifications())
                 .smsNotifications(communication.getSmsNotifications())
                 .notificationSettings(communication.getNotificationSettings())
+                .payloadFields(communication.getPayloadFields())
                 .build();
     }
 }

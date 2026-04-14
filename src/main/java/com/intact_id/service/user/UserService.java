@@ -1,5 +1,6 @@
 package com.intact_id.service.user;
 
+import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.model.user.Role;
 import com.intact_id.db.model.user.User;
@@ -10,7 +11,7 @@ import com.intact_id.dto.auth.RoleResponseDto;
 import com.intact_id.dto.auth.UserCreateDto;
 import com.intact_id.dto.auth.UserResponseDto;
 import com.intact_id.dto.email.EmailDTO;
-import com.intact_id.constant.enums.GlobalStatuses;
+import com.intact_id.service.email.EmailService;
 import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
@@ -24,7 +25,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -41,7 +41,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
-    private final com.intact_id.service.email.EmailService emailService;
+    private final EmailService emailService;
     private final GeneratorUtils generatorUtils;
 
     /**
@@ -81,7 +81,7 @@ public class UserService {
         if (plainPassword == null || plainPassword.trim().isEmpty()) {
             plainPassword = generatorUtils.generateRandomPassword();
             isRandomPassword = true;
-            log.info("Generated random password for user: {}, :{}", request.getUsername(),plainPassword);
+            log.info("Generated random password for user: {}, :{}", request.getUsername(), plainPassword);
         }
 
         // Create user

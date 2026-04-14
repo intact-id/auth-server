@@ -2,6 +2,8 @@ package com.intact_id.dto.request;
 
 import lombok.Data;
 
+import java.util.Map;
+
 /**
  * @Author frank
  *         email frank.mwangi@dadanadagroup.com
@@ -13,4 +15,5 @@ public class WebhookSettingsRequestDto {
     private Boolean webhookEnabled;
     private Boolean emailNotifications;
     private Boolean smsNotifications;
+    private Map<String, Object> payloadFields;
 }

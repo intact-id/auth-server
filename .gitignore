@@ -1,4 +1,11 @@
 HELP.md
+
+### Environment files — never commit real secrets ###
+.env
+.env.dev
+.env.prod
+.env.local
+# .env.example is intentionally tracked
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

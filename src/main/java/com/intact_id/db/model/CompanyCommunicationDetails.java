@@ -60,6 +60,10 @@ public class CompanyCommunicationDetails extends Auditable { ;
     @Column(name = "webhook_url")
     private String webhookUrl;
 
+    /** HMAC-SHA256 signing secret for webhook payload verification. Never exposed in list APIs. */
+    @Column(name = "webhook_secret")
+    private String webhookSecret;
+
     @Column(name = "webhook_enabled")
     private Boolean webhookEnabled = false;
 
@@ -83,7 +87,25 @@ public class CompanyCommunicationDetails extends Auditable { ;
     @Convert(converter = PgJsonbToMapConverter.class)
     private Map<String, Object> notificationSettings = new HashMap<>();
 
+    /**
+     * Controls which fields are included in outgoing webhook payloads.
+     * Keys: includeIds, includeTier, includeTimestamps, includeResults, includeRawScores, includeApplicant
+     * Defaults: all true except includeRawScores and includeApplicant (false — sensitive/PII).
+     */
+    @Column(name = "payload_fields", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Convert(converter = PgJsonbToMapConverter.class)
+    private Map<String, Object> payloadFields = new HashMap<>();
 
+    /** Returns true when the given payloadField should be included. Safe defaults applied when not configured. */
+    public boolean isPayloadFieldEnabled(String field) {
+        if (payloadFields == null || !payloadFields.containsKey(field)) {
+            // raw scores and applicant info are OFF by default for security
+            return !"includeRawScores".equals(field) && !"includeApplicant".equals(field);
+        }
+        Object val = payloadFields.get(field);
+        return val instanceof Boolean ? (Boolean) val : true;
+    }
 
     public boolean shouldNotifyByEmail() {
         return emailNotifications != null && emailNotifications;

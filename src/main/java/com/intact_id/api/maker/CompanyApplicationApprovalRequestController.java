@@ -4,6 +4,7 @@ import com.intact_id.dto.request.CompanyApplicationApprovalRequestDto;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.service.companyApplicationService.CompanyApplicationService;
+import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -29,6 +31,7 @@ public class CompanyApplicationApprovalRequestController {
     private final CompanyApplicationService companyApplicationService;
 
     @PostMapping("/{applicationId}/maker-action")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Perform maker action on application")
     public ResponseEntity<ApiResponse<ApplicationApprovalResponseDto>> performMakerAction(
             @PathVariable String applicationId,
@@ -40,6 +43,7 @@ public class CompanyApplicationApprovalRequestController {
             log.info("Maker action request for application: {}", applicationId);
 
             request.setApplicationId(applicationId);
+            request.setPerformedBy(SecurityContextUtil.getAuthenticatedUser().getId());
             var response = companyApplicationService.performMakerAction(request);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(

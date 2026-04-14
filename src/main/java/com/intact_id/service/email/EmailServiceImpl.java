@@ -30,8 +30,26 @@ public class EmailServiceImpl implements EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    @Value("${app.support-email}")
+    private String supportEmail;
+
+    @Value("${app.base-url}")
+    private String baseUrl;
+
     @Value("${app.dashboard-url}")
     private String dashboardUrl;
+
+    @Value("${app.docs-url}")
+    private String docsUrl;
+
+    private Map<String, Object> commonVars() {
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("supportEmail", supportEmail);
+        vars.put("baseUrl", baseUrl);
+        vars.put("dashboardUrl", dashboardUrl);
+        vars.put("docsUrl", docsUrl);
+        return vars;
+    }
 
     @Override
     public boolean sendTemplatedEmail(EmailDTO emailDTO) {
@@ -65,7 +83,10 @@ public class EmailServiceImpl implements EmailService {
             return true;
 
         } catch (MessagingException e) {
-            log.error("Failed to send email to: {}", emailDTO.getTo(), e);
+            log.error("Failed to build email to {}: {}", emailDTO.getTo(), e.getMessage(), e);
+            return false;
+        } catch (Exception e) {
+            log.error("Failed to send email to {} via SMTP: {}", emailDTO.getTo(), e.getMessage(), e);
             return false;
         }
     }
@@ -91,12 +112,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanyApprovalEmail(String companyEmail, String companyName, String apiKey, String apiSecret) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("apiKey", apiKey);
         variables.put("apiSecret", apiSecret);
-        variables.put("dashboardUrl", dashboardUrl);
-        variables.put("docsUrl", "https://docs.intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -110,11 +129,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanyRejectionEmail(String companyEmail, String companyName, String rejectionReason) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("rejectionReason", rejectionReason != null ? rejectionReason
                 : "Your application did not meet our requirements at this time.");
-        variables.put("supportEmail", "support@intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -128,11 +146,10 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanySuspensionEmail(String companyEmail, String companyName, String suspensionReason) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("suspensionReason",
                 suspensionReason != null ? suspensionReason : "Violation of terms of service");
-        variables.put("supportEmail", "support@intact-id.com");
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -146,9 +163,8 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanyActivationEmail(String companyEmail, String companyName) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
-        variables.put("dashboardUrl", dashboardUrl);
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
@@ -161,14 +177,70 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    public boolean sendApplicationReceivedEmail(String companyEmail, String companyName,
+            String applicationNumber, String trackUrl) {
+        Map<String, Object> variables = commonVars();
+        variables.put("companyName", companyName);
+        variables.put("applicationNumber", applicationNumber);
+        variables.put("trackUrl", trackUrl);
+
+        EmailDTO emailDTO = EmailDTO.builder()
+                .to(companyEmail)
+                .subject("Application Received – " + applicationNumber)
+                .templateName("application-received")
+                .variables(variables)
+                .build();
+
+        return sendTemplatedEmail(emailDTO);
+    }
+
+    @Override
+    public boolean sendApplicationUnderReviewEmail(String contactEmail, String contactPersonName,
+            String companyName, String applicationNumber) {
+        Map<String, Object> variables = commonVars();
+        variables.put("contactPersonName", contactPersonName);
+        variables.put("companyName", companyName);
+        variables.put("applicationNumber", applicationNumber);
+
+        EmailDTO emailDTO = EmailDTO.builder()
+                .to(contactEmail)
+                .subject("Your Application is Under Review – " + applicationNumber)
+                .templateName("application-under-review")
+                .variables(variables)
+                .build();
+
+        return sendTemplatedEmail(emailDTO);
+    }
+
+    @Override
+    public boolean sendCheckerActionRequiredEmail(String checkerEmail, String checkerName,
+            String companyName, String applicationNumber,
+            String endUserMessage, String approverNote) {
+        Map<String, Object> variables = commonVars();
+        variables.put("checkerName", checkerName);
+        variables.put("companyName", companyName);
+        variables.put("applicationNumber", applicationNumber);
+        variables.put("endUserMessage", endUserMessage);
+        variables.put("approverNote", approverNote);
+
+        EmailDTO emailDTO = EmailDTO.builder()
+                .to(checkerEmail)
+                .subject("Action Required: Application " + applicationNumber + " Pending Your Approval")
+                .templateName("checker-action-required")
+                .variables(variables)
+                .build();
+
+        return sendTemplatedEmail(emailDTO);
+    }
+
+    @Override
     public boolean sendVerificationCompletedEmail(String applicantEmail, String applicantName,
             String verificationStatus, String verificationId) {
-        Map<String, Object> variables = new HashMap<>();
+        Map<String, Object> variables = commonVars();
         variables.put("applicantName", applicantName);
         variables.put("verificationStatus", verificationStatus);
         variables.put("verificationId", verificationId);
         variables.put("isApproved", "APPROVED".equalsIgnoreCase(verificationStatus));
-        variables.put("supportEmail", "support@intact-id.com");
 
         String subject = "APPROVED".equalsIgnoreCase(verificationStatus)
                 ? "Your Identity Verification Has Been Approved"

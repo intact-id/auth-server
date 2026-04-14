@@ -80,4 +80,11 @@ public class ApplicationExceptions {
             super(message);
         }
     }
+
+    @ResponseStatus(HttpStatus.ALREADY_REPORTED)
+    public static class AlreadyReportedException extends RuntimeException {
+        public AlreadyReportedException(String message) {
+            super(message);
+        }
+    }
 }

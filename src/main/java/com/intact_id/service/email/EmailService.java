@@ -76,4 +76,31 @@ public interface EmailService {
      */
     boolean sendVerificationCompletedEmail(String applicantEmail, String applicantName,
             String verificationStatus, String verificationId);
+
+    /**
+     * Send application received confirmation email
+     *
+     * @param companyEmail      Company email address
+     * @param companyName       Company legal name
+     * @param applicationNumber Generated application number (e.g. APP-2026-XXXXXXXX)
+     * @param trackUrl          Public URL where applicant can track their status
+     * @return true if sent successfully
+     */
+    boolean sendApplicationReceivedEmail(String companyEmail, String companyName,
+            String applicationNumber, String trackUrl);
+
+    /**
+     * Notify the application's contact person that their application is under review (maker approved).
+     * Does NOT include any internal notes or end-user messages.
+     */
+    boolean sendApplicationUnderReviewEmail(String contactEmail, String contactPersonName,
+            String companyName, String applicationNumber);
+
+    /**
+     * Alert a checker/admin that an application is pending their approval.
+     * Includes the maker's end-user message and approver note.
+     */
+    boolean sendCheckerActionRequiredEmail(String checkerEmail, String checkerName,
+            String companyName, String applicationNumber,
+            String endUserMessage, String approverNote);
 }

@@ -137,8 +137,15 @@ public class ApiKeyServiceImpl implements ApiKeyService {
             credentials.setCompany(company);
         }
 
-        String rawApiKey = generatorUtils.generateApiKey();
-        String rawApiSecret = generatorUtils.generateApiSecret();
+        String rawApiKey;
+        String rawApiSecret;
+        if (environment == ApiKeyEnvironment.DEV) {
+            rawApiKey    = generatorUtils.generateDevApiKey();
+            rawApiSecret = generatorUtils.generateDevApiSecret();
+        } else {
+            rawApiKey    = generatorUtils.generateApiKey();
+            rawApiSecret = generatorUtils.generateApiSecret();
+        }
 
         if (environment == ApiKeyEnvironment.DEV) {
             credentials.setDevApiKeyHash(generatorUtils.hashString(rawApiKey));

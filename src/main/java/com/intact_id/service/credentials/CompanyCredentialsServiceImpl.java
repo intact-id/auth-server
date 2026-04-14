@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -79,6 +80,37 @@ public class CompanyCredentialsServiceImpl implements CompanyCredentialService {
             credentials.recordUsage(environment, success);
             credentialsRepository.save(credentials);
         });
+    }
+
+    @Override
+    @Transactional
+    public Map<String, String> generateProdCredentials(String companyId) {
+        CompanyCredentials credentials = credentialsRepository.findByCompanyId(companyId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                        "No credentials record found for company: " + companyId));
+
+        if (credentials.getProdApiKeyHash() != null) {
+            throw new ApplicationExceptions.DuplicateResourceException(
+                    "Production credentials already exist. Revoke existing keys before generating new ones.");
+        }
+
+        String apiKey    = generatorUtils.generateApiKey();
+        String apiSecret = generatorUtils.generateApiSecret();
+
+        credentials.setProdApiKeyHash(generatorUtils.hashString(apiKey));
+        credentials.setProdApiSecretHash(generatorUtils.hashString(apiSecret));
+        credentials.setProdStatus(GlobalStatuses.ACTIVE);
+        credentials.setProdRateLimitPerHour(500);
+        credentials.setProdRateLimitPerDay(10000);
+        credentials.setProdTotalRequests(0L);
+        credentials.setProdTotalSuccessfulRequests(0L);
+        credentials.setProdTotalFailedRequests(0L);
+
+        credentialsRepository.save(credentials);
+        log.info("PROD credentials generated for company: {}", companyId);
+
+        // Return plaintext keys — shown once; caller must display immediately
+        return Map.of("apiKey", apiKey, "apiSecret", apiSecret);
     }
 }
 

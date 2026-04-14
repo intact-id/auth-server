@@ -8,9 +8,11 @@ import com.intact_id.db.model.kyc.VerificationStep;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
 import com.intact_id.db.repository.kyc.VerificationStepRepository;
-import com.intact_id.service.webhook.WebhookService;
+import com.intact_id.service.kyc.events.VerificationStatusChangedData;
+import com.intact_id.service.kyc.events.VerificationStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -28,7 +31,7 @@ public class VerificationProcessingScheduler {
     private final VerificationDocumentRepository verificationDocumentRepository;
     private final VerificationStepRepository verificationStepRepository;
     private final ExternalKycServiceClient externalKycServiceClient;
-    private final WebhookService webhookService;
+    private final ApplicationEventPublisher eventPublisher;
     private final VerificationProcessingConfig config;
 
     @Scheduled(fixedDelayString = "${verification.processing.poll-interval-ms:30000}")
@@ -56,6 +59,7 @@ public class VerificationProcessingScheduler {
                 } catch (Exception e) {
                     log.error("Verification processing failed for: {}", request.getId(), e);
                     markAsFailed(request, "SystemError", e.getMessage());
+                    publishStatusChanged(request);
                 }
 
                 // Delay between calls (skip after last request)
@@ -116,7 +120,7 @@ public class VerificationProcessingScheduler {
             }
 
             markAsFailed(request, failureReason, errorDetails);
-            webhookService.sendVerificationFailedWebhook(request.getCompany(), request);
+            publishStatusChanged(request);
             return;
         }
 
@@ -132,26 +136,54 @@ public class VerificationProcessingScheduler {
             verificationStepRepository.save(step);
         }
 
-        // Update verification request with final result
-        request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
+        // Map business-level document failures to REJECTED.
+        if (shouldRejectVerification(result.getFailureReason(), result.getErrorDetails(), result.getOverallDecision())) {
+            request.markAsRejected(result.getFailureReason(), result.getErrorDetails(), result.getRiskScore());
+        } else {
+            request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
 
-        if (result.getFailureReason() != null) {
-            request.setFailureReason(result.getFailureReason());
-        }
-        if (result.getErrorDetails() != null) {
-            request.setErrorDetails(result.getErrorDetails());
+            if (result.getFailureReason() != null) {
+                request.setFailureReason(result.getFailureReason());
+            }
+            if (result.getErrorDetails() != null) {
+                request.setErrorDetails(result.getErrorDetails());
+            }
         }
 
         verificationRequestRepository.save(request);
 
         log.info("Verification completed for: {} with decision: {}", request.getId(), result.getOverallDecision());
 
-        // Send webhook notification
-        webhookService.sendVerificationCompletedWebhook(request.getCompany(), request);
+        publishStatusChanged(request);
+    }
+
+    private void publishStatusChanged(VerificationRequest request) {
+        eventPublisher.publishEvent(new VerificationStatusChangedEvent(
+                this, new VerificationStatusChangedData(
+                        request.getId(), request.getCompany().getId(), request.getStatus())));
     }
 
     private void markAsFailed(VerificationRequest request, String failureReason, String errorDetails) {
-        request.markAsFailed(failureReason, errorDetails);
+        if (shouldRejectVerification(failureReason, errorDetails, null)) {
+            request.markAsRejected(failureReason, errorDetails, 0.95);
+        } else {
+            request.markAsFailed(failureReason, errorDetails);
+        }
         verificationRequestRepository.save(request);
+    }
+
+    private boolean shouldRejectVerification(String failureReason, String errorDetails, String overallDecision) {
+        if ("rejected".equalsIgnoreCase(overallDecision)) {
+            return true;
+        }
+
+        String failure = failureReason == null ? "" : failureReason.toLowerCase(Locale.ROOT);
+        String details = errorDetails == null ? "" : errorDetails.toLowerCase(Locale.ROOT);
+
+        return failure.contains("face not detected")
+                || failure.contains("facenotdetected")
+                || details.contains("face not detected")
+                || details.contains("no face detected")
+                || details.contains("no face found");
     }
 }

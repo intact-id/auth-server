@@ -4,12 +4,13 @@ FROM maven:3.9-eclipse-temurin-17-alpine AS build
 # Set working directory
 WORKDIR /app
 
-# Copy project files
+# Download dependencies first — cached as a separate layer,
+# only re-runs when pom.xml changes (not on every source change)
 COPY pom.xml .
-COPY src ./src
+RUN mvn dependency:go-offline -q
 
-# Build the application
-RUN mvn clean package -DskipTests -B
+COPY src ./src
+RUN mvn package -DskipTests -q
 
 # Runtime stage
 FROM eclipse-temurin:17-jre-alpine
@@ -18,7 +19,8 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Create a non-root user
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN apk add --no-cache curl && \
+    addgroup -S spring && adduser -S spring -G spring
 
 # Copy the JAR file from build stage
 COPY --from=build --chown=spring:spring /app/target/*.jar app.jar

@@ -3,13 +3,16 @@ package com.intact_id.service.companyApplicationService;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.CompanyApplication;
 import com.intact_id.db.model.CompanyApplicationApproval;
+import com.intact_id.db.model.user.User;
 import com.intact_id.db.repository.CompanyApplicationApprovalRepository;
 import com.intact_id.db.repository.CompanyApplicationRepository;
+import com.intact_id.db.repository.user.UserRepository;
 import com.intact_id.dto.request.CompanyApplicationApprovalRequestDto;
 import com.intact_id.dto.request.CompanyApplicationRequestDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.dto.response.CompanyApplicationCreationResponseDto;
 import com.intact_id.dto.response.CompanyApplicationResponseDto;
+import com.intact_id.service.email.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import com.intact_id.util.mapper.MapperUtils;
@@ -20,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * @Author frank
@@ -36,6 +40,8 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     private final CompanyApplicationApprovalRepository approvalRepository;
     private final GeneratorUtils generatorUtils;
     private final MapperUtils mapperUtils;
+    private final EmailService emailService;
+    private final UserRepository userRepository;
 
     // ================= SUBMIT APPLICATION =================
 
@@ -60,6 +66,22 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
         var saved = applicationRepository.save(application);
 
         log.info("Application submitted successfully: {}", saved.getApplicationNumber());
+
+        // Send confirmation email — fire-and-forget, never fail the submission
+        try {
+            String trackUrl = "https://intact-id.com/track?ref=" + saved.getApplicationNumber();
+            boolean emailSent = emailService.sendApplicationReceivedEmail(
+                    saved.getEmail(),
+                    saved.getLegalName(),
+                    saved.getApplicationNumber(),
+                    trackUrl);
+            if (!emailSent) {
+                log.warn("Confirmation email could not be delivered for application: {}", saved.getApplicationNumber());
+            }
+        } catch (Exception e) {
+            log.error("Unexpected error sending confirmation email for application {}: {}",
+                    saved.getApplicationNumber(), e.getMessage(), e);
+        }
 
         return CompanyApplicationCreationResponseDto.builder()
                 .applicationNumber(saved.getApplicationNumber())
@@ -126,6 +148,9 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     public ApplicationApprovalResponseDto performMakerAction(CompanyApplicationApprovalRequestDto request) {
 
         log.info("Maker action initiated for application: {}", request.getApplicationId());
+        if (request.getPerformedBy() == null || request.getPerformedBy().isBlank()) {
+            throw new ApplicationExceptions.IntactUnauthorizedException("Authenticated maker is required");
+        }
 
         CompanyApplication application = applicationRepository.findById(request.getApplicationId())
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
@@ -154,7 +179,44 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
         var savedApproval = approvalRepository.save(approval);
         applicationRepository.save(application);
 
+        if (request.getPerformedByAction() == GlobalStatuses.APPROVED) {
+            sendMakerApprovalEmails(application, request);
+        }
+
         return mapperUtils.toApplicationApprovalResponseDto(savedApproval);
+    }
+
+    private void sendMakerApprovalEmails(CompanyApplication application, CompanyApplicationApprovalRequestDto request) {
+        // Notify contact person — no internal notes
+        String contactEmail = application.getContactPersonEmail() != null
+                ? application.getContactPersonEmail()
+                : application.getEmail();
+        String contactName = application.getContactPersonName() != null
+                ? application.getContactPersonName()
+                : application.getLegalName();
+        try {
+            emailService.sendApplicationUnderReviewEmail(
+                    contactEmail, contactName,
+                    application.getLegalName(), application.getApplicationNumber());
+        } catch (Exception e) {
+            log.warn("Failed to send under-review email for application {}: {}", application.getApplicationNumber(), e.getMessage());
+        }
+
+        // Alert all active checkers and admins
+        List<User> recipients = new java.util.ArrayList<>(userRepository.findActiveAdminUsersByRole("CHECKER"));
+        recipients.addAll(userRepository.findActiveAdminUsersByRole("ADMIN"));
+        for (User checker : recipients) {
+            try {
+                String checkerName = (checker.getFirstName() != null ? checker.getFirstName() : checker.getUsername());
+                emailService.sendCheckerActionRequiredEmail(
+                        checker.getEmail(), checkerName,
+                        application.getLegalName(), application.getApplicationNumber(),
+                        request.getEndUserMessage(), request.getApproverNote());
+            } catch (Exception e) {
+                log.warn("Failed to send checker alert to {} for application {}: {}",
+                        checker.getEmail(), application.getApplicationNumber(), e.getMessage());
+            }
+        }
     }
 
 

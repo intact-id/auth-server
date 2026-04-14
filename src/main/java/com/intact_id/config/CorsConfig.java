@@ -1,5 +1,6 @@
 package com.intact_id.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -7,6 +8,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * CORS configuration for allowing dashboard frontend to access the API
@@ -14,28 +16,29 @@ import java.util.Arrays;
 @Configuration
 public class CorsConfig {
 
+    @Value("#{'${cors.allowed-origins}'.split(',')}")
+    private List<String> allowedOrigins;
+
+    private static final List<String> ALLOWED_METHODS = Arrays.asList(
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS"
+    );
+
+
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+
         CorsConfiguration configuration = new CorsConfiguration();
 
         // Allow specific origins
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:5174",
-                "http://localhost:5175", // Added for dev server
-                "https://dashboard.intact-id.com",
-                "https://intact-id-backoffice.vercel.app",
-                "https://intact-id.com"));
-
+        configuration.setAllowedOrigins(allowedOrigins);
         // Allow all HTTP methods
-        configuration.setAllowedMethods(Arrays.asList(
-                "GET",
-                "POST",
-                "PUT",
-                "PATCH",
-                "DELETE",
-                "OPTIONS"));
+        configuration.setAllowedMethods(ALLOWED_METHODS);
 
         // Allow all headers
         configuration.setAllowedHeaders(Arrays.asList("*"));
