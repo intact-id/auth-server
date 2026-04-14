@@ -255,6 +255,50 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     @Transactional
+    public void suspendCredentials(String companyId, String environment) {
+        String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+        CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                        "Credentials not found for company"));
+        if ("dev".equalsIgnoreCase(environment)) {
+            credentials.setDevStatus(GlobalStatuses.SUSPENDED);
+        } else if ("prod".equalsIgnoreCase(environment)) {
+            credentials.setProdStatus(GlobalStatuses.SUSPENDED);
+            credentials.setStatus(GlobalStatuses.SUSPENDED);
+        } else {
+            // suspend all
+            credentials.setDevStatus(GlobalStatuses.SUSPENDED);
+            credentials.setProdStatus(GlobalStatuses.SUSPENDED);
+            credentials.setStatus(GlobalStatuses.SUSPENDED);
+        }
+        credentialsRepository.save(credentials);
+        log.info("Credentials ({}) suspended for company: {}", environment, resolvedCompanyId);
+    }
+
+    @Override
+    @Transactional
+    public void activateCredentials(String companyId, String environment) {
+        String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+        CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                        "Credentials not found for company"));
+        if ("dev".equalsIgnoreCase(environment)) {
+            credentials.setDevStatus(GlobalStatuses.ACTIVE);
+        } else if ("prod".equalsIgnoreCase(environment)) {
+            credentials.setProdStatus(GlobalStatuses.ACTIVE);
+            credentials.setStatus(GlobalStatuses.ACTIVE);
+        } else {
+            // activate all
+            credentials.setDevStatus(GlobalStatuses.ACTIVE);
+            credentials.setProdStatus(GlobalStatuses.ACTIVE);
+            credentials.setStatus(GlobalStatuses.ACTIVE);
+        }
+        credentialsRepository.save(credentials);
+        log.info("Credentials ({}) activated for company: {}", environment, resolvedCompanyId);
+    }
+
+    @Override
+    @Transactional
     public Company updateCompany(String companyId, CompanyUpdateRequestDto request) {
         String resolvedCompanyId = resolveCompanyIdForAction(companyId);
         log.info("Updating company: {}", resolvedCompanyId);

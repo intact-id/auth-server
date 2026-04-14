@@ -275,16 +275,15 @@ public class CompanyController {
     }
 
     @PostMapping("/{id}/credentials/suspend")
-    @Operation(summary = "Suspend company credentials (Admin)")
+    @Operation(summary = "Suspend company credentials (Admin). environment: 'prod', 'dev', or omit for both.")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> suspendCredentials(
             @PathVariable String id,
-            @RequestParam(required = false) String reason) {
+            @RequestParam(required = false) String environment) {
 
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
-            companyService.suspendCompany(resolvedCompanyId, "admin",
-                    reason != null ? reason : "Suspended via API Management");
+            companyService.suspendCredentials(resolvedCompanyId, environment);
 
             return ResponseEntity.ok(
                     ApiResponse.<String>builder()
@@ -299,24 +298,19 @@ public class CompanyController {
                             .responseMessage(e.getMessage())
                             .success(false)
                             .build());
-        } catch (ApplicationExceptions.InvalidActionException e) {
-            return ResponseEntity.badRequest().body(
-                    ApiResponse.<String>builder()
-                            .responseCode(HttpStatus.BAD_REQUEST.value())
-                            .responseMessage(e.getMessage())
-                            .success(false)
-                            .build());
         }
     }
 
     @PostMapping("/{id}/credentials/activate")
-    @Operation(summary = "Activate company credentials (Admin)")
+    @Operation(summary = "Activate company credentials (Admin). environment: 'prod', 'dev', or omit for both.")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<String>> activateCredentials(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<String>> activateCredentials(
+            @PathVariable String id,
+            @RequestParam(required = false) String environment) {
 
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
-            companyService.activateCompany(resolvedCompanyId, "admin");
+            companyService.activateCredentials(resolvedCompanyId, environment);
 
             return ResponseEntity.ok(
                     ApiResponse.<String>builder()
@@ -328,13 +322,6 @@ public class CompanyController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
                     ApiResponse.<String>builder()
                             .responseCode(HttpStatus.NOT_FOUND.value())
-                            .responseMessage(e.getMessage())
-                            .success(false)
-                            .build());
-        } catch (ApplicationExceptions.InvalidActionException e) {
-            return ResponseEntity.badRequest().body(
-                    ApiResponse.<String>builder()
-                            .responseCode(HttpStatus.BAD_REQUEST.value())
                             .responseMessage(e.getMessage())
                             .success(false)
                             .build());
