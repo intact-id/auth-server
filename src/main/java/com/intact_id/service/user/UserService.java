@@ -6,6 +6,7 @@ import com.intact_id.db.model.user.User;
 import com.intact_id.db.repository.CompanyRepository;
 import com.intact_id.db.repository.user.RoleRepository;
 import com.intact_id.db.repository.user.UserRepository;
+import com.intact_id.dto.auth.RoleResponseDto;
 import com.intact_id.dto.auth.UserCreateDto;
 import com.intact_id.dto.auth.UserResponseDto;
 import com.intact_id.dto.email.EmailDTO;
@@ -462,5 +463,19 @@ public class UserService {
                 throw new ApplicationExceptions.IntactUnauthorizedException("Access denied");
             }
         }
+    }
+
+    /**
+     * Get all available roles
+     */
+    public List<RoleResponseDto> getAllRoles() {
+        return roleRepository.findAll().stream()
+                .map(role -> RoleResponseDto.builder()
+                        .id(role.getId())
+                        .name(role.getName())
+                        .description(role.getDescription())
+                        .status(role.getStatus() != null ? role.getStatus().name() : null)
+                        .build())
+                .collect(Collectors.toList());
     }
 }
