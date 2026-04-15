@@ -68,11 +68,12 @@ public class AuthController {
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token using refresh token")
     public ResponseEntity<ApiResponse<TokenResponseDto>> refreshToken(
-            @Valid @RequestBody RefreshTokenRequestDto request) {
+            @Valid @RequestBody RefreshTokenRequestDto request,
+            HttpServletRequest httpRequest) {
         try {
             log.info("Token refresh request");
 
-            TokenResponseDto response = authenticationService.refreshAccessToken(request.getRefreshToken());
+            TokenResponseDto response = authenticationService.refreshAccessToken(request.getRefreshToken(), httpRequest);
 
             return ResponseEntity.ok(
                     ApiResponse.<TokenResponseDto>builder()
@@ -107,11 +108,12 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "Logout and revoke refresh token")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @Valid @RequestBody RefreshTokenRequestDto request) {
+            @Valid @RequestBody RefreshTokenRequestDto request,
+            HttpServletRequest httpRequest) {
         try {
             log.info("Logout request");
 
-            authenticationService.logout(request.getRefreshToken());
+            authenticationService.logout(request.getRefreshToken(), httpRequest);
 
             return ResponseEntity.ok(
                     ApiResponse.<Void>builder()

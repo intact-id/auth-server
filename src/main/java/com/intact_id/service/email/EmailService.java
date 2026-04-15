@@ -37,6 +37,19 @@ public interface EmailService {
     boolean sendCompanyApprovalEmail(String companyEmail, String companyName, String apiKey, String apiSecret);
 
     /**
+     * Send company email after API credentials are regenerated.
+     *
+     * @param companyEmail Company email address
+     * @param companyName  Company name
+     * @param apiKey       Regenerated API key
+     * @param apiSecret    Regenerated API secret
+     * @param environment  Credential environment (DEV/PROD)
+     * @return true if sent successfully
+     */
+    boolean sendCompanyCredentialsRegeneratedEmail(String companyEmail, String companyName,
+            String apiKey, String apiSecret, String environment);
+
+    /**
      * Send company rejection email
      * 
      * @param companyEmail    Company email address

@@ -2,6 +2,7 @@ package com.intact_id.config;
 
 import com.intact_id.security.filter.ApiKeyAuthFilter;
 import com.intact_id.security.filter.JwtAuthenticationFilter;
+import com.intact_id.security.filter.UserActivityAuditFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,7 @@ public class SecurityConfig {
 
         private final ApiKeyAuthFilter apiKeyAuthFilter;
         private final JwtAuthenticationFilter jwtAuthFilter;
+        private final UserActivityAuditFilter userActivityAuditFilter;
         private final CorsConfigurationSource corsConfigurationSource;
 
         @Bean
@@ -61,7 +63,8 @@ public class SecurityConfig {
                                 // 1. JWT filter (for admin users with Bearer tokens)
                                 // 2. API Key filter (for company API access with X-API-Key)
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                                .addFilterAfter(apiKeyAuthFilter, JwtAuthenticationFilter.class);
+                                .addFilterAfter(apiKeyAuthFilter, JwtAuthenticationFilter.class)
+                                .addFilterAfter(userActivityAuditFilter, ApiKeyAuthFilter.class);
 
                 return http.build();
         }

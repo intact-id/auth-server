@@ -10,6 +10,7 @@ import com.intact_id.db.repository.user.UserRepository;
 import com.intact_id.dto.auth.LoginRequestDto;
 import com.intact_id.dto.auth.LoginResponseDto;
 import com.intact_id.dto.auth.TokenResponseDto;
+import com.intact_id.service.audit.AuditService;
 import com.intact_id.service.jwt.JwtService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
@@ -35,6 +36,7 @@ public class AuthenticationService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final GeneratorUtils generatorUtils;
+    private final AuditService auditService;
     @Value("${jwt.access-token-expiration}")
     private Long accessTokenExpiration;
 
@@ -81,16 +83,22 @@ public class AuthenticationService {
             throw new ApplicationExceptions.IntactUnauthorizedException("Invalid credentials");
         }
 
+        String sessionId = java.util.UUID.randomUUID().toString();
+
         // Generate tokens
-        String accessToken = jwtService.generateAccessToken(user);
-        String refreshToken = jwtService.generateRefreshToken(user);
+        String accessToken = jwtService.generateAccessToken(user, sessionId);
+        String refreshToken = jwtService.generateRefreshToken(user, sessionId);
 
         // Save refresh token
-        saveRefreshToken(user, refreshToken, httpRequest);
+        RefreshToken savedRefreshToken = saveRefreshToken(user, refreshToken, httpRequest, sessionId);
 
         // Update user login info
         user.recordLogin();
         userRepository.save(user);
+
+        auditService.startSession(sessionId, user, savedRefreshToken, getClientIp(httpRequest),
+                httpRequest.getHeader("User-Agent"));
+        auditService.recordLogin(sessionId, user, getClientIp(httpRequest));
 
         log.info("User logged in successfully: {}", request.getUsername());
 
@@ -117,7 +125,7 @@ public class AuthenticationService {
      * Refresh access token using refresh token
      */
     @Transactional
-    public TokenResponseDto refreshAccessToken(String refreshTokenValue) {
+    public TokenResponseDto refreshAccessToken(String refreshTokenValue, HttpServletRequest httpRequest) {
         log.info("Refreshing access token");
 
         // Hash the refresh token
@@ -138,6 +146,9 @@ public class AuthenticationService {
 
         // Get user
         User user = refreshToken.getUser();
+        String sessionId = refreshToken.getSessionId() != null
+                ? refreshToken.getSessionId()
+                : jwtService.extractSessionId(refreshTokenValue);
 
         // Check if user is still active
         if (!user.isActive()) {
@@ -146,14 +157,14 @@ public class AuthenticationService {
         }
 
         // Generate new access token
-        String newAccessToken = jwtService.generateAccessToken(user);
+        String newAccessToken = jwtService.generateAccessToken(user, sessionId);
 
         // Generate new refresh token with retry logic for uniqueness
         String newRefreshToken = null;
         int maxRetries = 3;
         for (int i = 0; i < maxRetries; i++) {
             try {
-                newRefreshToken = jwtService.generateRefreshToken(user);
+                newRefreshToken = jwtService.generateRefreshToken(user, sessionId);
                 String newTokenHash = generatorUtils.hashString(newRefreshToken);
 
                 // Check if this token hash already exists
@@ -178,7 +189,9 @@ public class AuthenticationService {
         refreshTokenRepository.saveAndFlush(refreshToken); // Use saveAndFlush to ensure immediate persistence
 
         // Save new refresh token
-        saveRefreshToken(user, newRefreshToken, null);
+        RefreshToken savedRefreshToken = saveRefreshToken(user, newRefreshToken, httpRequest, sessionId);
+        auditService.linkRefreshToken(sessionId, savedRefreshToken);
+        auditService.recordTokenRefresh(sessionId, user, httpRequest != null ? getClientIp(httpRequest) : null);
 
         log.info("Access token refreshed for user: {}", user.getUsername());
 
@@ -194,7 +207,7 @@ public class AuthenticationService {
      * Logout user by revoking refresh token
      */
     @Transactional
-    public void logout(String refreshTokenValue) {
+    public void logout(String refreshTokenValue, HttpServletRequest httpRequest) {
         log.info("Logout request");
 
         String tokenHash = generatorUtils.hashString(refreshTokenValue);
@@ -203,6 +216,10 @@ public class AuthenticationService {
                 .ifPresent(token -> {
                     token.revoke();
                     refreshTokenRepository.save(token);
+                    if (token.getSessionId() != null) {
+                        auditService.closeSession(token.getSessionId(), token.getUser(),
+                                httpRequest != null ? getClientIp(httpRequest) : null);
+                    }
                     log.info("Refresh token revoked for user: {}", token.getUser().getUsername());
                 });
     }
@@ -219,20 +236,21 @@ public class AuthenticationService {
     /**
      * Save refresh token to database
      */
-    private void saveRefreshToken(User user, String refreshToken, HttpServletRequest httpRequest) {
+    private RefreshToken saveRefreshToken(User user, String refreshToken, HttpServletRequest httpRequest, String sessionId) {
         String tokenHash = generatorUtils.hashString(refreshToken);
 
         RefreshToken token = new RefreshToken();
         token.setUser(user);
         token.setTokenHash(tokenHash);
         token.setExpiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000));
+        token.setSessionId(sessionId);
 
         if (httpRequest != null) {
             token.setIpAddress(getClientIp(httpRequest));
             token.setUserAgent(httpRequest.getHeader("User-Agent"));
         }
 
-        refreshTokenRepository.save(token);
+        return refreshTokenRepository.save(token);
     }
 
     /**
