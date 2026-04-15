@@ -7,6 +7,7 @@ import com.intact_id.db.repository.user.RefreshTokenRepository;
 import com.intact_id.db.repository.user.UserRepository;
 import com.intact_id.dto.auth.LoginRequestDto;
 import com.intact_id.dto.auth.LoginResponseDto;
+import com.intact_id.service.audit.AuditService;
 import com.intact_id.service.jwt.JwtService;
 import com.intact_id.util.generator.GeneratorUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,6 +48,9 @@ class AuthenticationServiceTest {
     private GeneratorUtils generatorUtils;
 
     @Mock
+    private AuditService auditService;
+
+    @Mock
     private HttpServletRequest httpRequest;
 
     @InjectMocks
@@ -79,8 +83,8 @@ class AuthenticationServiceTest {
 
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(password, "hashedPassword")).thenReturn(true);
-        when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-token");
-        when(jwtService.generateRefreshToken(any(User.class))).thenReturn("refresh-token");
+        when(jwtService.generateAccessToken(any(User.class), anyString())).thenReturn("access-token");
+        when(jwtService.generateRefreshToken(any(User.class), anyString())).thenReturn("refresh-token");
         when(generatorUtils.hashString(anyString())).thenReturn("hashed-token");
         
         // Act
