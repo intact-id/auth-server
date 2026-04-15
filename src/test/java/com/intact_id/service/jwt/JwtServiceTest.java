@@ -41,8 +41,8 @@ class JwtServiceTest {
 
         // Act
         // Generate two tokens as fast as possible
-        String token1 = jwtService.generateRefreshToken(user);
-        String token2 = jwtService.generateRefreshToken(user);
+        String token1 = jwtService.generateRefreshToken(user, "session-1");
+        String token2 = jwtService.generateRefreshToken(user, "session-1");
 
         // Assert
         // This fails if tokens are identical (collision)
