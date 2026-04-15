@@ -35,10 +35,11 @@ public class JwtService {
     /**
      * Generate access token with user details, roles, and permissions
      */
-    public String generateAccessToken(User user) {
+    public String generateAccessToken(User user, String sessionId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("email", user.getEmail());
+        claims.put("sessionId", sessionId);
         claims.put("roles", user.getRoles().stream()
                 .map(role -> role.getName())
                 .collect(Collectors.toList()));
@@ -54,9 +55,10 @@ public class JwtService {
     /**
      * Generate refresh token (simpler, longer-lived)
      */
-    public String generateRefreshToken(User user) {
+    public String generateRefreshToken(User user, String sessionId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
+        claims.put("sessionId", sessionId);
         claims.put("tokenType", "refresh");
         claims.put("jti", java.util.UUID.randomUUID().toString());
 
@@ -92,6 +94,10 @@ public class JwtService {
      */
     public String extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId", String.class));
+    }
+
+    public String extractSessionId(String token) {
+        return extractClaim(token, claims -> claims.get("sessionId", String.class));
     }
 
     /**
