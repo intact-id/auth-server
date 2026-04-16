@@ -123,7 +123,11 @@ public class UserController {
         }
 
         @PutMapping("/{userId}")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasRole('SUPER_ADMIN')" +
+                "" +
+                "" +
+                "" +
+                "")
         @Operation(summary = "Update user")
         public ResponseEntity<ApiResponse<UserResponseDto>> updateUser(
                         @PathVariable String userId,
@@ -289,6 +293,20 @@ public class UserController {
                                                 .responseCode(HttpStatus.OK.value())
                                                 .responseMessage("Role removed successfully")
                                                 .data(user)
+                                                .build());
+        }
+
+        @PostMapping("/{userId}/logout")
+        @PreAuthorize("hasRole('SUPER_ADMIN')")
+        @Operation(summary = "Force-logout a user by revoking all their active sessions")
+        public ResponseEntity<ApiResponse<Void>> logoutUser(@PathVariable String userId) {
+                userService.logoutUser(userId);
+
+                return ResponseEntity.ok(
+                                ApiResponse.<Void>builder()
+                                                .success(true)
+                                                .responseCode(HttpStatus.OK.value())
+                                                .responseMessage("User logged out successfully")
                                                 .build());
         }
 
