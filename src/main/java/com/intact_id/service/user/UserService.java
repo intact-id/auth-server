@@ -2,11 +2,14 @@ package com.intact_id.service.user;
 
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
+import com.intact_id.db.model.user.RefreshToken;
 import com.intact_id.db.model.user.Role;
 import com.intact_id.db.model.user.User;
 import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.db.repository.user.RefreshTokenRepository;
 import com.intact_id.db.repository.user.RoleRepository;
 import com.intact_id.db.repository.user.UserRepository;
+import com.intact_id.service.audit.AuditService;
 import com.intact_id.dto.auth.RoleResponseDto;
 import com.intact_id.dto.auth.UserCreateDto;
 import com.intact_id.dto.auth.UserResponseDto;
@@ -40,6 +43,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final CompanyRepository companyRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final GeneratorUtils generatorUtils;
@@ -265,6 +270,21 @@ public class UserService {
             }
         }
 
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            Set<Role> roles = new HashSet<>();
+            for (String roleId : request.getRoleIds()) {
+                Role role = roleRepository.findById(roleId)
+                        .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                                "Role not found: " + roleId));
+                if ("SUPER_ADMIN".equals(role.getName()) && !SecurityContextUtil.isSuperAdminAuthenticated()) {
+                    throw new ApplicationExceptions.IntactUnauthorizedException(
+                            "Insufficient privileges to assign the SUPER_ADMIN role");
+                }
+                roles.add(role);
+            }
+            user.setRoles(roles);
+        }
+
         User updatedUser = userRepository.save(user);
         log.info("User updated successfully: {}", updatedUser.getUsername());
 
@@ -418,6 +438,33 @@ public class UserService {
         log.info("Role removed from user: {}", user.getUsername());
 
         return toUserResponseDto(updatedUser);
+    }
+
+    /**
+     * Force-logout a user by revoking all their active refresh tokens
+     */
+    @Transactional
+    public void logoutUser(String userId) {
+        log.info("Force-logging out user: {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                        "User not found: " + userId));
+
+        enforceUserScope(user);
+
+        List<RefreshToken> tokens = refreshTokenRepository.findByUserId(userId);
+        for (RefreshToken token : tokens) {
+            if (!Boolean.TRUE.equals(token.getRevoked())) {
+                token.revoke();
+                refreshTokenRepository.save(token);
+                if (token.getSessionId() != null) {
+                    auditService.closeSession(token.getSessionId(), user, null);
+                }
+            }
+        }
+
+        log.info("Force-logout complete for user: {}", user.getUsername());
     }
 
     /**
