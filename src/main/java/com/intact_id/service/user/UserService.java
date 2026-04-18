@@ -19,6 +19,7 @@ import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
+import jakarta.mail.internet.MailDateFormat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

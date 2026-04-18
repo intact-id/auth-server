@@ -4,7 +4,11 @@ import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.model.CompanyCommunicationDetails;
 import com.intact_id.dto.request.CompanyUpdateRequestDto;
+import com.intact_id.dto.request.RateLimitsRequestDto;
 import com.intact_id.dto.request.WebhookSettingsRequestDto;
+import com.intact_id.dto.response.RateLimitsResponseDto;
+import com.intact_id.db.model.CompanyCredentials;
+import com.intact_id.db.repository.CompanyCredentialsRepository;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.dto.response.CompanyCommunicationResponseDto;
 import com.intact_id.dto.response.CompanyResponseDto;
@@ -33,6 +37,7 @@ public class CompanyController {
 
     private final CompanyService companyService;
     private final WebhookService webhookService;
+    private final CompanyCredentialsRepository companyCredentialsRepository;
 
     @GetMapping("/{id}")
     @Operation(summary = "Get company by ID")
@@ -432,6 +437,58 @@ public class CompanyController {
         }
     }
 
+    // ========== Rate Limit Endpoints ==========
+
+    @GetMapping("/{id}/rate-limits")
+    @Operation(summary = "Get rate limits for a company")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<RateLimitsResponseDto>> getRateLimits(@PathVariable String id) {
+        String companyId = SecurityContextUtil.resolveCompanyId(id);
+        Company company = companyService.getCompanyById(companyId);
+        CompanyCredentials creds = companyCredentialsRepository.findByCompanyId(companyId).orElse(null);
+
+        return ResponseEntity.ok(ApiResponse.<RateLimitsResponseDto>builder()
+                .success(true).responseCode(200)
+                .data(toRateLimitsDto(company, creds))
+                .build());
+    }
+
+    @PutMapping("/{id}/rate-limits")
+    @Operation(summary = "Configure rate limits for a company (SUPER_ADMIN only)")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<RateLimitsResponseDto>> updateRateLimits(
+            @PathVariable String id,
+            @RequestBody RateLimitsRequestDto request) {
+
+        String companyId = SecurityContextUtil.resolveCompanyId(id);
+        Company company = companyService.getCompanyById(companyId);
+        CompanyCredentials creds = companyCredentialsRepository.findByCompanyId(companyId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                        "No credentials found for company: " + companyId));
+
+        if (request.getDev() != null) {
+            RateLimitsRequestDto.EnvLimits dev = request.getDev();
+            if (dev.getPerHour() != null) creds.setDevRateLimitPerHour(dev.getPerHour() < 0 ? null : dev.getPerHour());
+            if (dev.getPerDay() != null) creds.setDevRateLimitPerDay(dev.getPerDay() < 0 ? null : dev.getPerDay());
+            if (dev.getPerMonth() != null) creds.setDevRateLimitPerMonth(dev.getPerMonth() < 0 ? null : dev.getPerMonth());
+        }
+        if (request.getProd() != null) {
+            RateLimitsRequestDto.EnvLimits prod = request.getProd();
+            if (prod.getPerHour() != null) creds.setProdRateLimitPerHour(prod.getPerHour() < 0 ? null : prod.getPerHour());
+            if (prod.getPerDay() != null) creds.setProdRateLimitPerDay(prod.getPerDay() < 0 ? null : prod.getPerDay());
+            if (prod.getPerMonth() != null) creds.setProdRateLimitPerMonth(prod.getPerMonth() < 0 ? null : prod.getPerMonth());
+        }
+
+        companyCredentialsRepository.save(creds);
+        log.info("Rate limits updated for company {} by {}", companyId, SecurityContextUtil.getAuthenticatedUser().getEmail());
+
+        return ResponseEntity.ok(ApiResponse.<RateLimitsResponseDto>builder()
+                .success(true).responseCode(200)
+                .responseMessage("Rate limits updated successfully")
+                .data(toRateLimitsDto(company, creds))
+                .build());
+    }
+
     // ========== Helper Methods ==========
 
     private CompanyResponseDto mapToDto(Company company) {
@@ -453,6 +510,29 @@ public class CompanyController {
     private String maskSecret(String secret) {
         if (secret == null || secret.length() < 15) return secret;
         return secret.substring(0, 10) + "..." + secret.substring(secret.length() - 4);
+    }
+
+    private RateLimitsResponseDto toRateLimitsDto(Company company, CompanyCredentials creds) {
+        return RateLimitsResponseDto.builder()
+                .companyId(company.getId())
+                .companyName(company.getLegalName())
+                .dev(RateLimitsResponseDto.EnvLimits.builder()
+                        .perHour(creds != null ? creds.getDevRateLimitPerHour() : null)
+                        .perDay(creds != null ? creds.getDevRateLimitPerDay() : null)
+                        .perMonth(creds != null ? creds.getDevRateLimitPerMonth() : null)
+                        .totalRequests(creds != null ? creds.getDevTotalRequests() : 0L)
+                        .totalSuccessful(creds != null ? creds.getDevTotalSuccessfulRequests() : 0L)
+                        .totalFailed(creds != null ? creds.getDevTotalFailedRequests() : 0L)
+                        .build())
+                .prod(RateLimitsResponseDto.EnvLimits.builder()
+                        .perHour(creds != null ? creds.getProdRateLimitPerHour() : null)
+                        .perDay(creds != null ? creds.getProdRateLimitPerDay() : null)
+                        .perMonth(creds != null ? creds.getProdRateLimitPerMonth() : null)
+                        .totalRequests(creds != null ? creds.getProdTotalRequests() : 0L)
+                        .totalSuccessful(creds != null ? creds.getProdTotalSuccessfulRequests() : 0L)
+                        .totalFailed(creds != null ? creds.getProdTotalFailedRequests() : 0L)
+                        .build())
+                .build();
     }
 
     private CompanyCommunicationResponseDto mapCommunicationToDto(CompanyCommunicationDetails communication) {
