@@ -64,6 +64,12 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
 
         long countByCompanyIdAndCreatedAtAfter(String companyId, LocalDateTime after);
 
+        long countByCompanyIdAndEnvironmentAndStatusNotAndCreatedAtAfter(
+                String companyId,
+                com.intact_id.constant.enums.ApiKeyEnvironment environment,
+                GlobalStatuses excludedStatus,
+                LocalDateTime after);
+
         @Query("SELECT v FROM VerificationRequest v WHERE v.status = :status ORDER BY v.createdAt ASC")
         List<VerificationRequest> findByStatusOrderByCreatedAtAsc(
                         @Param("status") GlobalStatuses status, Pageable pageable);

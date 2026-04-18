@@ -3,6 +3,7 @@ package com.intact_id.service.kyc;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.kyc.VerificationDocument;
 import com.intact_id.db.model.kyc.VerificationRequest;
+import com.intact_id.service.kyc.RateLimitService.LimitExceeded;
 import com.intact_id.db.model.kyc.VerificationStep;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
@@ -31,12 +32,25 @@ public class VerificationProcessor {
     private final ExternalKycServiceClient externalKycServiceClient;
     private final ApplicationEventPublisher eventPublisher;
     private final EmailService emailService;
+    private final RateLimitService rateLimitService;
 
     @Value("${app.support-email:support@intact-id.com}")
     private String supportEmail;
 
     public void process(VerificationRequest request) {
         log.info("Processing verification: {}", request.getId());
+
+        // Rate limit check — runs before any external calls
+        LimitExceeded exceeded = rateLimitService.checkAndConsume(request);
+        if (exceeded != null) {
+            request.markAsRejected("rate_limit_exceeded",
+                    String.format("%s limit of %d reached. Resets at %s.", exceeded.window(), exceeded.limit(), exceeded.resetAt()),
+                    1.0);
+            verificationRequestRepository.save(request);
+            publishStatusChanged(request);
+            log.info("Verification {} rejected — {} rate limit exceeded ({}/{})", request.getId(), exceeded.window(), exceeded.used(), exceeded.limit());
+            return;
+        }
 
         List<VerificationDocument> documents = verificationDocumentRepository
                 .findByVerificationRequestId(request.getId());
