@@ -28,18 +28,7 @@ public class ManualReviewService {
         return verificationRequestRepository
                 .findByFilters(null, null, GlobalStatuses.PENDING_APPROVAL.name(),
                         null, null, null, null, pageable)
-                .map(r -> VerificationStatusResponseDto.builder()
-                        .verificationId(r.getId())
-                        .companyName(r.getCompany() != null ? r.getCompany().getLegalName() : null)
-                        .status(r.getStatus().name())
-                        .tier(r.getTier())
-                        .verificationType(r.getVerificationType())
-                        .overallDecision(r.getOverallDecision())
-                        .riskScore(r.getRiskScore())
-                        .customerData(r.getCustomerData())
-                        .createdAt(r.getCreatedAt())
-                        .completedAt(r.getCompletedAt())
-                        .build());
+                .map(r -> verificationService.getVerificationStatus(r.getId(), null, r.getEnvironment()));
     }
 
     @Transactional
