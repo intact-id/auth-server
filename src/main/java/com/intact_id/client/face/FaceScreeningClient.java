@@ -2,6 +2,7 @@ package com.intact_id.client.face;
 
 import com.intact_id.config.FeignConfig;
 import com.intact_id.dto.response.face.FaceVerificationResponse;
+import com.intact_id.dto.response.face.LivenessResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,4 +19,10 @@ public interface FaceScreeningClient {
             @RequestHeader("X-API-Secret") String apiSecret,
             @RequestPart("selfie") MultipartFile selfie,
             @RequestPart("id_photo") MultipartFile idPhoto);
+
+    @PostMapping(value = "/api/face/liveness/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    LivenessResponse checkLiveness(
+            @RequestHeader("X-API-Key") String apiKey,
+            @RequestHeader("X-API-Secret") String apiSecret,
+            @RequestPart("photo") MultipartFile photo);
 }

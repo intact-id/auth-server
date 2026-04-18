@@ -45,5 +45,6 @@ public class VerificationStatusResponseDto {
         private Long fileSize;
         private String mimeType;
         private LocalDateTime uploadedAt;
+        private Map<String, Object> extractedData;
     }
 }

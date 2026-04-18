@@ -8,10 +8,12 @@ import com.intact_id.db.model.kyc.VerificationStep;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
 import com.intact_id.db.repository.kyc.VerificationStepRepository;
+import com.intact_id.service.email.EmailService;
 import com.intact_id.service.kyc.events.VerificationStatusChangedData;
 import com.intact_id.service.kyc.events.VerificationStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,6 +35,10 @@ public class VerificationProcessingScheduler {
     private final ExternalKycServiceClient externalKycServiceClient;
     private final ApplicationEventPublisher eventPublisher;
     private final VerificationProcessingConfig config;
+    private final EmailService emailService;
+
+    @Value("${app.support-email:support@intact-id.com}")
+    private String supportEmail;
 
     @Scheduled(fixedDelayString = "${verification.processing.poll-interval-ms:30000}")
     public void processSubmittedVerifications() {
@@ -136,9 +142,20 @@ public class VerificationProcessingScheduler {
             verificationStepRepository.save(step);
         }
 
-        // Map business-level document failures to REJECTED.
+        // Persist OCR extracted data onto the id_front document
+        if (result.getExtractedOcrData() != null && result.getOcrDocumentId() != null) {
+            verificationDocumentRepository.findById(result.getOcrDocumentId()).ifPresent(doc -> {
+                doc.setExtractedData(result.getExtractedOcrData());
+                verificationDocumentRepository.save(doc);
+            });
+        }
+
+        // Map outcome to final status
         if (shouldRejectVerification(result.getFailureReason(), result.getErrorDetails(), result.getOverallDecision())) {
             request.markAsRejected(result.getFailureReason(), result.getErrorDetails(), result.getRiskScore());
+        } else if ("manual_review".equals(result.getOverallDecision())) {
+            request.markAsManualReview(result.getRiskScore());
+            notifyManualReviewRequired(request);
         } else {
             request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
 
@@ -170,6 +187,22 @@ public class VerificationProcessingScheduler {
             request.markAsFailed(failureReason, errorDetails);
         }
         verificationRequestRepository.save(request);
+    }
+
+    private void notifyManualReviewRequired(VerificationRequest request) {
+        try {
+            String companyName = request.getCompany() != null ? request.getCompany().getLegalName() : "Unknown";
+            emailService.sendSimpleEmail(
+                    supportEmail,
+                    "[Action Required] Manual KYC Review: " + request.getId(),
+                    "A KYC verification requires manual review.\n\n" +
+                            "Verification ID: " + request.getId() + "\n" +
+                            "Company: " + companyName + "\n" +
+                            "Tier: " + request.getTier() + "\n\n" +
+                            "Please review at the admin dashboard.");
+        } catch (Exception e) {
+            log.warn("Failed to send manual review notification for {}: {}", request.getId(), e.getMessage());
+        }
     }
 
     private boolean shouldRejectVerification(String failureReason, String errorDetails, String overallDecision) {

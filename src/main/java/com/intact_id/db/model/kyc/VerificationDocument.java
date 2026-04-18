@@ -1,10 +1,15 @@
 package com.intact_id.db.model.kyc;
 
 import com.intact_id.constant.base.Auditable;
+import com.intact_id.util.converter.PgJsonbToMapConverter;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.Map;
 
 @Entity
 @Getter
@@ -31,4 +36,9 @@ public class VerificationDocument extends Auditable {
 
     @Column(name = "original_filename")
     private String originalFilename;
+
+    @Column(name = "extracted_data", columnDefinition = "jsonb")
+    @Convert(converter = PgJsonbToMapConverter.class)
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Object> extractedData;
 }

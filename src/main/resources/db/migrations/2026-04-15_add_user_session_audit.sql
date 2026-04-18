@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     CONSTRAINT fk_user_sessions_user
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_user_sessions_company
-        FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE SET NULL,
+        FOREIGN KEY (company_id) REFERENCES company_tbl(id) ON DELETE SET NULL,
     CONSTRAINT fk_user_sessions_refresh_token
         FOREIGN KEY (refresh_token_id) REFERENCES refresh_tokens(id) ON DELETE SET NULL
 );

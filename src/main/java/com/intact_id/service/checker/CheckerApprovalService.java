@@ -23,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -91,7 +92,7 @@ public class CheckerApprovalService {
     @Transactional
     public ApplicationApprovalResponseDto performCheckerApproval(ApplicationApprovalDecisionDto request) {
         log.info("Checker approval initiated for approval: {}", request.getApprovalId());
-        if (request.getApprovedBy() == null || request.getApprovedBy().isBlank()) {
+        if (Objects.isNull(request.getApprovedBy()) || request.getApprovedBy().isBlank()) {
             throw new ApplicationExceptions.IntactUnauthorizedException("Authenticated checker is required");
         }
 

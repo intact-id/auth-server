@@ -67,6 +67,18 @@ face-service:
   api-key: ${FACE_SERVICE_API_KEY}
   api-secret: ${FACE_SERVICE_API_SECRET}
 
+ocr-service:
+  url: ${OCR_SERVICE_URL}
+  api-key: ${OCR_SERVICE_API_KEY}
+  api-secret: ${OCR_SERVICE_API_SECRET}
+
+ocr:
+  confidence:
+    threshold: ${OCR_CONFIDENCE_THRESHOLD:0.65}
+  name:
+    similarity:
+      threshold: ${OCR_NAME_SIMILARITY_THRESHOLD:0.85}
+
 app:
   documents:
     base-dir: ${APP_DOCUMENTS_BASE_DIR:${user.dir}/uploads}
