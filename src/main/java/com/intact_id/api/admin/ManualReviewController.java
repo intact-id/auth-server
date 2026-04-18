@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -30,7 +29,7 @@ public class ManualReviewController {
             @RequestParam(defaultValue = "20") int size) {
 
         Page<VerificationStatusResponseDto> queue = manualReviewService.getPendingReviewQueue(
-                PageRequest.of(page, size, Sort.by("createdAt").ascending()));
+                PageRequest.of(page, size));
 
         return ResponseEntity.ok(ApiResponse.<Page<VerificationStatusResponseDto>>builder()
                 .success(true).responseCode(200).data(queue).build());
