@@ -238,6 +238,7 @@ public class VerificationService {
                 .fileSize(document.getFileSize())
                 .mimeType(document.getMimeType())
                 .uploadedAt(document.getCreatedAt())
+                .extractedData(document.getExtractedData())
                 .build();
     }
 

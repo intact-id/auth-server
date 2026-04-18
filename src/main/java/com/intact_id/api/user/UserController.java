@@ -137,7 +137,8 @@ public class UserController {
                                 UserResponseDto existing = userService.getUserById(userId);
                                 String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
                                 if (existing.getCompanyId() == null || !existing.getCompanyId().equals(companyId)) {
-                                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                                        return ResponseEntity
+                                                .status(HttpStatus.FORBIDDEN).body(
                                                         ApiResponse.<UserResponseDto>builder()
                                                                         .success(false)
                                                                         .responseCode(HttpStatus.FORBIDDEN.value())
