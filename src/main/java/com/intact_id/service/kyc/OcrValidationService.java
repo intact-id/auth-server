@@ -73,7 +73,7 @@ public class OcrValidationService {
         resultDetails.put("overall_confidence", ocr.getOverallConfidence());
 
         // Rule 2: ID number — exact match after stripping non-alphanumeric
-        String submittedId = normalizeAlphanumeric((String) customerData.get("idNumber"));
+        String submittedId = normalizeAlphanumeric(asString(customerData.get("idNumber")));
         String ocrId = normalizeAlphanumeric(fields != null ? fields.getIdNumber() : null);
         if (submittedId != null && ocrId != null) {
             boolean idMatch = submittedId.equals(ocrId);
@@ -96,7 +96,8 @@ public class OcrValidationService {
         }
 
         // Rule 4: Date of birth — exact match after parsing
-        String submittedDob = (String) customerData.get("dateOfBirth");
+        // dateOfBirth is stored as LocalDate in JSONB → Jackson deserializes as [year,month,day] ArrayList
+        String submittedDob = asString(customerData.get("dateOfBirth"));
         String ocrDob = fields != null ? fields.getDateOfBirth() : null;
         if (submittedDob != null && ocrDob != null) {
             LocalDate submitted = parseDate(submittedDob);
@@ -136,7 +137,7 @@ public class OcrValidationService {
 
         // Rule 7: Nationality (Tier3 only) — soft check, warn don't reject
         if ("tier3".equalsIgnoreCase(tier)) {
-            String submittedNationality = normalizeAlphanumeric((String) customerData.get("nationality"));
+            String submittedNationality = normalizeAlphanumeric(asString(customerData.get("nationality")));
             String ocrNationality = normalizeAlphanumeric(ocr.getCountryIso3());
             if (submittedNationality != null && ocrNationality != null) {
                 boolean nationalityMatch = submittedNationality.contains(ocrNationality)
@@ -173,6 +174,17 @@ public class OcrValidationService {
                         .errorMessage(errorMessage)
                         .build(),
                 decision);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String asString(Object value) {
+        if (value == null) return null;
+        if (value instanceof String s) return s;
+        // LocalDate stored in JSONB deserializes as [year, month, day]
+        if (value instanceof java.util.List<?> list && list.size() == 3) {
+            return String.format("%04d-%02d-%02d", list.get(0), list.get(1), list.get(2));
+        }
+        return String.valueOf(value);
     }
 
     private static String normalizeAlphanumeric(String value) {
