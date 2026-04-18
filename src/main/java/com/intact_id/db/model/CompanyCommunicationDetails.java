@@ -111,6 +111,24 @@ public class CompanyCommunicationDetails extends Auditable { ;
         return emailNotifications != null && emailNotifications;
     }
 
+    public boolean shouldNotifyApplicantOnApproval() {
+        return getNotificationFlag("notifyApplicantOnApproval", true);
+    }
+
+    public boolean shouldNotifyApplicantOnRejection() {
+        return getNotificationFlag("notifyApplicantOnRejection", true);
+    }
+
+    public boolean shouldNotifyApplicantOnPendingReview() {
+        return getNotificationFlag("notifyApplicantOnPendingReview", false);
+    }
+
+    private boolean getNotificationFlag(String key, boolean defaultValue) {
+        if (notificationSettings == null || !notificationSettings.containsKey(key)) return defaultValue;
+        Object val = notificationSettings.get(key);
+        return val instanceof Boolean ? (Boolean) val : defaultValue;
+    }
+
     public boolean shouldNotifyBySms() {
         return smsNotifications != null && smsNotifications;
     }
