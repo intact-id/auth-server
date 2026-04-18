@@ -274,4 +274,38 @@ public class EmailServiceImpl implements EmailService {
 
         return sendTemplatedEmail(emailDTO);
     }
+
+    @Override
+    public boolean sendApplicantResultEmail(String applicantEmail, String applicantName,
+            String companyName, String decision, String rejectionReason, String verificationId) {
+        boolean approved = "approved".equalsIgnoreCase(decision);
+        boolean pendingReview = "pending_review".equalsIgnoreCase(decision);
+
+        Map<String, Object> variables = commonVars();
+        variables.put("applicantName", applicantName);
+        variables.put("companyName", companyName != null ? companyName : "Our platform");
+        variables.put("decision", decision);
+        variables.put("isApproved", approved);
+        variables.put("isPendingReview", pendingReview);
+        variables.put("rejectionReason", rejectionReason);
+        variables.put("verificationId", verificationId);
+
+        String subject;
+        if (approved) {
+            subject = "Your Identity Verification Has Been Approved";
+        } else if (pendingReview) {
+            subject = "Your Identity Verification Is Under Review";
+        } else {
+            subject = "Your Identity Verification Status Update";
+        }
+
+        EmailDTO emailDTO = EmailDTO.builder()
+                .to(applicantEmail)
+                .subject(subject)
+                .templateName("applicant-kyc-result")
+                .variables(variables)
+                .build();
+
+        return sendTemplatedEmail(emailDTO);
+    }
 }

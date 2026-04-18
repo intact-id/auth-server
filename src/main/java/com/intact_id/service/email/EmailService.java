@@ -80,7 +80,7 @@ public interface EmailService {
 
     /**
      * Send verification completed email
-     * 
+     *
      * @param applicantEmail     Applicant email
      * @param applicantName      Applicant name
      * @param verificationStatus Status (APPROVED, REJECTED, etc.)
@@ -89,6 +89,20 @@ public interface EmailService {
      */
     boolean sendVerificationCompletedEmail(String applicantEmail, String applicantName,
             String verificationStatus, String verificationId);
+
+    /**
+     * Send applicant KYC result email with company context and optional rejection reason.
+     *
+     * @param applicantEmail   Applicant email address
+     * @param applicantName    Applicant full name
+     * @param companyName      Name of the company that requested the verification
+     * @param decision         "approved", "rejected", or "pending_review"
+     * @param rejectionReason  Human-readable rejection reason (null for approvals)
+     * @param verificationId   Verification request ID
+     * @return true if sent successfully
+     */
+    boolean sendApplicantResultEmail(String applicantEmail, String applicantName,
+            String companyName, String decision, String rejectionReason, String verificationId);
 
     /**
      * Send application received confirmation email

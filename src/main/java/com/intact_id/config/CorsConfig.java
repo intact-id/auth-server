@@ -32,24 +32,25 @@ public class CorsConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-
-        CorsConfiguration configuration = new CorsConfiguration();
-
-        // Allow specific origins
-        configuration.setAllowedOrigins(allowedOrigins);
-        // Allow all HTTP methods
-        configuration.setAllowedMethods(ALLOWED_METHODS);
-
-        // Allow all headers
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-
-        // Allow credentials (cookies, authorization headers)
-        configuration.setAllowCredentials(true);
-
-        // Cache preflight response for 1 hour
-        configuration.setMaxAge(3600L);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
+        // Widget endpoints are embedded on third-party origins — allow any origin,
+        // but no credentials (auth is via X-Session-Token header, not cookies).
+        CorsConfiguration widgetConfig = new CorsConfiguration();
+        widgetConfig.setAllowedOriginPatterns(Arrays.asList("*"));
+        widgetConfig.setAllowedMethods(ALLOWED_METHODS);
+        widgetConfig.setAllowedHeaders(Arrays.asList("*"));
+        widgetConfig.setAllowCredentials(false);
+        widgetConfig.setMaxAge(3600L);
+        source.registerCorsConfiguration("/api/v1/kyc/widget/**", widgetConfig);
+
+        // All other endpoints: restrict to known dashboard/API origins.
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(ALLOWED_METHODS);
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         source.registerCorsConfiguration("/**", configuration);
 
         return source;

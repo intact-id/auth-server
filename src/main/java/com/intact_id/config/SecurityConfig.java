@@ -2,6 +2,7 @@ package com.intact_id.config;
 
 import com.intact_id.security.filter.ApiKeyAuthFilter;
 import com.intact_id.security.filter.JwtAuthenticationFilter;
+import com.intact_id.security.filter.KycWidgetAuthFilter;
 import com.intact_id.security.filter.UserActivityAuditFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -23,6 +24,7 @@ public class SecurityConfig {
 
         private final ApiKeyAuthFilter apiKeyAuthFilter;
         private final JwtAuthenticationFilter jwtAuthFilter;
+        private final KycWidgetAuthFilter kycWidgetAuthFilter;
         private final UserActivityAuditFilter userActivityAuditFilter;
         private final CorsConfigurationSource corsConfigurationSource;
 
@@ -59,11 +61,13 @@ public class SecurityConfig {
                                                 // All other requests require authentication (either JWT or API Key)
                                                 .anyRequest().authenticated())
 
-                                // Add filters in correct order:
-                                // 1. JWT filter (for admin users with Bearer tokens)
-                                // 2. API Key filter (for company API access with X-API-Key)
+                                // Filter order:
+                                // 1. JWT filter (admin Bearer tokens)
+                                // 2. KYC widget filter (X-Session-Token for /api/v1/kyc/widget/**)
+                                // 3. API Key filter (X-API-Key/Secret for company endpoints)
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                                .addFilterAfter(apiKeyAuthFilter, JwtAuthenticationFilter.class)
+                                .addFilterAfter(kycWidgetAuthFilter, JwtAuthenticationFilter.class)
+                                .addFilterAfter(apiKeyAuthFilter, KycWidgetAuthFilter.class)
                                 .addFilterAfter(userActivityAuditFilter, ApiKeyAuthFilter.class);
 
                 return http.build();
