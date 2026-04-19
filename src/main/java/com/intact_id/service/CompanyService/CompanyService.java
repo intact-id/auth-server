@@ -44,5 +44,7 @@ public interface CompanyService {
 
     CompanyCommunicationDetails rotateWebhookSecret(String companyId);
 
+    CompanyCommunicationDetails updateApplicantNotifications(String companyId, boolean onApproval, boolean onRejection, boolean onPendingReview);
+
     void deleteCompany(String companyId);
 }

@@ -251,6 +251,35 @@ public class CompanyController {
         }
     }
 
+    @PutMapping("/{id}/communication/notification-settings")
+    @Operation(summary = "Update applicant notification settings")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> updateApplicantNotifications(
+            @PathVariable String id,
+            @RequestBody java.util.Map<String, Boolean> flags) {
+
+        try {
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+            boolean onApproval    = Boolean.TRUE.equals(flags.getOrDefault("notifyApplicantOnApproval", true));
+            boolean onRejection   = Boolean.TRUE.equals(flags.getOrDefault("notifyApplicantOnRejection", true));
+            boolean onPending     = Boolean.TRUE.equals(flags.getOrDefault("notifyApplicantOnPendingReview", false));
+
+            CompanyCommunicationDetails communication =
+                    companyService.updateApplicantNotifications(resolvedCompanyId, onApproval, onRejection, onPending);
+
+            return ResponseEntity.ok(ApiResponse.<CompanyCommunicationResponseDto>builder()
+                    .responseCode(200)
+                    .responseMessage("Applicant notification settings updated")
+                    .success(true)
+                    .data(mapCommunicationToDto(communication))
+                    .build());
+        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                    ApiResponse.<CompanyCommunicationResponseDto>builder()
+                            .responseCode(404).responseMessage(e.getMessage()).success(false).build());
+        }
+    }
+
     @PostMapping("/{id}/communication/webhook/rotate-secret")
     @Operation(summary = "Rotate webhook signing secret")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
