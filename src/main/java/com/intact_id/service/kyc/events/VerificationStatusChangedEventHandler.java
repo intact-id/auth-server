@@ -34,7 +34,7 @@ public class VerificationStatusChangedEventHandler {
         VerificationStatusChangedData data = event.getData();
 
         VerificationRequest request = verificationRequestRepository
-                .findById(data.getVerificationId())
+                .findByIdWithCompany(data.getVerificationId())
                 .orElse(null);
 
         if (request == null) {
