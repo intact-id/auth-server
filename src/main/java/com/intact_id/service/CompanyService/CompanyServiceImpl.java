@@ -446,6 +446,24 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     @Transactional
+    public CompanyCommunicationDetails updateApplicantNotifications(String companyId, boolean onApproval, boolean onRejection, boolean onPendingReview) {
+        String resolvedCompanyId = resolveCompanyIdForAction(companyId);
+        CompanyCommunicationDetails communication = communicationRepository.findByCompanyId(resolvedCompanyId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                        "Communication details not found for company: " + resolvedCompanyId));
+
+        java.util.Map<String, Object> settings = communication.getNotificationSettings();
+        if (settings == null) settings = new java.util.HashMap<>();
+        settings.put("notifyApplicantOnApproval", onApproval);
+        settings.put("notifyApplicantOnRejection", onRejection);
+        settings.put("notifyApplicantOnPendingReview", onPendingReview);
+        communication.setNotificationSettings(settings);
+
+        return communicationRepository.save(communication);
+    }
+
+    @Override
+    @Transactional
     public CompanyCommunicationDetails rotateWebhookSecret(String companyId) {
         String resolvedCompanyId = resolveCompanyIdForAction(companyId);
         log.info("Rotating webhook secret for company: {}", resolvedCompanyId);
