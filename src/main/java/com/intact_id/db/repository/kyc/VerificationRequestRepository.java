@@ -73,4 +73,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
         @Query("SELECT v FROM VerificationRequest v WHERE v.status = :status ORDER BY v.createdAt ASC")
         List<VerificationRequest> findByStatusOrderByCreatedAtAsc(
                         @Param("status") GlobalStatuses status, Pageable pageable);
+
+        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company WHERE v.id = :id")
+        Optional<VerificationRequest> findByIdWithCompany(@Param("id") String id);
 }
