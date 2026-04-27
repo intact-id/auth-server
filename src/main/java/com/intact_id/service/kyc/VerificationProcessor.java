@@ -86,7 +86,7 @@ public class VerificationProcessor {
             VerificationStep step = new VerificationStep();
             step.setVerificationRequest(request);
             step.setStepName(check.getStepName());
-            step.setStatus("passed".equals(check.getStatus()) ? GlobalStatuses.COMPLETED : GlobalStatuses.FAILED);
+            step.setStatus(mapStepStatus(check.getStatus()));
             step.setConfidenceScore(check.getConfidenceScore());
             step.setResult(check.getResult());
             step.setExecutedAt(LocalDateTime.now());
@@ -156,5 +156,15 @@ public class VerificationProcessor {
                 || details.contains("face not detected")
                 || details.contains("no face detected")
                 || details.contains("no face found");
+    }
+
+    private static GlobalStatuses mapStepStatus(String status) {
+        if ("passed".equalsIgnoreCase(status)) {
+            return GlobalStatuses.COMPLETED;
+        }
+        if ("review".equalsIgnoreCase(status) || "manual_review".equalsIgnoreCase(status)) {
+            return GlobalStatuses.PENDING_APPROVAL;
+        }
+        return GlobalStatuses.FAILED;
     }
 }

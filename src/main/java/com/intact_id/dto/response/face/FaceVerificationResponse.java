@@ -11,9 +11,15 @@ import java.util.Map;
 public class FaceVerificationResponse {
     @JsonProperty("match")
     private boolean verified;
+    @JsonProperty("confidence")
+    private Double confidence;
     private double distance;
     @JsonProperty("threshold")
     private double threshold;
+    @JsonProperty("review_status")
+    private String reviewStatus;
+    @JsonProperty("review_reason")
+    private String reviewReason;
     @JsonProperty("model")
     private String model;
     @JsonProperty("similarity_metric")

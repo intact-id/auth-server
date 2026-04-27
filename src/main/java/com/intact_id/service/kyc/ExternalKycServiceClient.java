@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -104,19 +105,30 @@ public class ExternalKycServiceClient {
 
                 // --- Face match (critical) ---
                 FaceVerificationResponse faceResponse = faceFuture.join();
+                boolean faceManualReview = isManualReview(faceResponse);
+                String faceStatus = faceResponse.isVerified()
+                        ? "passed"
+                        : faceManualReview ? "review" : "failed";
                 checks.add(CheckResult.builder()
                         .stepName("face_match")
-                        .status(faceResponse.isVerified() ? "passed" : "failed")
+                        .status(faceStatus)
                         .confidenceScore(1.0 - faceResponse.getDistance())
                         .result(Map.of(
                                 "match_score", 1.0 - faceResponse.getDistance(),
                                 "verified", faceResponse.isVerified(),
                                 "distance", faceResponse.getDistance(),
                                 "threshold", faceResponse.getThreshold(),
-                                "similarity_metric", faceResponse.getSimilarityMetric()))
+                                "similarity_metric", faceResponse.getSimilarityMetric(),
+                                "review_status", faceResponse.getReviewStatus() != null ? faceResponse.getReviewStatus() : "",
+                                "review_reason", faceResponse.getReviewReason() != null ? faceResponse.getReviewReason() : ""))
                         .build());
 
-                if (!faceResponse.isVerified()) {
+                if (faceResponse.isVerified()) {
+                    // no-op
+                } else if (faceManualReview) {
+                    overallDecision = "manual_review";
+                    riskScore = 0.5;
+                } else {
                     overallDecision = "rejected";
                     riskScore = 0.9;
                 }
@@ -245,6 +257,13 @@ public class ExternalKycServiceClient {
         File file = new File(doc.getFilePath());
         return new FileMultipartFile(file, doc.getDocumentType(),
                 doc.getOriginalFilename(), doc.getMimeType());
+    }
+
+    private boolean isManualReview(FaceVerificationResponse faceResponse) {
+        return "manual_review".equalsIgnoreCase(
+                Optional.ofNullable(faceResponse.getReviewStatus())
+                        .map(status -> status.toLowerCase(Locale.ROOT))
+                        .orElse(null));
     }
 
     @Data
