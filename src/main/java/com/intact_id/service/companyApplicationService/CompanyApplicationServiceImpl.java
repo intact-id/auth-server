@@ -16,7 +16,7 @@ import com.intact_id.service.email.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import com.intact_id.util.mapper.MapperUtils;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -34,7 +34,7 @@ import java.util.List;
 
 @Slf4j
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class CompanyApplicationServiceImpl implements CompanyApplicationService {
 
     private final CompanyApplicationRepository applicationRepository;
