@@ -18,6 +18,7 @@ import com.intact_id.util.generator.GeneratorUtils;
 import com.intact_id.util.mapper.MapperUtils;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,9 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     private final MapperUtils mapperUtils;
     private final EmailService emailService;
     private final UserRepository userRepository;
+
+    @Value("${app.track-url:https://id.intact-id.com}")
+    private String trackBaseUrl;
 
     // ================= SUBMIT APPLICATION =================
 
@@ -69,7 +73,7 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
 
         // Send confirmation email — fire-and-forget, never fail the submission
         try {
-            String trackUrl = "https://intact-id.com/track?ref=" + saved.getApplicationNumber();
+            String trackUrl = trackBaseUrl + "/track?ref=" + saved.getApplicationNumber();
             boolean emailSent = emailService.sendApplicationReceivedEmail(
                     saved.getEmail(),
                     saved.getLegalName(),

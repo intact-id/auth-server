@@ -84,6 +84,7 @@ app:
     base-dir: ${APP_DOCUMENTS_BASE_DIR:${user.dir}/uploads}
   support-email: ${SUPPORT_EMAIL:support@intact-id.com}
   base-url: ${APP_BASE_URL:https://intact-id.com}
+  track-url: ${TRACK_URL:https://id.intact-id.com}
   dashboard-url: ${DASHBOARD_URL:https://dashboard.intact-id.com}
   docs-url: ${DOCS_URL:https://docs.intact-id.com}
 
