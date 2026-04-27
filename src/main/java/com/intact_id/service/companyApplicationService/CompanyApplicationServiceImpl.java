@@ -44,7 +44,7 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     private final EmailService emailService;
     private final UserRepository userRepository;
 
-    @Value("${app.track-url:https://id.intact-id.com}")
+    @Value("${app.track-url:https://id.intact-io.com}")
     private String trackBaseUrl;
 
     // ================= SUBMIT APPLICATION =================
