@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
+<h2>Invoice <span th:text="${invoiceNumber}">INV-XXXX</span></h2>
+<p>Hello <strong th:text="${companyName}">Company</strong>,</p>
+<p>
+    Your invoice for the period
+    <strong th:text="${periodStart}">2026-04-01</strong>
+    to
+    <strong th:text="${periodEnd}">2026-04-30</strong>
+    is ready.
+</p>
+
+<table style="border-collapse: collapse; width: 100%; margin-top: 20px;">
+    <thead>
+    <tr>
+        <th style="border: 1px solid #d1d5db; padding: 8px; text-align: left;">Description</th>
+        <th style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">Qty</th>
+        <th style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">Unit Price</th>
+        <th style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">Amount</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="line : ${lineItems}">
+        <td style="border: 1px solid #d1d5db; padding: 8px;" th:text="${line.description}">Verification charges</td>
+        <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;" th:text="${line.quantity}">0</td>
+        <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">
+            <span th:text="${currency}">USD</span>
+            <span th:text="${line.unitPrice}">0.00</span>
+        </td>
+        <td style="border: 1px solid #d1d5db; padding: 8px; text-align: right;">
+            <span th:text="${currency}">USD</span>
+            <span th:text="${line.amount}">0.00</span>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<p style="margin-top: 20px;">
+    Total:
+    <strong><span th:text="${currency}">USD</span> <span th:text="${total}">0.00</span></strong>
+</p>
+<p>
+    Due date:
+    <strong th:text="${dueAt}">2026-05-30</strong>
+</p>
+</body>
+</html>

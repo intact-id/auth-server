@@ -12,13 +12,16 @@ import com.intact_id.db.repository.kyc.VerificationStepRepository;
 import com.intact_id.dto.request.KycVerificationRequestDto;
 import com.intact_id.dto.response.KycVerificationResponseDto;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
+import com.intact_id.service.billing.BillingService;
 import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +44,7 @@ public class VerificationService {
     private final TierValidationService tierValidationService;
     private final ExternalKycServiceClient externalKycServiceClient;
     private final com.intact_id.service.webhook.WebhookService webhookService;
+    private final BillingService billingService;
 
     @Value("${app.documents.base-dir:${user.dir}/uploads}")
     private String documentsBaseDir;
@@ -88,6 +92,7 @@ public class VerificationService {
                 .setMetadata(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
 
         VerificationRequest savedRequest = verificationRequestRepository.save(verificationRequest);
+        billingService.handleVerificationSubmitted(savedRequest);
 
         // Save documents immediately — MultipartFile objects are tied to the HTTP request
         // lifecycle and won't be available when the scheduler processes them later
