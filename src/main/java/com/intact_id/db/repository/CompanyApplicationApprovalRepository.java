@@ -1,9 +1,10 @@
 package com.intact_id.db.repository;
 
+import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.CompanyApplicationApproval;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.UUID;
 
 /**
  * @Author frank
@@ -15,4 +16,9 @@ public interface CompanyApplicationApprovalRepository extends JpaRepository<Comp
     boolean existsByApplicationIdAndPerformedBy(String applicationId, String performedBy);
 
     long countByApplicationId(String applicationId);
+
+    Page<CompanyApplicationApproval> findByFinalActionIsNullAndPerformedByAction(
+            GlobalStatuses performedByAction,
+            Pageable pageable
+    );
 }

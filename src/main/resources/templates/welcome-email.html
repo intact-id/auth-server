@@ -264,8 +264,8 @@
         <div class="footer">
             <p><strong>Intact ID</strong> - Identity Verification Platform</p>
             <p>
-                <a href="mailto:support@intact-id.com">support@intact-id.com</a> |
-                <a href="https://intact-id.com">intact-id.com</a>
+                <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}">support@intact-id.com</a> |
+                <a th:href="${baseUrl}" th:text="${baseUrl}">intact-id.com</a>
             </p>
 
             <div class="support-info">

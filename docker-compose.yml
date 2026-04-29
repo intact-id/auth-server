@@ -1,67 +1,25 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:16-alpine
-    container_name: intact-id-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: intact_id
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
-      PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - intact-id-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  # Spring Boot Application
   auth-server:
-    image: frankmwangi8118/intact-id:V1
-    container_name: intact-id-auth-server
+    image: ${DOCKERHUB_USERNAME}/intact-auth:latest
+    container_name: intact-auth
     restart: unless-stopped
-    environment:
-      # Database Configuration
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: intact_id
-      DB_USERNAME: postgres
-      DB_PASSWORD: ${DB_PASSWORD:-admin}
-      
-      # JWT Configuration
-      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      
-      # Spring Profile
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
-      
-      # JVM Options
-      JAVA_OPTS: "-Xmx512m -Xms256m"
+    env_file: .env
     ports:
       - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    volumes:
+      - /var/data/intact-id/uploads:/var/data/intact-id/uploads
     networks:
-      - intact-id-network
+      - app-net
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
 networks:
-  intact-id-network:
-    driver: bridge
-
-volumes:
-  postgres_data:
-    driver: local
+  app-net:
+    external: true   # already exists — shared with postgres and face-service

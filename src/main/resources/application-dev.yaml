@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+# Dev CORS — localhost dev servers; override by setting CORS_ALLOWED_ORIGINS in your .env
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://intact-id.vercel.app/,http://localhost:5173,http://localhost:5174,http://localhost:5175}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    com.intact_id: DEBUG

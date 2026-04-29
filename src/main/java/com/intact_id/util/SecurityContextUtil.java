@@ -141,6 +141,25 @@ public class SecurityContextUtil {
         return false;
     }
 
+    /**
+     * Get authenticated user from JWT auth context.
+     */
+    public static User getAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            throw new ApplicationExceptions.IntactUnauthorizedException(
+                    "No authentication found in security context");
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof User user) {
+            return user;
+        }
+
+        throw new ApplicationExceptions.IntactUnauthorizedException(
+                "No authenticated user found in security context");
+    }
+
     private static boolean isAdminUser(User user) {
         if (user.getRoles() == null || user.getRoles().isEmpty()) {
             return false;

@@ -7,8 +7,10 @@ import com.intact_id.db.model.CompanyApplicationApproval;
 import com.intact_id.db.repository.CompanyApplicationApprovalRepository;
 import com.intact_id.db.repository.CompanyApplicationRepository;
 import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.db.repository.user.UserRepository;
 import com.intact_id.dto.request.ApplicationApprovalDecisionDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
+import com.intact_id.dto.response.CheckerApprovalQueueResponseDto;
 import com.intact_id.service.CompanyService.CompanyService;
 import com.intact_id.service.email.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
@@ -16,9 +18,14 @@ import com.intact_id.util.mapper.MapperUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * @Author frank
@@ -37,10 +44,57 @@ public class CheckerApprovalService {
     private final MapperUtils mapperUtils;
     private final CompanyRepository companyRepository;
     private final EmailService emailService;
+    private final UserRepository userRepository;
+
+    public Page<CheckerApprovalQueueResponseDto> getPendingCheckerApprovals(Pageable pageable) {
+        var pendingApprovals = approvalRepository.findByFinalActionIsNullAndPerformedByAction(
+                GlobalStatuses.APPROVED,
+                pageable
+        );
+
+        var applicationIds = pendingApprovals.stream()
+                .map(CompanyApplicationApproval::getApplicationId)
+                .collect(Collectors.toSet());
+
+        var applicationsById = applicationRepository.findAllById(applicationIds).stream()
+                .collect(Collectors.toMap(CompanyApplication::getId, Function.identity()));
+
+        var makerIds = pendingApprovals.stream()
+                .map(CompanyApplicationApproval::getPerformedBy)
+                .collect(Collectors.toSet());
+
+        var makersById = userRepository.findAllById(makerIds).stream()
+                .collect(Collectors.toMap(user -> user.getId(), Function.identity()));
+
+        return pendingApprovals.map(approval -> {
+            var application = applicationsById.get(approval.getApplicationId());
+            var maker = makersById.get(approval.getPerformedBy());
+
+            return CheckerApprovalQueueResponseDto.builder()
+                    .approvalId(approval.getId())
+                    .applicationId(approval.getApplicationId())
+                    .applicationNumber(application != null ? application.getApplicationNumber() : null)
+                    .legalName(application != null ? application.getLegalName() : null)
+                    .registrationNumber(application != null ? application.getRegistrationNumber() : null)
+                    .email(application != null ? application.getEmail() : null)
+                    .businessType(application != null ? application.getBusinessType() : null)
+                    .applicationStatus(application != null ? application.getApplicationStatus() : null)
+                    .makerId(approval.getPerformedBy())
+                    .makerUsername(maker != null ? maker.getUsername() : null)
+                    .makerEmail(maker != null ? maker.getEmail() : null)
+                    .makerAction(approval.getPerformedByAction())
+                    .makerNote(approval.getApproverNote())
+                    .submittedForApprovalAt(approval.getActionPerformedAt())
+                    .build();
+        });
+    }
 
     @Transactional
     public ApplicationApprovalResponseDto performCheckerApproval(ApplicationApprovalDecisionDto request) {
         log.info("Checker approval initiated for approval: {}", request.getApprovalId());
+        if (Objects.isNull(request.getApprovedBy()) || request.getApprovedBy().isBlank()) {
+            throw new ApplicationExceptions.IntactUnauthorizedException("Authenticated checker is required");
+        }
 
         // 1. Get the maker's approval record
         var makerApproval = approvalRepository.findById(request.getApprovalId())

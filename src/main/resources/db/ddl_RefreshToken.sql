@@ -10,7 +10,7 @@ CREATE TABLE refresh_tokens (
     token_hash VARCHAR(255) UNIQUE NOT NULL,
     expires_at TIMESTAMP NOT NULL,
     revoked BOOLEAN DEFAULT FALSE,
-    
+
     ip_address VARCHAR(45),
     user_agent TEXT,
     
@@ -24,6 +24,7 @@ CREATE TABLE refresh_tokens (
 CREATE INDEX idx_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX idx_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_expires_at ON refresh_tokens(expires_at);
+CREATE INDEX idx_refresh_tokens_session_id ON refresh_tokens(session_id);
 
 -- Comments
 COMMENT ON TABLE refresh_tokens IS 'JWT refresh tokens for session management';

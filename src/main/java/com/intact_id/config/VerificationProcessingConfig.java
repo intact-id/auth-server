@@ -13,7 +13,7 @@ public class VerificationProcessingConfig {
 
     private long pollIntervalMs = 30000;
 
-    private int batchSize = 5;
+    private int batchSize = 7;
 
-    private long delayBetweenCallsMs = 30000;
+    private int maxConcurrent = 4;
 }

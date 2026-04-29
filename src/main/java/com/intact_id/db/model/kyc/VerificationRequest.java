@@ -105,4 +105,33 @@ public class VerificationRequest extends Auditable {
         this.errorDetails = errorDetails;
         this.completedAt = LocalDateTime.now();
     }
+
+    public void markAsRejected(String failureReason, String errorDetails, Double riskScore) {
+        this.status = GlobalStatuses.REJECTED;
+        this.overallDecision = "rejected";
+        this.failureReason = failureReason;
+        this.errorDetails = errorDetails;
+        this.riskScore = riskScore;
+        this.completedAt = LocalDateTime.now();
+    }
+
+    public void markAsManualReview(Double riskScore) {
+        this.status = GlobalStatuses.PENDING_APPROVAL;
+        this.overallDecision = "manual_review";
+        this.riskScore = riskScore;
+    }
+
+    public void resolveManualReview(String decision, String reviewerNotes) {
+        if ("approved".equalsIgnoreCase(decision)) {
+            this.status = GlobalStatuses.COMPLETED;
+            this.overallDecision = "approved";
+            this.riskScore = 0.1;
+        } else {
+            this.status = GlobalStatuses.REJECTED;
+            this.overallDecision = "rejected";
+            this.riskScore = 0.9;
+        }
+        this.failureReason = reviewerNotes;
+        this.completedAt = LocalDateTime.now();
+    }
 }

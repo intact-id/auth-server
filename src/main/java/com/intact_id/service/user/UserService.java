@@ -1,28 +1,34 @@
 package com.intact_id.service.user;
 
+import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
+import com.intact_id.db.model.user.RefreshToken;
 import com.intact_id.db.model.user.Role;
 import com.intact_id.db.model.user.User;
 import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.db.repository.user.RefreshTokenRepository;
 import com.intact_id.db.repository.user.RoleRepository;
 import com.intact_id.db.repository.user.UserRepository;
+import com.intact_id.service.audit.AuditService;
+import com.intact_id.dto.auth.RoleResponseDto;
 import com.intact_id.dto.auth.UserCreateDto;
 import com.intact_id.dto.auth.UserResponseDto;
 import com.intact_id.dto.email.EmailDTO;
-import com.intact_id.constant.enums.GlobalStatuses;
+import com.intact_id.service.email.EmailService;
 import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
+import jakarta.mail.internet.MailDateFormat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,11 +38,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserService {
 
+    @Value("${app.dashboard-url}")
+    private String dashboardUrl;
+
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final CompanyRepository companyRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
-    private final com.intact_id.service.email.EmailService emailService;
+    private final EmailService emailService;
     private final GeneratorUtils generatorUtils;
 
     /**
@@ -76,7 +87,7 @@ public class UserService {
         if (plainPassword == null || plainPassword.trim().isEmpty()) {
             plainPassword = generatorUtils.generateRandomPassword();
             isRandomPassword = true;
-            log.info("Generated random password for user: {}, :{}", request.getUsername(),plainPassword);
+            log.info("Generated random password for user: {}, :{}", request.getUsername(), plainPassword);
         }
 
         // Create user
@@ -147,7 +158,7 @@ public class UserService {
             variables.put("fullName", user.getFirstName() + " " + user.getLastName());
             variables.put("username", user.getUsername());
             variables.put("password", temporaryPassword);
-            variables.put("dashboardUrl", "http://localhost:5173/login");
+            variables.put("dashboardUrl", dashboardUrl + "/login");
 
             EmailDTO emailDTO = new EmailDTO();
             emailDTO.setTo(user.getEmail());
@@ -258,6 +269,21 @@ public class UserService {
                                 "Company not found: " + request.getCompanyId()));
                 user.setCompany(company);
             }
+        }
+
+        if (request.getRoleIds() != null && !request.getRoleIds().isEmpty()) {
+            Set<Role> roles = new HashSet<>();
+            for (String roleId : request.getRoleIds()) {
+                Role role = roleRepository.findById(roleId)
+                        .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                                "Role not found: " + roleId));
+                if ("SUPER_ADMIN".equals(role.getName()) && !SecurityContextUtil.isSuperAdminAuthenticated()) {
+                    throw new ApplicationExceptions.IntactUnauthorizedException(
+                            "Insufficient privileges to assign the SUPER_ADMIN role");
+                }
+                roles.add(role);
+            }
+            user.setRoles(roles);
         }
 
         User updatedUser = userRepository.save(user);
@@ -416,6 +442,33 @@ public class UserService {
     }
 
     /**
+     * Force-logout a user by revoking all their active refresh tokens
+     */
+    @Transactional
+    public void logoutUser(String userId) {
+        log.info("Force-logging out user: {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
+                        "User not found: " + userId));
+
+        enforceUserScope(user);
+
+        List<RefreshToken> tokens = refreshTokenRepository.findByUserId(userId);
+        for (RefreshToken token : tokens) {
+            if (!Boolean.TRUE.equals(token.getRevoked())) {
+                token.revoke();
+                refreshTokenRepository.save(token);
+                if (token.getSessionId() != null) {
+                    auditService.closeSession(token.getSessionId(), user, null);
+                }
+            }
+        }
+
+        log.info("Force-logout complete for user: {}", user.getUsername());
+    }
+
+    /**
      * Delete user
      */
     @Transactional
@@ -462,5 +515,19 @@ public class UserService {
                 throw new ApplicationExceptions.IntactUnauthorizedException("Access denied");
             }
         }
+    }
+
+    /**
+     * Get all available roles
+     */
+    public List<RoleResponseDto> getAllRoles() {
+        return roleRepository.findAll().stream()
+                .map(role -> RoleResponseDto.builder()
+                        .id(role.getId())
+                        .name(role.getName())
+                        .description(role.getDescription())
+                        .status(role.getStatus() != null ? role.getStatus().name() : null)
+                        .build())
+                .collect(Collectors.toList());
     }
 }

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action Required – Intact ID</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0f1115; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <div style="max-width: 600px; margin: 40px auto; background: #161b22; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.4); border: 1px solid #30363d;">
+
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, rgba(234,179,8,0.12) 0%, rgba(249,115,22,0.06) 100%); padding: 40px 30px; text-align: center; border-bottom: 1px solid #30363d;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.02em;">🔐 Intact<span style="color: #3b82f6;">ID</span></h1>
+            <p style="margin: 12px 0 0; color: #eab308; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Action Required</p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 40px 30px;">
+            <h2 style="margin: 0 0 8px; color: #ffffff; font-size: 22px; font-weight: 600;">Application Pending Your Approval</h2>
+            <p style="margin: 0 0 24px; color: #8b949e; font-size: 15px; line-height: 1.6;">
+                Hi <span th:text="${checkerName}" style="color: #e6edf3; font-weight: 500;"></span>,<br/>
+                a new application from <strong th:text="${companyName}" style="color: #e6edf3;"></strong>
+                has been reviewed by the maker and is now awaiting your final decision.
+                Please log in to the dashboard to approve or reject.
+            </p>
+
+            <!-- Application Details Box -->
+            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 20px 24px; margin-bottom: 24px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 6px 0; color: #6e7681; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; width: 160px;">Company</td>
+                        <td style="padding: 6px 0; color: #e6edf3; font-size: 14px; font-weight: 500;" th:text="${companyName}"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px 0; color: #6e7681; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;">Application No.</td>
+                        <td style="padding: 6px 0; color: #3b82f6; font-size: 14px; font-weight: 700; font-family: monospace;" th:text="${applicationNumber}"></td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Maker Note -->
+            <div th:if="${approverNote != null and !#strings.isEmpty(approverNote)}"
+                 style="background: #0d1117; border-left: 3px solid #6366f1; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 20px;">
+                <p style="margin: 0 0 6px; color: #6366f1; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;">Maker Note</p>
+                <p th:text="${approverNote}" style="margin: 0; color: #c9d1d9; font-size: 14px; line-height: 1.6;"></p>
+            </div>
+
+            <!-- End User Message -->
+            <div th:if="${endUserMessage != null and !#strings.isEmpty(endUserMessage)}"
+                 style="background: #0d1117; border-left: 3px solid #eab308; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 28px;">
+                <p style="margin: 0 0 6px; color: #eab308; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;">End User Message</p>
+                <p th:text="${endUserMessage}" style="margin: 0; color: #c9d1d9; font-size: 14px; line-height: 1.6;"></p>
+            </div>
+
+            <!-- CTA -->
+            <div style="text-align: center; margin-bottom: 8px;">
+                <a th:href="${dashboardUrl}" style="display: inline-block; background: linear-gradient(135deg, #eab308 0%, #f97316 100%); color: #0d1117; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 15px; font-weight: 700; letter-spacing: 0.01em;">Review in Dashboard</a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #0d1117; padding: 20px 30px; border-top: 1px solid #30363d; text-align: center;">
+            <p style="margin: 0; color: #6e7681; font-size: 12px;">
+                This is an internal alert. Questions? <a th:href="'mailto:' + ${supportEmail}" th:text="${supportEmail}" style="color: #3b82f6; text-decoration: none;"></a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

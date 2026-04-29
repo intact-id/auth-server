@@ -17,6 +17,8 @@ import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
@@ -27,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -42,6 +45,9 @@ public class VerificationService {
     private final ExternalKycServiceClient externalKycServiceClient;
     private final com.intact_id.service.webhook.WebhookService webhookService;
     private final BillingService billingService;
+
+    @Value("${app.documents.base-dir:${user.dir}/uploads}")
+    private String documentsBaseDir;
 
     @Transactional
     public KycVerificationResponseDto submitVerification(
@@ -107,115 +113,20 @@ public class VerificationService {
                 .build();
     }
 
-    private void addDocument(List<VerificationDocument> list, VerificationDocument doc) {
-        if (doc != null)
-            list.add(doc);
-    }
-
-    @Async
-    @Transactional
-    public void processVerificationAsync(VerificationRequest request, KycVerificationRequestDto requestDto) {
-        try {
-            log.info("Starting async verification processing for: {}", request.getId());
-
-            // Update status to processing
-            request.markAsProcessing();
-            verificationRequestRepository.save(request);
-
-            // Save documents in background (this was blocking the API before)
-            List<VerificationDocument> documents = new java.util.ArrayList<>();
-            addDocument(documents, saveDocument(request, requestDto.getSelfie(), "selfie"));
-            addDocument(documents, saveDocument(request, requestDto.getIdFront(), "id_front"));
-            if (requestDto.getIdBack() != null)
-                addDocument(documents, saveDocument(request, requestDto.getIdBack(), "id_back"));
-            if (requestDto.getProofOfAddress() != null)
-                addDocument(documents, saveDocument(request, requestDto.getProofOfAddress(), "proof_of_address"));
-
-            // Call external KYC service (mocked)
-            ExternalKycServiceClient.VerificationResult result = externalKycServiceClient
-                    .performVerification(request.getTier(), request, documents).get();
-
-            // Save verification steps
-            for (ExternalKycServiceClient.CheckResult check : result.getChecks()) {
-                VerificationStep step = new VerificationStep();
-                step.setVerificationRequest(request);
-                step.setStepName(check.getStepName());
-                step.setStatus("passed".equals(check.getStatus()) ? GlobalStatuses.COMPLETED : GlobalStatuses.FAILED);
-                step.setConfidenceScore(check.getConfidenceScore());
-                step.setResult(check.getResult());
-                step.setExecutedAt(LocalDateTime.now());
-                verificationStepRepository.save(step);
-            }
-
-            // Update verification request with final result
-            request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
-
-            // Store error details if present
-            if (result.getFailureReason() != null) {
-                request.setFailureReason(result.getFailureReason());
-            }
-            if (result.getErrorDetails() != null) {
-                request.setErrorDetails(result.getErrorDetails());
-            }
-
-            verificationRequestRepository.save(request);
-            billingService.handleVerificationOutcome(request);
-
-            log.info("Verification completed successfully for: {}", request.getId());
-
-            // Send webhook notification
-            webhookService.sendVerificationCompletedWebhook(request.getCompany(), request);
-
-        } catch (Exception e) {
-            log.error("Verification processing failed for: {}", request.getId(), e);
-
-            String failureReason = "SystemError";
-            String errorDetails = e.getMessage();
-
-            // Extract more specific error information if available
-            if (e.getCause() != null && e.getCause() instanceof feign.FeignException) {
-                feign.FeignException feignException = (feign.FeignException) e.getCause();
-                try {
-                    String responseBody = feignException.contentUTF8();
-                    if (responseBody != null && !responseBody.isEmpty()) {
-                        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                        com.fasterxml.jackson.databind.JsonNode errorJson = mapper.readTree(responseBody);
-
-                        if (errorJson.has("error")) {
-                            failureReason = errorJson.get("error").asText();
-                        }
-                        if (errorJson.has("message")) {
-                            errorDetails = errorJson.get("message").asText();
-                        }
-                    }
-                } catch (Exception parseEx) {
-                    log.warn("Failed to parse error response", parseEx);
-                }
-            }
-
-            request.markAsFailed(failureReason, errorDetails);
-            verificationRequestRepository.save(request);
-            billingService.handleVerificationOutcome(request);
-
-            // Send webhook notification for failure
-            webhookService.sendVerificationFailedWebhook(request.getCompany(), request);
-        }
-    }
-
     private VerificationDocument saveDocument(VerificationRequest request, MultipartFile file, String documentType) {
         if (file == null || file.isEmpty())
             return null;
 
         try {
-            // Create uploads directory if not exists
-            java.nio.file.Path uploadPath = java.nio.file.Paths.get(System.getProperty("user.dir"), "uploads");
+            // Persist all documents under a configurable base directory.
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(documentsBaseDir).toAbsolutePath().normalize();
             if (!java.nio.file.Files.exists(uploadPath)) {
                 java.nio.file.Files.createDirectories(uploadPath);
             }
 
             // Generate unique filename
             String filename = request.getId() + "_" + documentType + "_" + file.getOriginalFilename();
-            java.nio.file.Path filePath = uploadPath.resolve(filename);
+            java.nio.file.Path filePath = uploadPath.resolve(filename).normalize();
 
             // Save file
             file.transferTo(filePath.toFile());
@@ -269,6 +180,8 @@ public class VerificationService {
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
                 .overallDecision(request.getOverallDecision())
+                .failureReason(request.getFailureReason())
+                .errorDetails(request.getErrorDetails())
                 .riskScore(request.getRiskScore())
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
@@ -285,11 +198,15 @@ public class VerificationService {
             String tier,
             LocalDateTime fromDate,
             LocalDateTime toDate,
+            String search,
             Pageable pageable) {
 
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
+        String normalizedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+        String environmentName = environment != null ? environment.name() : null;
+        String statusName = status != null ? status.name() : null;
         Page<VerificationRequest> requests = verificationRequestRepository.findByFilters(
-                resolvedCompanyId, environment, status, tier, fromDate, toDate, pageable);
+                resolvedCompanyId, environmentName, statusName, tier, fromDate, toDate, normalizedSearch, pageable);
 
         return requests.map(request -> VerificationStatusResponseDto.builder()
                 .verificationId(request.getId())
@@ -300,6 +217,7 @@ public class VerificationService {
                 .overallDecision(request.getOverallDecision())
                 .riskScore(request.getRiskScore())
                 .failureReason(request.getFailureReason())
+                .errorDetails(request.getErrorDetails())
                 .customerData(request.getCustomerData())
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
@@ -325,6 +243,22 @@ public class VerificationService {
                 .fileSize(document.getFileSize())
                 .mimeType(document.getMimeType())
                 .uploadedAt(document.getCreatedAt())
+                .extractedData(document.getExtractedData())
                 .build();
+    }
+
+    private boolean shouldRejectVerification(String failureReason, String errorDetails, String overallDecision) {
+        if ("rejected".equalsIgnoreCase(overallDecision)) {
+            return true;
+        }
+
+        String failure = failureReason == null ? "" : failureReason.toLowerCase(Locale.ROOT);
+        String details = errorDetails == null ? "" : errorDetails.toLowerCase(Locale.ROOT);
+
+        return failure.contains("face not detected")
+                || failure.contains("facenotdetected")
+                || details.contains("face not detected")
+                || details.contains("no face detected")
+                || details.contains("no face found");
     }
 }

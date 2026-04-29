@@ -21,6 +21,11 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
+# Environment — never bake secrets into the image
+.env
+.env.*
+!.env.example
+
 # Logs
 *.log
 

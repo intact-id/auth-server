@@ -1,6 +1,7 @@
 package com.intact_id.api.user;
 
 import com.intact_id.constant.enums.GlobalStatuses;
+import com.intact_id.dto.auth.RoleResponseDto;
 import com.intact_id.dto.auth.UserCreateDto;
 import com.intact_id.dto.auth.UserResponseDto;
 import com.intact_id.dto.response.ApiResponse;
@@ -122,7 +123,11 @@ public class UserController {
         }
 
         @PutMapping("/{userId}")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasRole('SUPER_ADMIN')" +
+                "" +
+                "" +
+                "" +
+                "")
         @Operation(summary = "Update user")
         public ResponseEntity<ApiResponse<UserResponseDto>> updateUser(
                         @PathVariable String userId,
@@ -132,7 +137,8 @@ public class UserController {
                                 UserResponseDto existing = userService.getUserById(userId);
                                 String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
                                 if (existing.getCompanyId() == null || !existing.getCompanyId().equals(companyId)) {
-                                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                                        return ResponseEntity
+                                                .status(HttpStatus.FORBIDDEN).body(
                                                         ApiResponse.<UserResponseDto>builder()
                                                                         .success(false)
                                                                         .responseCode(HttpStatus.FORBIDDEN.value())
@@ -291,6 +297,20 @@ public class UserController {
                                                 .build());
         }
 
+        @PostMapping("/{userId}/logout")
+        @PreAuthorize("hasRole('SUPER_ADMIN')")
+        @Operation(summary = "Force-logout a user by revoking all their active sessions")
+        public ResponseEntity<ApiResponse<Void>> logoutUser(@PathVariable String userId) {
+                userService.logoutUser(userId);
+
+                return ResponseEntity.ok(
+                                ApiResponse.<Void>builder()
+                                                .success(true)
+                                                .responseCode(HttpStatus.OK.value())
+                                                .responseMessage("User logged out successfully")
+                                                .build());
+        }
+
         @DeleteMapping("/{userId}")
         @PreAuthorize("hasRole('SUPER_ADMIN')")
         @Operation(summary = "Delete user")
@@ -302,6 +322,21 @@ public class UserController {
                                                 .success(true)
                                                 .responseCode(HttpStatus.OK.value())
                                                 .responseMessage("User deleted successfully")
+                                                .build());
+        }
+
+        @GetMapping("/roles")
+        @PreAuthorize("hasRole('SUPER_ADMIN')")
+        @Operation(summary = "Get all available roles")
+        public ResponseEntity<ApiResponse<List<RoleResponseDto>>> getAllRoles() {
+                List<RoleResponseDto> roles = userService.getAllRoles();
+
+                return ResponseEntity.ok(
+                                ApiResponse.<List<RoleResponseDto>>builder()
+                                                .success(true)
+                                                .responseCode(HttpStatus.OK.value())
+                                                .responseMessage("Roles retrieved successfully")
+                                                .data(roles)
                                                 .build());
         }
 }

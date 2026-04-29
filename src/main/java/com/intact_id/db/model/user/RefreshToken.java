@@ -38,6 +38,9 @@ public class RefreshToken extends Auditable {
     @Column(name = "user_agent", columnDefinition = "TEXT")
     private String userAgent;
 
+    @Column(name = "session_id", length = 255)
+    private String sessionId;
+
     // Helper methods
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt);
