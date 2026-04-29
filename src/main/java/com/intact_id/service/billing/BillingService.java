@@ -154,6 +154,25 @@ public class BillingService {
         BigDecimal ready = sumCharges(charges, BillingChargeStatus.READY);
         BigDecimal debited = sumCharges(charges, BillingChargeStatus.DEBITED);
         BigDecimal invoiced = sumCharges(charges, BillingChargeStatus.INVOICED);
+        BigDecimal currentBalance = defaultDecimal(profile.getCurrentBalance());
+        BigDecimal creditLimit = defaultDecimal(profile.getCreditLimit());
+        BigDecimal walletBalance = currentBalance.max(BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal usedCredit = currentBalance.signum() < 0
+                ? currentBalance.abs().setScale(4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        BigDecimal remainingCredit = creditLimit.subtract(usedCredit).max(BigDecimal.ZERO).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal availableToSpend = walletBalance.add(remainingCredit).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal outstandingAmount = profile.getBillingMode() == BillingMode.POSTPAID
+                ? ready.add(invoiced).setScale(4, RoundingMode.HALF_UP)
+                : usedCredit;
+        Integer estimatedSubmissionsRemaining = null;
+        if (profile.getBillingMode() == BillingMode.PREPAID
+                && profile.getUnitPrice() != null
+                && profile.getUnitPrice().compareTo(BigDecimal.ZERO) > 0) {
+            estimatedSubmissionsRemaining = availableToSpend
+                    .divide(profile.getUnitPrice(), 0, RoundingMode.DOWN)
+                    .intValue();
+        }
 
         return BillingSummaryResponseDto.builder()
                 .companyId(companyId)
@@ -161,10 +180,16 @@ public class BillingService {
                 .billingMode(profile.getBillingMode())
                 .currency(profile.getCurrency())
                 .unitPrice(profile.getUnitPrice())
-                .currentBalance(defaultDecimal(profile.getCurrentBalance()))
+                .currentBalance(currentBalance)
+                .walletBalance(walletBalance)
+                .usedCredit(usedCredit)
+                .remainingCredit(remainingCredit)
+                .availableToSpend(availableToSpend)
+                .outstandingAmount(outstandingAmount)
                 .readyToInvoiceAmount(ready)
                 .debitedAmount(debited)
                 .invoicedAmount(invoiced)
+                .estimatedSubmissionsRemaining(estimatedSubmissionsRemaining)
                 .build();
     }
 
@@ -303,6 +328,31 @@ public class BillingService {
         invoice.setStatus(BillingInvoiceStatus.SENT);
         invoice.setSentAt(LocalDateTime.now());
         return toInvoiceResponse(billingInvoiceRepository.save(invoice));
+    }
+
+    public record InsufficientBalance(BigDecimal available, BigDecimal required) {}
+
+    @Transactional(readOnly = true)
+    public InsufficientBalance checkSufficientBalance(VerificationRequest verificationRequest) {
+        Optional<CompanyBillingProfile> optionalProfile = billingProfileRepository
+                .findByCompanyId(verificationRequest.getCompany().getId());
+        if (optionalProfile.isEmpty()) return null;
+
+        CompanyBillingProfile profile = optionalProfile.get();
+        if (profile.getBillingMode() != BillingMode.PREPAID) return null;
+        if (profile.getUnitPrice() == null || profile.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) return null;
+
+        BigDecimal currentBalance = defaultDecimal(profile.getCurrentBalance());
+        BigDecimal creditLimit = defaultDecimal(profile.getCreditLimit());
+        BigDecimal walletBalance = currentBalance.max(BigDecimal.ZERO);
+        BigDecimal usedCredit = currentBalance.signum() < 0 ? currentBalance.abs() : BigDecimal.ZERO;
+        BigDecimal remainingCredit = creditLimit.subtract(usedCredit).max(BigDecimal.ZERO);
+        BigDecimal availableToSpend = walletBalance.add(remainingCredit);
+
+        if (availableToSpend.compareTo(profile.getUnitPrice()) < 0) {
+            return new InsufficientBalance(availableToSpend, profile.getUnitPrice());
+        }
+        return null;
     }
 
     @Transactional

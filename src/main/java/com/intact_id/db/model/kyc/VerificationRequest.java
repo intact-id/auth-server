@@ -87,6 +87,10 @@ public class VerificationRequest extends Auditable {
         this.status = GlobalStatuses.PROCESSING;
     }
 
+    public void markAsSubmitted() {
+        this.status = GlobalStatuses.SUBMITTED;
+    }
+
     public void markAsCompleted(String decision, Double riskScore) {
         this.status = GlobalStatuses.COMPLETED;
         this.overallDecision = decision;
