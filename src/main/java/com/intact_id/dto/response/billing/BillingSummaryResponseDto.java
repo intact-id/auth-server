@@ -15,7 +15,13 @@ public class BillingSummaryResponseDto {
     private String currency;
     private BigDecimal unitPrice;
     private BigDecimal currentBalance;
+    private BigDecimal walletBalance;
+    private BigDecimal usedCredit;
+    private BigDecimal remainingCredit;
+    private BigDecimal availableToSpend;
+    private BigDecimal outstandingAmount;
     private BigDecimal readyToInvoiceAmount;
     private BigDecimal debitedAmount;
     private BigDecimal invoicedAmount;
+    private Integer estimatedSubmissionsRemaining;
 }

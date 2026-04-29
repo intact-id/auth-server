@@ -3,6 +3,8 @@ package com.intact_id.service.kyc;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.kyc.VerificationDocument;
 import com.intact_id.db.model.kyc.VerificationRequest;
+import com.intact_id.service.billing.BillingService;
+import com.intact_id.service.billing.BillingService.InsufficientBalance;
 import com.intact_id.service.kyc.RateLimitService.LimitExceeded;
 import com.intact_id.db.model.kyc.VerificationStep;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
@@ -33,6 +35,7 @@ public class VerificationProcessor {
     private final ApplicationEventPublisher eventPublisher;
     private final EmailService emailService;
     private final RateLimitService rateLimitService;
+    private final BillingService billingService;
 
     @Value("${app.support-email:support@intact-id.com}")
     private String supportEmail;
@@ -43,12 +46,20 @@ public class VerificationProcessor {
         // Rate limit check — runs before any external calls
         LimitExceeded exceeded = rateLimitService.checkAndConsume(request);
         if (exceeded != null) {
-            request.markAsRejected("rate_limit_exceeded",
-                    String.format("%s limit of %d reached. Resets at %s.", exceeded.window(), exceeded.limit(), exceeded.resetAt()),
-                    1.0);
+            request.markAsSubmitted();
             verificationRequestRepository.save(request);
-            publishStatusChanged(request);
-            log.info("Verification {} rejected — {} rate limit exceeded ({}/{})", request.getId(), exceeded.window(), exceeded.used(), exceeded.limit());
+            log.info("Verification {} parked — {} rate limit exceeded ({}/{}), will retry next cycle",
+                    request.getId(), exceeded.window(), exceeded.used(), exceeded.limit());
+            return;
+        }
+
+        // Wallet balance check — only relevant for PREPAID companies
+        InsufficientBalance insufficientBalance = billingService.checkSufficientBalance(request);
+        if (insufficientBalance != null) {
+            request.markAsSubmitted();
+            verificationRequestRepository.save(request);
+            log.info("Verification {} parked — insufficient wallet balance (available={}, required={}), will retry next cycle",
+                    request.getId(), insufficientBalance.available(), insufficientBalance.required());
             return;
         }
 
