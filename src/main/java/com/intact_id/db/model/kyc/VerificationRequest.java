@@ -15,6 +15,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.math.BigDecimal;
 
 @Entity
 @Getter
@@ -68,6 +69,12 @@ public class VerificationRequest extends Auditable {
 
     @Column(name = "error_details", columnDefinition = "text")
     private String errorDetails; // Detailed error message
+
+    @Column(name = "billing_amount", precision = 19, scale = 4)
+    private BigDecimal billingAmount;
+
+    @Column(name = "billed_at")
+    private LocalDateTime billedAt;
 
     // Helper methods
     public boolean isCompleted() {
