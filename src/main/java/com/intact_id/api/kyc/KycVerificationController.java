@@ -168,6 +168,46 @@ public class KycVerificationController {
                 }
         }
 
+        @PostMapping("/verifications/{verificationId}/release")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @Operation(summary = "Release a held verification", description = "Manually release a single ON_HOLD verification back to SUBMITTED so the scheduler will retry it")
+        public ResponseEntity<ApiResponse<Void>> releaseHeldVerification(
+                        @PathVariable String verificationId) {
+                try {
+                        verificationService.releaseHeldVerification(verificationId);
+                        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                                        .responseCode(HttpStatus.OK.value())
+                                        .responseMessage("Verification released successfully")
+                                        .success(true)
+                                        .build());
+                } catch (com.intact_id.util.exception.ApplicationExceptions.IntactResourceNotFoundException e) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.<Void>builder()
+                                        .responseCode(HttpStatus.NOT_FOUND.value())
+                                        .responseMessage(e.getMessage())
+                                        .success(false)
+                                        .build());
+                } catch (com.intact_id.util.exception.ApplicationExceptions.InvalidActionException e) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.<Void>builder()
+                                        .responseCode(HttpStatus.BAD_REQUEST.value())
+                                        .responseMessage(e.getMessage())
+                                        .success(false)
+                                        .build());
+                }
+        }
+
+        @PostMapping("/verifications/release-held")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @Operation(summary = "Release all held verifications", description = "Release all ON_HOLD verifications back to SUBMITTED. Optionally scope to a single company.")
+        public ResponseEntity<ApiResponse<Void>> releaseAllHeld(
+                        @Parameter(description = "Release only for this company (omit to release all)") @RequestParam(required = false) String companyId) {
+                int released = verificationService.releaseAllHeldForCompany(companyId);
+                return ResponseEntity.ok(ApiResponse.<Void>builder()
+                                .responseCode(HttpStatus.OK.value())
+                                .responseMessage(released + " verification(s) released")
+                                .success(true)
+                                .build());
+        }
+
         @GetMapping("/verify/{verificationId}")
         @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
         @Operation(summary = "Get verification status", description = "Retrieve the status and results of a verification request")

@@ -87,8 +87,19 @@ public class VerificationRequest extends Auditable {
         this.status = GlobalStatuses.PROCESSING;
     }
 
+    public void markAsHeld(String reason) {
+        this.status = GlobalStatuses.ON_HOLD;
+        if (this.metadata == null) this.metadata = new HashMap<>();
+        this.metadata.put("holdReason", reason);
+        this.metadata.put("heldAt", java.time.LocalDateTime.now().toString());
+    }
+
     public void markAsSubmitted() {
         this.status = GlobalStatuses.SUBMITTED;
+        if (this.metadata != null) {
+            this.metadata.remove("holdReason");
+            this.metadata.remove("heldAt");
+        }
     }
 
     public void markAsCompleted(String decision, Double riskScore) {
