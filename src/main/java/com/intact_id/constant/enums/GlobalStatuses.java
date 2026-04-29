@@ -27,6 +27,7 @@ public enum GlobalStatuses {
     DRAFT("Work is in progress, not finalized"),
     INFO_REQUESTED("extra info is being requested so as to continue with the action or proccess"),
     REJECTED("action or process has been rejected"),
+    ON_HOLD("Verification is temporarily held, awaiting manual release before the scheduler can retry it"),
     ARCHIVED("Entity or record is stored for historical purposes"),
     UNKNOWN("Status is unknown or not set"),
     CLOSED("entity or business or service has been closed"),;

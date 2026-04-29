@@ -224,6 +224,31 @@ public class VerificationService {
                 .build());
     }
 
+    @Transactional
+    public void releaseHeldVerification(String verificationId) {
+        VerificationRequest request = verificationRequestRepository.findByIdWithCompany(verificationId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
+                        "Verification not found: " + verificationId));
+        if (request.getStatus() != GlobalStatuses.ON_HOLD) {
+            throw new ApplicationExceptions.InvalidActionException(
+                    "Verification " + verificationId + " is not ON_HOLD (current status: " + request.getStatus() + ")");
+        }
+        request.markAsSubmitted();
+        verificationRequestRepository.save(request);
+        log.info("Verification {} manually released back to SUBMITTED", verificationId);
+    }
+
+    @Transactional
+    public int releaseAllHeldForCompany(String companyId) {
+        List<VerificationRequest> held = companyId != null
+                ? verificationRequestRepository.findByStatusAndCompanyId(GlobalStatuses.ON_HOLD, companyId)
+                : verificationRequestRepository.findByStatus(GlobalStatuses.ON_HOLD);
+        held.forEach(r -> r.markAsSubmitted());
+        verificationRequestRepository.saveAll(held);
+        log.info("Released {} held verification(s) for companyId={}", held.size(), companyId != null ? companyId : "ALL");
+        return held.size();
+    }
+
     private VerificationStatusResponseDto.VerificationStepDto mapStepToDto(VerificationStep step) {
         return VerificationStatusResponseDto.VerificationStepDto.builder()
                 .stepName(step.getStepName())

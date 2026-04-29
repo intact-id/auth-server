@@ -46,20 +46,22 @@ public class VerificationProcessor {
         // Rate limit check — runs before any external calls
         LimitExceeded exceeded = rateLimitService.checkAndConsume(request);
         if (exceeded != null) {
-            request.markAsSubmitted();
+            String reason = String.format("%s rate limit exceeded (%d/%d, resets at %s)",
+                    exceeded.window(), exceeded.used(), exceeded.limit(), exceeded.resetAt());
+            request.markAsHeld(reason);
             verificationRequestRepository.save(request);
-            log.info("Verification {} parked — {} rate limit exceeded ({}/{}), will retry next cycle",
-                    request.getId(), exceeded.window(), exceeded.used(), exceeded.limit());
+            log.info("Verification {} held — {}", request.getId(), reason);
             return;
         }
 
         // Wallet balance check — only relevant for PREPAID companies
         InsufficientBalance insufficientBalance = billingService.checkSufficientBalance(request);
         if (insufficientBalance != null) {
-            request.markAsSubmitted();
+            String reason = String.format("insufficient wallet balance (available=%s, required=%s)",
+                    insufficientBalance.available(), insufficientBalance.required());
+            request.markAsHeld(reason);
             verificationRequestRepository.save(request);
-            log.info("Verification {} parked — insufficient wallet balance (available={}, required={}), will retry next cycle",
-                    request.getId(), insufficientBalance.available(), insufficientBalance.required());
+            log.info("Verification {} held — {}", request.getId(), reason);
             return;
         }
 
