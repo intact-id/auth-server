@@ -48,6 +48,7 @@ public class SecurityConfig {
                                                                 "/api/public/**",
                                                                 "/api/auth/login",
                                                                 "/api/auth/refresh",
+                                                                "/api/auth/2fa/login-verify",
                                                                 "/api/v1/tiers/**",
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",

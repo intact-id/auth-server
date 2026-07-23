@@ -3,9 +3,6 @@ package com.intact_id.dto.auth;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
 @Data
 @Builder
 public class LoginResponseDto {
@@ -13,11 +10,13 @@ public class LoginResponseDto {
     private String refreshToken;
     private String tokenType;
     private Long expiresIn;
-    private String userId;
-    private String username;
-    private String email;
-    private List<String> roles;
-    private List<String> permissions;
-    private LocalDateTime loginAt;
-    private Boolean mustChangePassword;
+    private Long refreshExpiresIn;
+
+    // Populated instead of the token fields above when a second factor is required.
+    private Boolean mfaRequired;
+    private String mfaToken;
+    private Long mfaTokenExpiresIn;
+
+    // Populated only when a login (password or MFA-verify) requested "remember this device".
+    private String deviceToken;
 }

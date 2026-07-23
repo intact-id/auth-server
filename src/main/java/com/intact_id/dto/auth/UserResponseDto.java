@@ -22,4 +22,6 @@ public class UserResponseDto {
     private LocalDateTime createdAt;
     private List<String> roles;
     private String companyId;
+    private Boolean is2faEnabled;
+    private String googleAuthenticationKey;
 }

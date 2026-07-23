@@ -134,6 +134,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
         log.info("Generating {} API key for company: {}", environment.name(), resolvedCompanyId);
 
+        assert resolvedCompanyId != null;
         Company company = companyRepository.findById(resolvedCompanyId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException("Company not found"));
 

@@ -60,8 +60,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Load user from database
                 User user = userRepository.findByUsername(username).orElse(null);
 
-                // Validate token
-                if (user != null && jwtService.validateToken(jwt, username)) {
+                // Validate token — and reject anything that isn't a plain access token.
+                // Refresh tokens carry tokenType "refresh" and MFA challenge tokens carry
+                // "mfa_challenge"; neither should ever authenticate an API request.
+                String tokenType = jwtService.extractTokenType(jwt);
+                if (user != null && tokenType == null && jwtService.validateToken(jwt, username)) {
                     // Create authorities from user roles and permissions
                     List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
                             .flatMap(role -> {

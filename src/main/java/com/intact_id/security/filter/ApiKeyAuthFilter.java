@@ -43,7 +43,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             "/api/admin/",
             "/api/company-approval/",
             "/api/v1/tiers",
-            "/api/v1/kyc/widget/",   // widget endpoints use X-Session-Token via KycWidgetAuthFilter
+            "/api/v1/kyc/widget/",
             "/swagger-ui",
             "/webjars",
             "/v3/api-docs",

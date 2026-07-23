@@ -29,6 +29,9 @@ public class JwtService {
     @Value("${jwt.refresh-token-expiration}")
     private Long refreshTokenExpiration;
 
+    @Value("${jwt.mfa-challenge-expiration}")
+    private Long mfaChallengeExpiration;
+
     @Value("${jwt.issuer}")
     private String issuer;
 
@@ -66,6 +69,19 @@ public class JwtService {
     }
 
     /**
+     * Generate a short-lived challenge token issued after a correct password when 2FA is
+     * required. Only accepted by the MFA verification endpoint — never a valid access token.
+     */
+    public String generateMfaChallengeToken(User user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", user.getId());
+        claims.put("tokenType", "mfa_challenge");
+        claims.put("jti", java.util.UUID.randomUUID().toString());
+
+        return createToken(claims, user.getUsername(), mfaChallengeExpiration);
+    }
+
+    /**
      * Create JWT token
      */
     private String createToken(Map<String, Object> claims, String subject, Long expiration) {
@@ -98,6 +114,14 @@ public class JwtService {
 
     public String extractSessionId(String token) {
         return extractClaim(token, claims -> claims.get("sessionId", String.class));
+    }
+
+    /**
+     * Extract the "tokenType" claim — null for a normal access token, "refresh" for a
+     * refresh token, "mfa_challenge" for a pending-2FA challenge token.
+     */
+    public String extractTokenType(String token) {
+        return extractClaim(token, claims -> claims.get("tokenType", String.class));
     }
 
     /**
