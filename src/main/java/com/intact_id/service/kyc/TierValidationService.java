@@ -12,14 +12,27 @@ import java.util.Arrays;
 public class TierValidationService {
 
     public void validateTier(String tier, KycVerificationRequestDto request) {
-        log.info("Validating fields for tier: {}", tier);
+        String normalizedTier = normalizeTier(tier);
+        log.info("Validating fields for tier: {}", normalizedTier);
 
-        switch (tier.toLowerCase()) {
+        switch (normalizedTier) {
             case "tier1" -> validateTier1(request);
             case "tier2" -> validateTier2(request);
             case "tier3" -> validateTier3(request);
             default -> throw new ApplicationExceptions.IntactBadRequestException("Invalid tier: " + tier);
         }
+    }
+
+    private String normalizeTier(String tier) {
+        if (tier == null || tier.isBlank()) {
+            return "";
+        }
+
+        String normalized = tier.trim().toLowerCase().replace("_", "");
+        if (normalized.startsWith("tier")) {
+            return normalized;
+        }
+        return tier.trim().toLowerCase();
     }
 
     private void validateTier1(KycVerificationRequestDto request) {

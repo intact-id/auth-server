@@ -15,6 +15,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.math.BigDecimal;
 
 @Entity
 @Getter
@@ -69,6 +70,12 @@ public class VerificationRequest extends Auditable {
     @Column(name = "error_details", columnDefinition = "text")
     private String errorDetails; // Detailed error message
 
+    @Column(name = "billing_amount", precision = 19, scale = 4)
+    private BigDecimal billingAmount;
+
+    @Column(name = "billed_at")
+    private LocalDateTime billedAt;
+
     // Helper methods
     public boolean isCompleted() {
         return status == GlobalStatuses.COMPLETED ||
@@ -78,6 +85,21 @@ public class VerificationRequest extends Auditable {
 
     public void markAsProcessing() {
         this.status = GlobalStatuses.PROCESSING;
+    }
+
+    public void markAsHeld(String reason) {
+        this.status = GlobalStatuses.ON_HOLD;
+        if (this.metadata == null) this.metadata = new HashMap<>();
+        this.metadata.put("holdReason", reason);
+        this.metadata.put("heldAt", java.time.LocalDateTime.now().toString());
+    }
+
+    public void markAsSubmitted() {
+        this.status = GlobalStatuses.SUBMITTED;
+        if (this.metadata != null) {
+            this.metadata.remove("holdReason");
+            this.metadata.remove("heldAt");
+        }
     }
 
     public void markAsCompleted(String decision, Double riskScore) {
