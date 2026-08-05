@@ -1,19 +1,18 @@
 package com.intact_id.service.auth;
 
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.db.model.user.Permission;
 import com.intact_id.db.model.user.RefreshToken;
-import com.intact_id.db.model.user.Role;
 import com.intact_id.db.model.user.User;
 import com.intact_id.db.repository.user.RefreshTokenRepository;
 import com.intact_id.db.repository.user.UserRepository;
-import com.intact_id.dto.auth.LoginRequestDto;
-import com.intact_id.dto.auth.LoginResponseDto;
-import com.intact_id.dto.auth.TokenResponseDto;
+import com.intact_id.dto.auth.*;
+import com.intact_id.security.totp.TotpService;
 import com.intact_id.service.audit.AuditService;
 import com.intact_id.service.jwt.JwtService;
+import com.intact_id.service.user.UserService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
+import com.intact_id.util.security.RequestHeaderUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -37,11 +36,19 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final GeneratorUtils generatorUtils;
     private final AuditService auditService;
+    private final TotpService totpService;
+    private final BackupCodeService backupCodeService;
+    private final TrustedDeviceService trustedDeviceService;
+    private final RequestHeaderUtil requestHeaderUtil;
+    private final UserService userService;
     @Value("${jwt.access-token-expiration}")
     private Long accessTokenExpiration;
 
     @Value("${jwt.refresh-token-expiration}")
     private Long refreshTokenExpiration;
+
+    @Value("${jwt.mfa-challenge-expiration}")
+    private Long mfaChallengeExpiration;
 
 
     /**
@@ -83,16 +90,92 @@ public class AuthenticationService {
             throw new ApplicationExceptions.IntactUnauthorizedException("Invalid credentials");
         }
 
+        // Trusted-device short-circuit: this only ever skips the 2FA step below, never the
+        // password check above — a leaked device token alone can't authenticate on its own.
+        String deviceTokenHeader = requestHeaderUtil.getHeader(httpRequest, "X-Device-Token");
+        if (deviceTokenHeader != null && trustedDeviceService.isDeviceTrusted(user, deviceTokenHeader)) {
+            log.info("Trusted device recognized for user: {}, skipping 2FA", request.getUsername());
+            return issueFullSession(user, httpRequest);
+        }
+
+        if (Boolean.TRUE.equals(user.getIs2faEnabled())) {
+            log.info("2FA required for user: {}", request.getUsername());
+            String mfaToken = jwtService.generateMfaChallengeToken(user);
+            return LoginResponseDto.builder()
+                    .mfaRequired(true)
+                    .mfaToken(mfaToken)
+                    .mfaTokenExpiresIn(mfaChallengeExpiration / 1000)
+                    .build();
+        }
+
+        return issueFullSession(user, httpRequest);
+    }
+
+    /**
+     * Complete a login that was paused for a 2FA challenge, using either a TOTP code or a
+     * backup code. On success, mints the same full session a non-2FA login would.
+     */
+    @Transactional
+    public LoginResponseDto verifyMfaLogin(MfaLoginVerifyRequestDto request, HttpServletRequest httpRequest) {
+        User user = resolveUserFromMfaToken(request.getMfaToken());
+
+        if (user.isLocked()) {
+            throw new ApplicationExceptions.IntactUnauthorizedException(
+                    "Account is locked. Please try again later or contact support.");
+        }
+
+        boolean valid;
+        if (request.getVerificationCode() != null) {
+            valid = totpService.validateTotpSecretKey(user.getGoogleAuthenticatorKey(), request.getVerificationCode());
+        } else if (request.getBackupCode() != null && !request.getBackupCode().isBlank()) {
+            valid = backupCodeService.verifyAndConsume(user, request.getBackupCode());
+        } else {
+            throw new ApplicationExceptions.InvalidRequestException("Either verificationCode or backupCode is required");
+        }
+
+        if (!valid) {
+            log.warn("Invalid 2FA code at login for user: {}", user.getUsername());
+            user.incrementFailedAttempts();
+            userRepository.save(user);
+            throw new ApplicationExceptions.InvalidRequestException("Invalid verification code");
+        }
+
+        LoginResponseDto response = issueFullSession(user, httpRequest);
+
+        if (Boolean.TRUE.equals(request.getRememberDevice())) {
+            response.setDeviceToken(trustedDeviceService.issueTrustedDevice(user, httpRequest));
+        }
+
+        return response;
+    }
+
+    private User resolveUserFromMfaToken(String mfaToken) {
+        try {
+            if (!"mfa_challenge".equals(jwtService.extractTokenType(mfaToken)) || jwtService.isTokenExpired(mfaToken)) {
+                throw new ApplicationExceptions.IntactUnauthorizedException("MFA session expired, please log in again");
+            }
+            String username = jwtService.extractUsername(mfaToken);
+            return userRepository.findByUsername(username)
+                    .orElseThrow(() -> new ApplicationExceptions.IntactUnauthorizedException("Invalid MFA session"));
+        } catch (ApplicationExceptions.IntactUnauthorizedException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ApplicationExceptions.IntactUnauthorizedException("MFA session expired, please log in again");
+        }
+    }
+
+    /**
+     * Mints a full access/refresh token pair and records the login — shared tail for both a
+     * non-2FA login and a completed MFA challenge.
+     */
+    private LoginResponseDto issueFullSession(User user, HttpServletRequest httpRequest) {
         String sessionId = java.util.UUID.randomUUID().toString();
 
-        // Generate tokens
         String accessToken = jwtService.generateAccessToken(user, sessionId);
         String refreshToken = jwtService.generateRefreshToken(user, sessionId);
 
-        // Save refresh token
         RefreshToken savedRefreshToken = saveRefreshToken(user, refreshToken, httpRequest, sessionId);
 
-        // Update user login info
         user.recordLogin();
         userRepository.save(user);
 
@@ -100,24 +183,15 @@ public class AuthenticationService {
                 httpRequest.getHeader("User-Agent"));
         auditService.recordLogin(sessionId, user, getClientIp(httpRequest));
 
-        log.info("User logged in successfully: {}", request.getUsername());
+        log.info("User logged in successfully: {}", user.getUsername());
 
         return LoginResponseDto.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(accessTokenExpiration)
-                .userId(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .roles(user.getRoles().stream().map(Role::getName).toList())
-                .permissions(user.getRoles().stream()
-                        .flatMap(role -> role.getPermissions().stream())
-                        .map(Permission::getName)
-                        .distinct()
-                        .toList())
-                .loginAt(LocalDateTime.now())
-                .mustChangePassword(user.getMustChangePassword())
+                .refreshExpiresIn(refreshTokenExpiration)
+                .mfaRequired(false)
                 .build();
     }
 
@@ -224,14 +298,26 @@ public class AuthenticationService {
                 });
     }
 
-    public String getAuthorizedUsername(){
-
-        Authentication authentication= SecurityContextHolder.getContext().getAuthentication();
-
-        var response = authentication.getPrincipal() instanceof String ? ((String) authentication.getPrincipal()) : null;
-        log.info("Authentication principal: {}", response);
-        return (String) authentication.getPrincipal();
+    public UserResponseDto getCurrentUser() {
+        var username = getAuthorizedUsername();
+        return userService.getUserByUsername(username);
     }
+
+    public String getAuthorizedUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = authentication.getPrincipal();
+
+        if (principal instanceof User user) {
+            return user.getUsername();
+        }
+        if (principal instanceof String username) {
+            return username;
+        }
+
+        log.warn("Unrecognized authentication principal type: {}", principal.getClass());
+        return null;
+    }
+
 
     /**
      * Save refresh token to database

@@ -4,6 +4,7 @@ import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.kyc.VerificationRequest;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
+import com.intact_id.service.billing.BillingService;
 import com.intact_id.service.webhook.WebhookService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class ManualReviewService {
     private final VerificationRequestRepository verificationRequestRepository;
     private final VerificationService verificationService;
     private final WebhookService webhookService;
+    private final BillingService billingService;
 
     public Page<VerificationStatusResponseDto> getPendingReviewQueue(Pageable pageable) {
         return verificationRequestRepository
@@ -49,6 +51,7 @@ public class ManualReviewService {
 
         request.resolveManualReview(decision, notes);
         verificationRequestRepository.save(request);
+        billingService.handleVerificationOutcome(request);
 
         log.info("Manual review resolved for {} by {}: decision={}", verificationId, reviewerEmail, decision);
 

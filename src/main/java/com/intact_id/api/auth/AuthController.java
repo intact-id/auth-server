@@ -3,6 +3,7 @@ package com.intact_id.api.auth;
 import com.intact_id.dto.auth.*;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.service.auth.AuthenticationService;
+import com.intact_id.service.user.UserService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -64,7 +64,7 @@ public class AuthController {
         }
     }
 
-    @Deprecated(since = "2026-02-01",forRemoval = true)
+    @Deprecated(since = "2026-02-01", forRemoval = true)
     @PostMapping("/refresh")
     @Operation(summary = "Refresh access token using refresh token")
     public ResponseEntity<ApiResponse<TokenResponseDto>> refreshToken(
@@ -135,8 +135,28 @@ public class AuthController {
     }
 
     @GetMapping("/current-user")
-    public String  getCurrentUser() {
-       return authenticationService.getAuthorizedUsername();
+    @Operation(summary = "Get the authenticated user's profile, roles, and permissions")
+    public ResponseEntity<ApiResponse<UserResponseDto>> getCurrentUser() {
+        try {
+            var response = authenticationService.getCurrentUser();
 
+            return ResponseEntity.ok(
+                    ApiResponse.<UserResponseDto>builder()
+                            .success(true)
+                            .responseCode(HttpStatus.OK.value())
+                            .responseMessage("Current user retrieved successfully")
+                            .data(response)
+                            .build());
+        } catch (Exception e) {
+            log.error("Get current user error", e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    ApiResponse.<UserResponseDto>builder()
+                            .success(false)
+                            .responseCode(HttpStatus.UNAUTHORIZED.value())
+                            .responseMessage("Unable to retrieve current user")
+                            .errorMessage(e.getMessage())
+                            .isInternalError(false)
+                            .build());
+        }
     }
 }

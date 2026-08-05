@@ -4,6 +4,7 @@ import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.Company;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -66,6 +67,15 @@ public class User extends Auditable {
     @Column(name = "must_change_password")
     private Boolean mustChangePassword = false;
 
+    @Column(name = "is_2fa_enabled")
+    private Boolean is2faEnabled = false;
+
+    @Column(name = "is_active")
+    private Boolean isActive = true;
+
+    @Column (name = "google_authenticator_key")
+    private String googleAuthenticatorKey;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
@@ -105,6 +115,14 @@ public class User extends Auditable {
     public void recordLogin() {
         this.lastLoginAt = LocalDateTime.now();
         resetFailedAttempts();
+    }
+
+    public void enable2FA() {
+        this.is2faEnabled = true;
+    }
+
+    public void disable2FA() {
+        this.is2faEnabled = false;
     }
 
     public boolean isActive() {

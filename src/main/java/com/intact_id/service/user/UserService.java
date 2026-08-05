@@ -20,6 +20,7 @@ import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import jakarta.mail.internet.MailDateFormat;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -251,6 +252,12 @@ public class UserService {
         if (request.getFirstName() != null) {
             user.setFirstName(request.getFirstName());
         }
+        if (!Objects.isNull(request.getIs2FaEnabled())) {
+            user.setIs2faEnabled(request.getIs2FaEnabled());
+        }
+        if (request.getGoogleAuthenticatorKey() != null) {
+            user.setGoogleAuthenticatorKey(request.getGoogleAuthenticatorKey());
+        }
 
         if (request.getLastName() != null) {
             user.setLastName(request.getLastName());
@@ -478,16 +485,32 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                         "User not found: " + userId));
-
+        //user.setIsActive(false);
+        // todo: switch to soft delete
         enforceUserScope(user);
         userRepository.delete(user);
         log.info("User deleted: {}", user.getUsername());
     }
 
+
+    /**
+     * Returns 2fa status
+     *
+     */
+    public Boolean fetchOrUpdate2FaStatus(@NonNull String userId, Boolean is2FaEnabled) {
+        User user = toUser(getUserById(userId));  // throws IntactCompanyNotFoundException if missing
+
+        if (is2FaEnabled != null) {
+            user.disable2FA();
+            user = userRepository.save(user);
+        }
+        return user.getIs2faEnabled();
+    }
+
     /**
      * Convert User to UserResponseDto
      */
-    private UserResponseDto toUserResponseDto(User user) {
+    public UserResponseDto toUserResponseDto(User user) {
         return UserResponseDto.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -500,11 +523,31 @@ public class UserService {
                 .mustChangePassword(user.getMustChangePassword())
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
+                .googleAuthenticationKey(user.getGoogleAuthenticatorKey())
+                .is2faEnabled(user.getIs2faEnabled())
                 .roles(user.getRoles().stream()
                         .map(Role::getName)
                         .collect(Collectors.toList()))
                 .companyId(user.getCompany() != null ? user.getCompany().getId() : null)
                 .build();
+    }
+
+    public User toUser(UserResponseDto user) {
+        User userEntity = new User();
+        userEntity.setId(user.getId());
+        userEntity.setUsername(user.getUsername());
+        userEntity.setEmail(user.getEmail());
+        userEntity.setFirstName(user.getFirstName());
+        userEntity.setLastName(user.getLastName());
+        userEntity.setPhone(user.getPhone());
+        userEntity.setStatus(GlobalStatuses.valueOf(user.getStatus()));
+        userEntity.setEmailVerified(user.getEmailVerified());
+        userEntity.setMustChangePassword(user.getMustChangePassword());
+        userEntity.setLastLoginAt(user.getLastLoginAt());
+        userEntity.setCreatedAt(user.getCreatedAt());
+        userEntity.setGoogleAuthenticatorKey(user.getGoogleAuthenticationKey());
+        userEntity.setIs2faEnabled(user.getIs2faEnabled());
+        return userEntity;
     }
 
     private void enforceUserScope(User user) {

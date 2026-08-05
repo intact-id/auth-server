@@ -35,6 +35,7 @@ public class OpenApiConfig {
                         new Server().url("https://auth.144-91-122-121.sslip.io").description("VPS Server"),
                         new Server().url("http://144.91.122.121:8080").description("VPS Server (Direct)"),
                         new Server().url("http://localhost:8080").description("Local Development Server"),
+                        new Server().url("http://localhost:8085").description("Local Development Server"),
                         new Server().url("https://prod.api.intact-id.com").description("Production Server"),
                         new Server().url("https://dev.api.intact-id.com").description("Development Server")
                 ))

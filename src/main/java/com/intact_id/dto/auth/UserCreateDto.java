@@ -38,4 +38,8 @@ public class UserCreateDto {
 
     // Optional: associate user to a company for tenant scoping
     private String companyId;
+
+    private Boolean is2FaEnabled;
+
+    private String googleAuthenticatorKey;
 }
