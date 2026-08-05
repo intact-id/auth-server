@@ -70,7 +70,11 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                 GlobalStatuses excludedStatus,
                 LocalDateTime after);
 
-        @Query("SELECT v FROM VerificationRequest v WHERE v.status = :status ORDER BY v.createdAt ASC")
+        // JOIN FETCH v.company: the scheduler hands these entities off to a worker thread pool
+        // (see VerificationProcessingScheduler) after this short-lived query's session/transaction
+        // has already closed, so the company relation must be eagerly loaded here — a later lazy
+        // access on the worker thread has no session to fetch it with.
+        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company WHERE v.status = :status ORDER BY v.createdAt ASC")
         List<VerificationRequest> findByStatusOrderByCreatedAtAsc(
                         @Param("status") GlobalStatuses status, Pageable pageable);
 

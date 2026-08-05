@@ -126,6 +126,11 @@ public class VerificationProcessor {
 
         verificationRequestRepository.save(request);
         log.info("Verification completed for: {} decision={}", request.getId(), result.getOverallDecision());
+        // Manual-review outcomes aren't final yet — billing fires once ManualReviewService
+        // resolves the review, not here (determineBillingEvent assumes a terminal status).
+        if (request.getStatus() != GlobalStatuses.PENDING_APPROVAL) {
+            billingService.handleVerificationOutcome(request);
+        }
         publishStatusChanged(request);
     }
 
@@ -136,6 +141,7 @@ public class VerificationProcessor {
             request.markAsFailed(failureReason, errorDetails);
         }
         verificationRequestRepository.save(request);
+        billingService.handleVerificationOutcome(request);
     }
 
     private void notifyManualReviewRequired(VerificationRequest request) {

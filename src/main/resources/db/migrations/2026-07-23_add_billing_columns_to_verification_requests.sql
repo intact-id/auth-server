@@ -1,0 +1,3 @@
+ALTER TABLE verification_requests
+    ADD COLUMN IF NOT EXISTS billing_amount NUMERIC(19, 4),
+    ADD COLUMN IF NOT EXISTS billed_at TIMESTAMP WITHOUT TIME ZONE;

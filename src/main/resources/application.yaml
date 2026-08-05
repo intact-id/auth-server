@@ -70,8 +70,8 @@ face-service:
 
 ocr-service:
   url: ${OCR_SERVICE_URL:http://localhost:8001}
-  api-key: ${OCR_SERVICE_API_KEY:dev_placeholder}
-  api-secret: ${OCR_SERVICE_API_SECRET:dev_placeholder}
+  api-key: ${OCR_SERVICE_API_KEY:your_ocr_api_key}
+  api-secret: ${OCR_SERVICE_API_SECRET:your_ocr_api_secret}
 
 ocr:
   confidence:

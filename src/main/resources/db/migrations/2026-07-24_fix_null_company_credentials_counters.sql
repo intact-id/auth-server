@@ -1,0 +1,28 @@
+UPDATE company_credentials SET total_requests = 0 WHERE total_requests IS NULL;
+UPDATE company_credentials SET total_successful_requests = 0 WHERE total_successful_requests IS NULL;
+UPDATE company_credentials SET total_failed_requests = 0 WHERE total_failed_requests IS NULL;
+UPDATE company_credentials SET dev_total_requests = 0 WHERE dev_total_requests IS NULL;
+UPDATE company_credentials SET dev_total_successful_requests = 0 WHERE dev_total_successful_requests IS NULL;
+UPDATE company_credentials SET dev_total_failed_requests = 0 WHERE dev_total_failed_requests IS NULL;
+UPDATE company_credentials SET prod_total_requests = 0 WHERE prod_total_requests IS NULL;
+UPDATE company_credentials SET prod_total_successful_requests = 0 WHERE prod_total_successful_requests IS NULL;
+UPDATE company_credentials SET prod_total_failed_requests = 0 WHERE prod_total_failed_requests IS NULL;
+
+ALTER TABLE company_credentials ALTER COLUMN total_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN total_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN total_successful_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN total_successful_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN total_failed_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN total_failed_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN dev_total_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN dev_total_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN dev_total_successful_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN dev_total_successful_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN dev_total_failed_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN dev_total_failed_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN prod_total_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN prod_total_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN prod_total_successful_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN prod_total_successful_requests SET NOT NULL;
+ALTER TABLE company_credentials ALTER COLUMN prod_total_failed_requests SET DEFAULT 0;
+ALTER TABLE company_credentials ALTER COLUMN prod_total_failed_requests SET NOT NULL;
