@@ -134,6 +134,12 @@
 			<artifactId>resilience4j-circuitbreaker</artifactId>
 			<version>2.2.0</version>
 		</dependency>
+
+		<!-- In-memory cache for company access-token validation (jti denylist, tenant lookup) -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
 	</dependencies>
 
 	<dependencyManagement>

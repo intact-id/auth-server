@@ -1,6 +1,7 @@
 package com.intact_id.config;
 
 import com.intact_id.security.filter.ApiKeyAuthFilter;
+import com.intact_id.security.filter.CompanyAccessTokenAuthFilter;
 import com.intact_id.security.filter.JwtAuthenticationFilter;
 import com.intact_id.security.filter.KycWidgetAuthFilter;
 import com.intact_id.security.filter.UserActivityAuditFilter;
@@ -25,6 +26,7 @@ public class SecurityConfig {
         private final ApiKeyAuthFilter apiKeyAuthFilter;
         private final JwtAuthenticationFilter jwtAuthFilter;
         private final KycWidgetAuthFilter kycWidgetAuthFilter;
+        private final CompanyAccessTokenAuthFilter companyAccessTokenAuthFilter;
         private final UserActivityAuditFilter userActivityAuditFilter;
         private final CorsConfigurationSource corsConfigurationSource;
 
@@ -49,6 +51,7 @@ public class SecurityConfig {
                                                                 "/api/auth/login",
                                                                 "/api/auth/refresh",
                                                                 "/api/auth/2fa/login-verify",
+                                                                "/api/v1/auth/token",
                                                                 "/api/v1/tiers/**",
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
@@ -65,10 +68,15 @@ public class SecurityConfig {
                                 // Filter order:
                                 // 1. JWT filter (admin Bearer tokens)
                                 // 2. KYC widget filter (X-Session-Token for /api/v1/kyc/widget/**)
-                                // 3. API Key filter (X-API-Key/Secret for company endpoints)
+                                // 3. Company access token filter (Bearer client-credentials token from
+                                //    POST /api/v1/auth/token) — runs before the API key filter so a
+                                //    request bearing a valid token skips the expensive key/secret path
+                                // 4. API Key filter (X-API-Key/Secret for company endpoints — deprecated
+                                //    on /verify in favor of #3, still active elsewhere during transition)
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                                 .addFilterAfter(kycWidgetAuthFilter, JwtAuthenticationFilter.class)
-                                .addFilterAfter(apiKeyAuthFilter, KycWidgetAuthFilter.class)
+                                .addFilterAfter(companyAccessTokenAuthFilter, KycWidgetAuthFilter.class)
+                                .addFilterAfter(apiKeyAuthFilter, CompanyAccessTokenAuthFilter.class)
                                 .addFilterAfter(userActivityAuditFilter, ApiKeyAuthFilter.class);
 
                 return http.build();

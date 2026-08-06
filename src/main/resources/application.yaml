@@ -54,7 +54,17 @@ jwt:
   access-token-expiration: 900000   # 15 minutes in milliseconds
   refresh-token-expiration: 604800000 # 7 days in milliseconds
   mfa-challenge-expiration: 300000  # 5 minutes in milliseconds
+  company-access-token-expiration: 1800000  # 30 minutes in milliseconds — POST /api/v1/auth/token
   issuer: intact-id-auth-server
+
+# Caching (Caffeine) + rate limiting for the company access-token flow (POST /api/v1/auth/token).
+# Cache TTLs are derived from jwt.company-access-token-expiration above, not set here, so they
+# can never outlive the token they're backing.
+company-access-token:
+  company-cache-max-size: 10000
+  denylist-max-size: 50000
+  rate-limit-window-seconds: 60
+  rate-limit-max-attempts: 10
 
 webhook:
   enabled: true

@@ -87,4 +87,11 @@ public class ApplicationExceptions {
             super(message);
         }
     }
+
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public static class IntactTooManyRequestsException extends RuntimeException {
+        public IntactTooManyRequestsException(String message) {
+            super(message);
+        }
+    }
 }
