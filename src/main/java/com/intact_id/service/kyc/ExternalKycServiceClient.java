@@ -203,6 +203,17 @@ public class ExternalKycServiceClient {
 
             } catch (Exception e) {
                 log.error("Verification failed for {}", request.getId(), e);
+
+                // Transient failures (timeouts, 5xx, open circuit breaker) must NOT be
+                // swallowed into a normal "completed" result here — that would bypass
+                // VerificationProcessor's retry/ON_HOLD handling entirely and let the
+                // request get marked COMPLETED with overallDecision="error". Rethrow so
+                // it surfaces as an exceptional completion and reaches that handling.
+                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                if (ExternalServiceFailureClassifier.isTransient(cause)) {
+                    throw new java.util.concurrent.CompletionException(cause);
+                }
+
                 return buildErrorResult(request.getId(), e);
             }
         });
