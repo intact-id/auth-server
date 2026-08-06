@@ -127,6 +127,13 @@
 			<artifactId>spring-cloud-starter-openfeign</artifactId>
             <version>4.3.0</version>
 		</dependency>
+
+		<!-- Circuit breaker for face-service/OCR calls -->
+		<dependency>
+			<groupId>io.github.resilience4j</groupId>
+			<artifactId>resilience4j-circuitbreaker</artifactId>
+			<version>2.2.0</version>
+		</dependency>
 	</dependencies>
 
 	<dependencyManagement>

@@ -2,6 +2,7 @@ package com.intact_id.service.kyc;
 
 import com.intact_id.client.face.FaceScreeningClient;
 import com.intact_id.client.ocr.OcrScreeningClient;
+import com.intact_id.config.ResilienceConfig;
 import com.intact_id.db.model.kyc.VerificationDocument;
 import com.intact_id.db.model.kyc.VerificationRequest;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
@@ -11,6 +12,8 @@ import com.intact_id.dto.response.ocr.OcrExtractionResponse;
 import com.intact_id.service.kyc.OcrValidationService.ValidationDecision;
 import com.intact_id.service.kyc.OcrValidationService.ValidationOutcome;
 import com.intact_id.util.FileMultipartFile;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +38,7 @@ public class ExternalKycServiceClient {
     private final OcrScreeningClient ocrScreeningClient;
     private final OcrValidationService ocrValidationService;
     private final VerificationDocumentRepository verificationDocumentRepository;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Value("${face-service.api-key}")
     private String faceApiKey;
@@ -74,24 +78,27 @@ public class ExternalKycServiceClient {
                 MultipartFile idFileForFace = createMultipartFile(idDoc);
                 MultipartFile idFileForOcr = createMultipartFile(idDoc);
 
+                CircuitBreaker faceBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.FACE_SERVICE);
+                CircuitBreaker ocrBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.OCR_SERVICE);
+
                 // Face match — critical, failure propagates
                 CompletableFuture<FaceVerificationResponse> faceFuture = CompletableFuture
-                        .supplyAsync(() -> faceScreeningClient.verifyFace(
-                                faceApiKey, faceApiSecret, selfieForFace, idFileForFace));
+                        .supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> faceScreeningClient.verifyFace(
+                                faceApiKey, faceApiSecret, selfieForFace, idFileForFace)));
 
-                // Liveness — degrades to manual_review if service is down
+                // Liveness — degrades to manual_review if service is down (or breaker is open)
                 CompletableFuture<LivenessResponse> livenessFuture = CompletableFuture
-                        .supplyAsync(() -> faceScreeningClient.checkLiveness(
-                                faceApiKey, faceApiSecret, selfieForLiveness))
+                        .supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> faceScreeningClient.checkLiveness(
+                                faceApiKey, faceApiSecret, selfieForLiveness)))
                         .exceptionally(ex -> {
                             log.warn("Liveness check unavailable for {}: {}", request.getId(), ex.getMessage());
                             return null;
                         });
 
-                // OCR extraction — degrades to manual_review if service is down
+                // OCR extraction — degrades to manual_review if service is down (or breaker is open)
                 CompletableFuture<OcrExtractionResponse> ocrFuture = CompletableFuture
-                        .supplyAsync(() -> ocrScreeningClient.extractDocument(
-                                ocrApiKey, ocrApiSecret, idFileForOcr))
+                        .supplyAsync(CircuitBreaker.decorateSupplier(ocrBreaker, () -> ocrScreeningClient.extractDocument(
+                                ocrApiKey, ocrApiSecret, idFileForOcr)))
                         .exceptionally(ex -> {
                             log.warn("OCR service unavailable for {}: {}", request.getId(), ex.getMessage());
                             return null;

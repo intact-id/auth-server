@@ -78,7 +78,8 @@ public class VerificationProcessor {
             String failureReason = "SystemError";
             String errorDetails = e.getMessage();
 
-            if (e.getCause() instanceof feign.FeignException feignEx) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof feign.FeignException feignEx) {
                 try {
                     String body = feignEx.contentUTF8();
                     if (body != null && !body.isBlank()) {
@@ -88,6 +89,16 @@ public class VerificationProcessor {
                         if (json.has("message")) errorDetails = json.get("message").asText();
                     }
                 } catch (Exception ignored) {}
+            }
+
+            // Transient/connectivity failures (timeouts, connection refused, 5xx) don't mean the
+            // verification itself failed — hold it for a human to release once the service is back,
+            // instead of auto-retrying (which would re-run paid face/OCR calls) or failing it outright.
+            if (isRetryableServiceError(cause)) {
+                request.markAsHeld("Transient error from verification service: " + errorDetails);
+                verificationRequestRepository.save(request);
+                log.warn("Verification {} held — transient service error: {}", request.getId(), errorDetails);
+                return;
             }
 
             markAsFailed(request, failureReason, errorDetails);
@@ -164,6 +175,13 @@ public class VerificationProcessor {
         eventPublisher.publishEvent(new VerificationStatusChangedEvent(
                 this, new VerificationStatusChangedData(
                         request.getId(), request.getCompany().getId(), request.getStatus())));
+    }
+
+    // Network-level failures, 5xx responses, and an open circuit breaker are the service's
+    // fault, not the applicant's data — hold for retry. Anything else (4xx, bad response
+    // parsing, "selfie not found", etc.) is terminal. See ExternalServiceFailureClassifier.
+    private static boolean isRetryableServiceError(Throwable cause) {
+        return ExternalServiceFailureClassifier.isTransient(cause);
     }
 
     private static boolean shouldReject(String failureReason, String errorDetails, String overallDecision) {
