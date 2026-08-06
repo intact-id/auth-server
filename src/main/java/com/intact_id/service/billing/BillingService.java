@@ -33,6 +33,7 @@ import com.intact_id.dto.response.billing.CompanyBillingProfileResponseDto;
 import com.intact_id.dto.response.billing.WalletTransactionResponseDto;
 import com.intact_id.service.email.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
+import com.github.benmanes.caffeine.cache.Cache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -66,6 +67,7 @@ public class BillingService {
     private final WalletTransactionRepository walletTransactionRepository;
     private final EmailService emailService;
     private final TiersConfig tiersConfig;
+    private final Cache<String, CompanyBillingProfile> companyBillingProfileCache;
 
     @Transactional(readOnly = true)
     public CompanyBillingProfileResponseDto getCompanyBillingProfile(String companyId) {
@@ -109,12 +111,15 @@ public class BillingService {
         }
 
         CompanyBillingProfile saved = billingProfileRepository.save(profile);
+        companyBillingProfileCache.invalidate(companyId);
         return toProfileResponse(saved);
     }
 
     @Transactional
     public WalletTransactionResponseDto topUpWallet(String companyId, WalletTopUpRequestDto request) {
-        CompanyBillingProfile profile = getBillingProfileEntity(companyId);
+        // Fresh read, not cached — this is a read-modify-write of currentBalance, so it must
+        // never be based on a possibly-stale cached value.
+        CompanyBillingProfile profile = getFreshBillingProfileEntity(companyId);
         if (profile.getBillingMode() != BillingMode.PREPAID) {
             throw new ApplicationExceptions.InvalidActionException("Wallet top-up is only supported for PREPAID companies");
         }
@@ -125,6 +130,7 @@ public class BillingService {
 
         profile.setCurrentBalance(after);
         billingProfileRepository.save(profile);
+        companyBillingProfileCache.invalidate(companyId);
 
         WalletTransaction transaction = new WalletTransaction();
         transaction.setCompany(profile.getCompany());
@@ -334,8 +340,11 @@ public class BillingService {
 
     @Transactional(readOnly = true)
     public InsufficientBalance checkSufficientBalance(VerificationRequest verificationRequest) {
-        Optional<CompanyBillingProfile> optionalProfile = billingProfileRepository
-                .findByCompanyId(verificationRequest.getCompany().getId());
+        // Cached: this is advisory only (never mutates), and it's the hottest read in this
+        // class — called once per verification, including on rapid same-company bursts. The
+        // actual credit-limit enforcement that matters happens fresh, in debitWallet.
+        Optional<CompanyBillingProfile> optionalProfile = getCachedBillingProfile(
+                verificationRequest.getCompany().getId());
         if (optionalProfile.isEmpty()) return null;
 
         CompanyBillingProfile profile = optionalProfile.get();
@@ -357,6 +366,8 @@ public class BillingService {
 
     @Transactional
     public void handleVerificationSubmitted(VerificationRequest verificationRequest) {
+        // Fresh read, not cached — may flow into createOrApplyCharge -> debitWallet, a
+        // read-modify-write of currentBalance. Do not swap this for getCachedBillingProfile.
         Optional<CompanyBillingProfile> optionalProfile = billingProfileRepository
                 .findByCompanyId(verificationRequest.getCompany().getId());
         if (optionalProfile.isEmpty()) {
@@ -371,6 +382,7 @@ public class BillingService {
 
     @Transactional
     public void handleVerificationOutcome(VerificationRequest verificationRequest) {
+        // Fresh read, not cached — same reason as handleVerificationSubmitted above.
         Optional<CompanyBillingProfile> optionalProfile = billingProfileRepository
                 .findByCompanyId(verificationRequest.getCompany().getId());
         if (optionalProfile.isEmpty()) {
@@ -477,6 +489,7 @@ public class BillingService {
 
         profile.setCurrentBalance(scale(after));
         billingProfileRepository.save(profile);
+        companyBillingProfileCache.invalidate(profile.getCompany().getId());
 
         WalletTransaction transaction = new WalletTransaction();
         transaction.setCompany(profile.getCompany());
@@ -492,7 +505,30 @@ public class BillingService {
         return walletTransactionRepository.save(transaction);
     }
 
+    /**
+     * Cached read for callers that only display/derive from the profile and never write it
+     * back (getCompanyBillingProfile, getBillingSummary, getWalletTransactions,
+     * generateInvoice — none of these mutate currentBalance). Do NOT use this for any call
+     * site that feeds into debitWallet/topUpWallet's read-modify-write.
+     */
     private CompanyBillingProfile getBillingProfileEntity(String companyId) {
+        return getCachedBillingProfile(companyId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
+                        "Billing profile not found for company: " + companyId));
+    }
+
+    private Optional<CompanyBillingProfile> getCachedBillingProfile(String companyId) {
+        CompanyBillingProfile cached = companyBillingProfileCache.getIfPresent(companyId);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
+        Optional<CompanyBillingProfile> loaded = billingProfileRepository.findByCompanyId(companyId);
+        loaded.ifPresent(profile -> companyBillingProfileCache.put(companyId, profile));
+        return loaded;
+    }
+
+    /** Always hits the DB — for read-modify-write callers (e.g. topUpWallet). */
+    private CompanyBillingProfile getFreshBillingProfileEntity(String companyId) {
         return billingProfileRepository.findByCompanyId(companyId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
                         "Billing profile not found for company: " + companyId));

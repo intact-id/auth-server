@@ -18,12 +18,13 @@ import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -45,11 +46,23 @@ public class VerificationService {
     private final ExternalKycServiceClient externalKycServiceClient;
     private final com.intact_id.service.webhook.WebhookService webhookService;
     private final BillingService billingService;
+    private final PlatformTransactionManager transactionManager;
 
     @Value("${app.documents.base-dir:${user.dir}/uploads}")
     private String documentsBaseDir;
 
-    @Transactional
+    /**
+     * Deliberately NOT @Transactional at the method level. The old version was, which meant
+     * the DB connection stayed checked out for the entire method — including the synchronous
+     * multi-file disk writes below. Under concurrent load that starved the (small, default)
+     * HikariCP pool: every request held a connection through several MB of disk I/O, so most
+     * of a 100-concurrent-request burst just queued for a free connection instead of being
+     * rejected fast or processed fast. Only the DB-only part (build + save the request, run
+     * the billing hook) needs an actual transaction boundary — scoped explicitly below via
+     * TransactionTemplate so the connection is released before any file I/O starts. Each
+     * saveDocument() call still gets its own short, implicit transaction from Spring Data's
+     * repository.save() — never held across another document's I/O.
+     */
     public KycVerificationResponseDto submitVerification(
             String tier,
             KycVerificationRequestDto request,
@@ -58,44 +71,49 @@ public class VerificationService {
 
         log.info("Submitting {} verification for company: {}, tier: {}", environment.name(), company.getId(), tier);
 
-        // Validate tier-specific requirements
+        // Validate tier-specific requirements — in-memory, no DB/IO involved
         tierValidationService.validateTier(tier, request);
 
-        // Create verification request
-        VerificationRequest verificationRequest = new VerificationRequest();
-        verificationRequest.setCompany(company);
-        verificationRequest.setTier(tier);
-        verificationRequest.setVerificationType(request.getVerificationType());
-        verificationRequest.setStatus(GlobalStatuses.SUBMITTED);
-        verificationRequest.setWebhookUrl(request.getWebhookUrl());
-        verificationRequest.setEnvironment(environment);
+        VerificationRequest savedRequest = new TransactionTemplate(transactionManager).execute(status -> {
+            // Create verification request
+            VerificationRequest verificationRequest = new VerificationRequest();
+            verificationRequest.setCompany(company);
+            verificationRequest.setTier(tier);
+            verificationRequest.setVerificationType(request.getVerificationType());
+            verificationRequest.setStatus(GlobalStatuses.SUBMITTED);
+            verificationRequest.setWebhookUrl(request.getWebhookUrl());
+            verificationRequest.setEnvironment(environment);
 
-        // Store customer data
-        Map<String, Object> customerData = new HashMap<>();
-        customerData.put("firstName", request.getFirstName());
-        customerData.put("lastName", request.getLastName());
-        customerData.put("dateOfBirth", request.getDateOfBirth());
-        customerData.put("idNumber", request.getIdNumber());
-        if (request.getIdType() != null)
-            customerData.put("idType", request.getIdType());
-        if (request.getNationality() != null)
-            customerData.put("nationality", request.getNationality());
-        if (request.getCountryOfResidence() != null)
-            customerData.put("countryOfResidence", request.getCountryOfResidence());
-        if (request.getPhone() != null)
-            customerData.put("phone", request.getPhone());
-        if (request.getEmail() != null)
-            customerData.put("email", request.getEmail());
+            // Store customer data
+            Map<String, Object> customerData = new HashMap<>();
+            customerData.put("firstName", request.getFirstName());
+            customerData.put("lastName", request.getLastName());
+            customerData.put("dateOfBirth", request.getDateOfBirth());
+            customerData.put("idNumber", request.getIdNumber());
+            if (request.getIdType() != null)
+                customerData.put("idType", request.getIdType());
+            if (request.getNationality() != null)
+                customerData.put("nationality", request.getNationality());
+            if (request.getCountryOfResidence() != null)
+                customerData.put("countryOfResidence", request.getCountryOfResidence());
+            if (request.getPhone() != null)
+                customerData.put("phone", request.getPhone());
+            if (request.getEmail() != null)
+                customerData.put("email", request.getEmail());
 
-        verificationRequest.setCustomerData(customerData);
-        verificationRequest
-                .setMetadata(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
+            verificationRequest.setCustomerData(customerData);
+            verificationRequest
+                    .setMetadata(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
 
-        VerificationRequest savedRequest = verificationRequestRepository.save(verificationRequest);
-        billingService.handleVerificationSubmitted(savedRequest);
+            VerificationRequest saved = verificationRequestRepository.save(verificationRequest);
+            billingService.handleVerificationSubmitted(saved);
+            return saved;
+        });
 
-        // Save documents immediately — MultipartFile objects are tied to the HTTP request
-        // lifecycle and won't be available when the scheduler processes them later
+        // Save documents AFTER the transaction above has committed and released its
+        // connection — MultipartFile objects are tied to the HTTP request lifecycle and
+        // won't be available when the scheduler processes them later, so they still have to
+        // happen here, just no longer while pinning a DB connection.
         saveDocument(savedRequest, request.getSelfie(), "selfie");
         saveDocument(savedRequest, request.getIdFront(), "id_front");
         if (request.getIdBack() != null)
