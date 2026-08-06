@@ -35,6 +35,14 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     private final CredentialsValidator credentialsValidator;
     private final CompanyCredentialService companyCredentialService;
 
+    // Deprecated as of the client-credentials token flow (POST /api/v1/auth/token): key+secret
+    // still works here during the migration window, but callers should exchange it for a
+    // short-lived access token once and use CompanyAccessTokenAuthFilter instead — avoids the
+    // per-request DB lookup + secure hash comparison this filter does on every single call.
+    private static final List<String> DEPRECATED_KEY_SECRET_PATHS = Arrays.asList(
+            "/api/v1/kyc/verify/",
+            "/api/v1/kyc/dev/verify/");
+
     // Paths that don't require API key authentication
     private static final List<String> EXCLUDED_PATHS = Arrays.asList(
             "/api/public/companies/register",
@@ -94,6 +102,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             log.info("Authenticated company: {} for path: {}",
                     credentials.getCompany().getLegalName(), requestPath);
 
+            if (isDeprecatedKeySecretPath(requestPath)) {
+                log.warn("Deprecated key/secret auth used on {} by company {} — migrate to POST /api/v1/auth/token",
+                        requestPath, credentials.getCompany().getId());
+            }
 
             StatusCaptureResponse wrappedResponse = new StatusCaptureResponse(response);
             boolean success = false;
@@ -121,6 +133,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
     private boolean shouldSkipAuthentication(String requestPath) {
         return EXCLUDED_PATHS.stream().anyMatch(requestPath::startsWith);
+    }
+
+    private boolean isDeprecatedKeySecretPath(String requestPath) {
+        return DEPRECATED_KEY_SECRET_PATHS.stream().anyMatch(requestPath::contains);
     }
 
     private static class StatusCaptureResponse extends HttpServletResponseWrapper {

@@ -1,5 +1,6 @@
 package com.intact_id.service.jwt;
 
+import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.db.model.user.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -13,6 +14,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -32,8 +34,14 @@ public class JwtService {
     @Value("${jwt.mfa-challenge-expiration}")
     private Long mfaChallengeExpiration;
 
+    @Value("${jwt.company-access-token-expiration}")
+    private Long companyAccessTokenExpiration;
+
     @Value("${jwt.issuer}")
     private String issuer;
+
+    private static final String COMPANY_ACCESS_TOKEN_TYPE = "company_access";
+    private static final String COMPANY_ACCESS_SCOPE = "kyc:verify";
 
     /**
      * Generate access token with user details, roles, and permissions
@@ -79,6 +87,52 @@ public class JwtService {
         claims.put("jti", java.util.UUID.randomUUID().toString());
 
         return createToken(claims, user.getUsername(), mfaChallengeExpiration);
+    }
+
+    /**
+     * Generate a short-lived, minimal-claim access token for company (client-credentials)
+     * API auth. Deliberately opaque: only the company id, environment, scope, jti, iat, and
+     * exp are included — no company name/email, no internal user data, nothing a decoded
+     * token shouldn't leak. Subject is a fixed constant (never a resolvable username) so
+     * JwtAuthenticationFilter's username lookup safely no-ops on this token type.
+     */
+    public String generateCompanyAccessToken(String companyId, ApiKeyEnvironment environment) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tokenType", COMPANY_ACCESS_TOKEN_TYPE);
+        claims.put("cid", companyId);
+        claims.put("env", environment.name());
+        claims.put("scope", COMPANY_ACCESS_SCOPE);
+        claims.put("jti", UUID.randomUUID().toString());
+
+        return createToken(claims, "company-access", companyAccessTokenExpiration);
+    }
+
+    public Long getCompanyAccessTokenExpiration() {
+        return companyAccessTokenExpiration;
+    }
+
+    /**
+     * True only for tokens minted by generateCompanyAccessToken — callers must check this
+     * before trusting the cid/env/jti/scope claims below.
+     */
+    public boolean isCompanyAccessToken(String token) {
+        return COMPANY_ACCESS_TOKEN_TYPE.equals(extractTokenType(token));
+    }
+
+    public String extractCompanyId(String token) {
+        return extractClaim(token, claims -> claims.get("cid", String.class));
+    }
+
+    public String extractCompanyTokenEnvironment(String token) {
+        return extractClaim(token, claims -> claims.get("env", String.class));
+    }
+
+    public String extractScope(String token) {
+        return extractClaim(token, claims -> claims.get("scope", String.class));
+    }
+
+    public String extractJti(String token) {
+        return extractClaim(token, claims -> claims.get("jti", String.class));
     }
 
     /**

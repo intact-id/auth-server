@@ -42,7 +42,9 @@ public class KycVerificationController {
 
         @PostMapping(value = "/verify/{tier}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         @PreAuthorize("hasRole('COMPANY')")
-        @Operation(summary = "Submit KYC verification request (PROD)", description = "Submit a new KYC verification with tier-specific requirements")
+        @Operation(summary = "Submit KYC verification request (PROD)", description = "Submit a new KYC verification with tier-specific requirements. "
+                        + "Preferred auth: Bearer access token from POST /api/v1/auth/token. "
+                        + "Direct X-API-Key/X-API-Secret auth still works here but is deprecated — see ApiKeyAuthFilter.")
         public ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerification(
                         @PathVariable String tier,
                         @RequestParam String firstName,
@@ -69,7 +71,9 @@ public class KycVerificationController {
 
         @PostMapping(value = "/dev/verify/{tier}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         @PreAuthorize("hasRole('COMPANY')")
-        @Operation(summary = "Submit KYC verification request (DEV)", description = "Submit a new DEV KYC verification with tier-specific requirements")
+        @Operation(summary = "Submit KYC verification request (DEV)", description = "Submit a new DEV KYC verification with tier-specific requirements. "
+                        + "Preferred auth: Bearer access token from POST /api/v1/auth/token. "
+                        + "Direct X-API-Key/X-API-Secret auth still works here but is deprecated — see ApiKeyAuthFilter.")
         public ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerificationDev(
                         @PathVariable String tier,
                         @RequestParam String firstName,
