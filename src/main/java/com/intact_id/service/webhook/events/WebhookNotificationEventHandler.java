@@ -8,7 +8,6 @@ import com.intact_id.service.webhook.WebhookService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -28,8 +27,12 @@ public class WebhookNotificationEventHandler implements InternalEventHandler<Web
     private final WebhookService webhookService;
     private final CompanyRepository companyRepository;
 
+    // Dispatched exclusively via InternalApplicationEventListener, which routes InternalEvent
+    // subtypes to the matching InternalEventHandler bean. Do NOT add @EventListener here —
+    // this method would then be invoked twice per event (once directly by Spring, once via
+    // that generic dispatch), which is exactly the bug this comment replaced: every webhook
+    // firing — and being recorded as a delivery — twice.
     @Override
-    @EventListener
     public void handle(WebhookNotificationEvent event) {
         WebhookEventData data = event.getData();
 
