@@ -66,6 +66,13 @@ company-access-token:
   rate-limit-window-seconds: 60
   rate-limit-max-attempts: 10
 
+# Caffeine cache for CompanyBillingProfile reads that never mutate the balance
+# (checkSufficientBalance, billing summary/profile GETs). Money-mutating paths
+# (debitWallet, topUpWallet) always bypass this and read the DB fresh — see BillingService.
+billing:
+  profile-cache-ttl-seconds: 30
+  profile-cache-max-size: 5000
+
 webhook:
   enabled: true
   max-retries: 0
