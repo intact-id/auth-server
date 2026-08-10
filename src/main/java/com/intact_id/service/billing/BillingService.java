@@ -31,6 +31,8 @@ import com.intact_id.dto.response.billing.BillingInvoiceResponseDto;
 import com.intact_id.dto.response.billing.BillingSummaryResponseDto;
 import com.intact_id.dto.response.billing.CompanyBillingProfileResponseDto;
 import com.intact_id.dto.response.billing.WalletTransactionResponseDto;
+import com.intact_id.service.billing.events.BillingEventPublisher;
+import com.intact_id.service.billing.events.KafkaBillingEventType;
 import com.intact_id.service.email.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -66,6 +68,7 @@ public class BillingService {
     private final BillingInvoiceLineRepository billingInvoiceLineRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final EmailService emailService;
+    private final BillingEventPublisher billingEventPublisher;
     private final TiersConfig tiersConfig;
     private final Cache<String, CompanyBillingProfile> companyBillingProfileCache;
 
@@ -386,22 +389,54 @@ public class BillingService {
         Optional<CompanyBillingProfile> optionalProfile = billingProfileRepository
                 .findByCompanyId(verificationRequest.getCompany().getId());
         if (optionalProfile.isEmpty()) {
+            log.info("handleVerificationOutcome: no billing profile for company {} — skipping billing for verification {}",
+                    verificationRequest.getCompany().getId(), verificationRequest.getId());
             return;
         }
 
         CompanyBillingProfile profile = optionalProfile.get();
         if (billingChargeRepository.findByVerificationRequestId(verificationRequest.getId()).isPresent()) {
+            log.info("handleVerificationOutcome: charge already exists for verification {} — skipping (duplicate outcome event)",
+                    verificationRequest.getId());
             return;
         }
 
         BillingEvent event = determineBillingEvent(verificationRequest);
         boolean billable = isBillable(profile, event);
+        log.info("handleVerificationOutcome: verification {} company {} event={} billable={}",
+                verificationRequest.getId(), verificationRequest.getCompany().getId(), event, billable);
+
         if (!billable) {
             createWaivedCharge(profile, verificationRequest, event, "Charge waived by billing profile rule");
             return;
         }
 
+        publishBillingEvent(verificationRequest, event);
         createOrApplyCharge(profile, verificationRequest, event, "Billed by final verification outcome");
+    }
+
+    /**
+     * Publishes a usage event to Kafka for the external billing consumer, alongside (not
+     * instead of) the local charge/wallet bookkeeping above. Only called on the same path as
+     * createOrApplyCharge — waived charges (see isBillable) never reach here, so the consumer
+     * never sees a billing event for something the local profile rules opted out of.
+     */
+    private void publishBillingEvent(VerificationRequest verificationRequest, BillingEvent event) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("billingEvent", event.name());
+        metadata.put("tier", verificationRequest.getTier());
+        metadata.put("overallDecision", verificationRequest.getOverallDecision());
+        metadata.put("verificationId", verificationRequest.getId());
+
+        String clientIdentifier = verificationRequest.getCompany().getCompanyIdentifierCode();
+        log.info("Publishing billing event: client={} eventType={} verification={} billingEvent={}",
+                clientIdentifier, KafkaBillingEventType.KYC_VERIFICATION_CALL, verificationRequest.getId(), event);
+
+        billingEventPublisher.publish(
+                clientIdentifier,
+                KafkaBillingEventType.KYC_VERIFICATION_CALL,
+                1,
+                metadata);
     }
 
     private BillingEvent determineBillingEvent(VerificationRequest verificationRequest) {

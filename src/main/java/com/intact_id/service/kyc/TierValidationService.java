@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -78,7 +79,7 @@ public class TierValidationService {
     }
 
     private void validateRequiredFile(org.springframework.web.multipart.MultipartFile file, String fieldName) {
-        if (file == null || file.isEmpty()) {
+        if (Objects.isNull(file) || file.isEmpty()) {
             throw new ApplicationExceptions.IntactBadRequestException(fieldName + " is required");
         }
 
