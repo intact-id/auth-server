@@ -341,6 +341,14 @@ public class BillingService {
 
     public record InsufficientBalance(BigDecimal available, BigDecimal required) {}
 
+    /**
+     * @deprecated the pre-verification balance gate now goes through billing-service, via
+     * RemoteBalanceCheckService (called from VerificationProcessor.process instead of this).
+     * Left in place, unused, rather than deleted — createOrApplyCharge/debitWallet still use
+     * this class's local CompanyBillingProfile for charge/wallet bookkeeping, only the
+     * credit-limit gate moved.
+     */
+    @Deprecated
     @Transactional(readOnly = true)
     public InsufficientBalance checkSufficientBalance(VerificationRequest verificationRequest) {
         // Cached: this is advisory only (never mutates), and it's the hottest read in this
