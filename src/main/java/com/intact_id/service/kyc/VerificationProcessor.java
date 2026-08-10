@@ -4,7 +4,8 @@ import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.kyc.VerificationDocument;
 import com.intact_id.db.model.kyc.VerificationRequest;
 import com.intact_id.service.billing.BillingService;
-import com.intact_id.service.billing.BillingService.InsufficientBalance;
+import com.intact_id.service.billing.RemoteBalanceCheckService;
+import com.intact_id.service.billing.RemoteBalanceCheckService.HoldDecision;
 import com.intact_id.service.kyc.RateLimitService.LimitExceeded;
 import com.intact_id.db.model.kyc.VerificationStep;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
@@ -36,6 +37,7 @@ public class VerificationProcessor {
     private final EmailService emailService;
     private final RateLimitService rateLimitService;
     private final BillingService billingService;
+    private final RemoteBalanceCheckService remoteBalanceCheckService;
 
     @Value("${app.support-email:support@intact-id.com}")
     private String supportEmail;
@@ -54,14 +56,13 @@ public class VerificationProcessor {
             return;
         }
 
-        // Wallet balance check — only relevant for PREPAID companies
-        InsufficientBalance insufficientBalance = billingService.checkSufficientBalance(request);
-        if (insufficientBalance != null) {
-            String reason = String.format("insufficient wallet balance (available=%s, required=%s)",
-                    insufficientBalance.available(), insufficientBalance.required());
-            request.markAsHeld(reason);
+        // Wallet balance check — delegated to billing-service (see RemoteBalanceCheckService).
+        // The local check-and-hold path (BillingService.checkSufficientBalance) is deprecated.
+        HoldDecision balanceDecision = remoteBalanceCheckService.check(request.getCompany().getCompanyIdentifierCode());
+        if (balanceDecision.hold()) {
+            request.markAsHeld(balanceDecision.reason());
             verificationRequestRepository.save(request);
-            log.info("Verification {} held — {}", request.getId(), reason);
+            log.info("Verification {} held — {}", request.getId(), balanceDecision.reason());
             return;
         }
 

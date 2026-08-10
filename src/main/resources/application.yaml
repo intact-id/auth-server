@@ -76,11 +76,7 @@ billing:
   profile-cache-ttl-seconds: 30
   profile-cache-max-size: 5000
 
-# Kafka producer scaffolding. Disabled by default — no broker is deployed yet, and nothing in
-# the codebase publishes to Kafka. KafkaProducerConfig only stands up its beans when this is
-# true, so leaving it false is a no-op: same behavior as before this block existed.
-# Topic names live in com.intact_id.config.kafka.KafkaTopics. Connection details are under
-# spring.kafka above.
+
 kafka:
   enabled: ${KAFKA_ENABLED:true}
 
@@ -114,6 +110,12 @@ ocr:
   name:
     similarity:
       threshold: ${OCR_NAME_SIMILARITY_THRESHOLD:0.85}
+
+# billing-service's POST /v1/billing-profile/check-balance — no auth required. Called from
+# RemoteBalanceCheckService before each verification is processed. Own short Feign timeout
+# (BillingServiceFeignConfig), not the 120s face/OCR default.
+billing-service:
+  url: ${BILLING_SERVICE_URL:http://localhost:8086}
 
 app:
   documents:
