@@ -44,6 +44,9 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
 server:
   port: ${SERVER_PORT:8085}
   servlet:
@@ -72,6 +75,14 @@ company-access-token:
 billing:
   profile-cache-ttl-seconds: 30
   profile-cache-max-size: 5000
+
+# Kafka producer scaffolding. Disabled by default — no broker is deployed yet, and nothing in
+# the codebase publishes to Kafka. KafkaProducerConfig only stands up its beans when this is
+# true, so leaving it false is a no-op: same behavior as before this block existed.
+# Topic names live in com.intact_id.config.kafka.KafkaTopics. Connection details are under
+# spring.kafka above.
+kafka:
+  enabled: ${KAFKA_ENABLED:true}
 
 webhook:
   enabled: true
@@ -139,3 +150,4 @@ springdoc:
   packages-to-scan: com.intact_id
   paths-to-match: /api/**
   show-actuator: false
+

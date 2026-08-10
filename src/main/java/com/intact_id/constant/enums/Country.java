@@ -2,12 +2,6 @@ package com.intact_id.constant.enums;
 
 import lombok.Getter;
 
-/**
- * @Author frank
- * email frank.mwangi@dadanadagroup.com
- * Created on 21/11/2025 18:48
- */
-
 @Getter
 public enum Country {
 
