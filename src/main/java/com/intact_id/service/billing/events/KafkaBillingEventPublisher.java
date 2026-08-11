@@ -11,7 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Publishes KYC billing/usage events to Kafka for the external billing consumer. Additive —
@@ -28,9 +27,9 @@ public class KafkaBillingEventPublisher implements BillingEventPublisher {
     private final ObjectMapper objectMapper;
 
     @Override
-    public void publish(String clientIdentifier, KafkaBillingEventType eventType, int quantity, Map<String, Object> metadata) {
+    public void publish(String eventId, String clientIdentifier, KafkaBillingEventType eventType, int quantity, Map<String, Object> metadata) {
         BillingEventMessage message = BillingEventMessage.builder()
-                .eventId("evt-" + UUID.randomUUID())
+                .eventId(eventId)
                 .clientIdentifier(clientIdentifier)
                 .eventType(eventType)
                 .quantity(quantity)
