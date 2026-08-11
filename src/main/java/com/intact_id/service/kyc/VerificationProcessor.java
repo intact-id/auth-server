@@ -58,7 +58,8 @@ public class VerificationProcessor {
 
         // Wallet balance check — delegated to billing-service (see RemoteBalanceCheckService).
         // The local check-and-hold path (BillingService.checkSufficientBalance) is deprecated.
-        HoldDecision balanceDecision = remoteBalanceCheckService.check(request.getCompany().getCompanyIdentifierCode());
+        HoldDecision balanceDecision = remoteBalanceCheckService.check(
+                request.getCompany().getCompanyIdentifierCode(), request.getId());
         if (balanceDecision.hold()) {
             request.markAsHeld(balanceDecision.reason());
             verificationRequestRepository.save(request);

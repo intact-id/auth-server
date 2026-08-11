@@ -10,17 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-/**
- * Gates verification submission against billing-service's balance, replacing the local
- * credit-limit check (BillingService.checkSufficientBalance — deprecated, see there).
- *
- * PROFILE_NOT_FOUND is treated as allowed rather than held: billing-service is still being
- * onboarded company by company, and a company with no profile there yet should behave the same
- * as it does today (no billing gate), not suddenly get blocked. Every other reason
- * (INSUFFICIENT_BALANCE, PROFILE_INACTIVE, PRICING_NOT_CONFIGURED, WALLET_NOT_CONFIGURED) holds,
- * and so does billing-service being unreachable or erroring — fail closed, since those cases
- * can't be told apart from "we don't know if this company can pay."
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,11 +21,17 @@ public class RemoteBalanceCheckService {
         public static final HoldDecision ALLOW = new HoldDecision(false, null);
     }
 
-    public HoldDecision check(String clientIdentifier) {
+    /**
+     * verificationId doubles as the check-balance lock's externalRef — BillingService later
+     * publishes the outcome's Kafka event with this same id as eventId, so the real debit it
+     * triggers in billing-service releases this exact lock instead of waiting out its TTL.
+     */
+    public HoldDecision check(String clientIdentifier, String verificationId) {
         BillingApiResult<BalanceCheckResponse> result;
         try {
             result = billingServiceClient.checkBalance(
-                    new BalanceCheckRequest(clientIdentifier, KafkaBillingEventType.KYC_VERIFICATION_CALL.name(), 1));
+                    new BalanceCheckRequest(clientIdentifier, KafkaBillingEventType.KYC_VERIFICATION_CALL.name(),
+                            true, verificationId, 1));
         } catch (Exception e) {
             log.error("billing-service check-balance call failed for client {} — holding (fail closed): {}",
                     clientIdentifier, e.getMessage(), e);

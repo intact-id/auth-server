@@ -441,6 +441,7 @@ public class BillingService {
                 clientIdentifier, KafkaBillingEventType.KYC_VERIFICATION_CALL, verificationRequest.getId(), event);
 
         billingEventPublisher.publish(
+                verificationRequest.getId(),
                 clientIdentifier,
                 KafkaBillingEventType.KYC_VERIFICATION_CALL,
                 1,
