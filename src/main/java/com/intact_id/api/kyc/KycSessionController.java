@@ -43,13 +43,14 @@ public class KycSessionController {
                 company.getId(), request.getTier(), request.getEnvironment());
 
         String token = kycSessionService.createSessionToken(
-                company.getId(), request.getEnvironment(), request.getTier());
+                company.getId(), request.getEnvironment(), request.getTier(), request.getExternalReference());
 
         KycSessionResponseDto response = KycSessionResponseDto.builder()
                 .sessionToken(token)
                 .expiresInSeconds(900)
                 .tier(request.getTier())
                 .environment(request.getEnvironment().name())
+                .externalReference(request.getExternalReference())
                 .build();
 
         return ResponseEntity.ok(ApiResponse.<KycSessionResponseDto>builder()

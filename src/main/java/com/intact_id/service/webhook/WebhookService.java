@@ -61,6 +61,9 @@ public class WebhookService {
 
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("verification_id", verificationRequest.getId());
+        if (verificationRequest.getExternalReference() != null) {
+            eventData.put("external_reference", verificationRequest.getExternalReference());
+        }
         eventData.put("status", verificationRequest.getStatus().name());
         eventData.put("overall_decision", verificationRequest.getOverallDecision());
         eventData.put("tier", verificationRequest.getTier());
@@ -192,6 +195,9 @@ public class WebhookService {
 
         Map<String, Object> eventData = new HashMap<>();
         eventData.put("verification_id", verificationRequest.getId());
+        if (verificationRequest.getExternalReference() != null) {
+            eventData.put("external_reference", verificationRequest.getExternalReference());
+        }
         eventData.put("status", verificationRequest.getStatus().name());
         eventData.put("overall_decision", "error");
         eventData.put("tier", verificationRequest.getTier());

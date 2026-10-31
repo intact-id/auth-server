@@ -62,4 +62,7 @@ public class KycVerificationRequestDto {
     // Metadata
     private String verificationType = "individual"; // individual, business
     private String webhookUrl;
+
+    @Size(max = 255, message = "externalReference must be at most 255 characters")
+    private String externalReference;
 }

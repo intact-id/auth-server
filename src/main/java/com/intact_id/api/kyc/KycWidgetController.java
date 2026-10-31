@@ -1,11 +1,13 @@
 package com.intact_id.api.kyc;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
+import com.intact_id.constant.enums.kyc.WidgetChannel;
 import com.intact_id.db.model.Company;
 import com.intact_id.dto.request.KycVerificationRequestDto;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.dto.response.KycVerificationResponseDto;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
+import com.intact_id.security.authentication.WidgetSessionContext;
 import com.intact_id.service.kyc.VerificationService;
 import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
@@ -56,6 +58,17 @@ public class KycWidgetController {
             @RequestParam(required = false) String livenessLabels,
             HttpServletRequest httpRequest) {
 
+        // Phone tokens are scoped to one draft and must not start new verifications
+        WidgetSessionContext context = (WidgetSessionContext) httpRequest.getAttribute(WidgetSessionContext.ATTRIBUTE);
+        if (context != null && context.channel() == WidgetChannel.HANDOFF) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    ApiResponse.<KycVerificationResponseDto>builder()
+                            .responseCode(HttpStatus.FORBIDDEN.value())
+                            .responseMessage("Use the draft submit endpoint from a phone session")
+                            .success(false)
+                            .build());
+        }
+
         try {
             Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
             ApiKeyEnvironment environment = (ApiKeyEnvironment) httpRequest.getAttribute("widget.environment");
@@ -72,6 +85,7 @@ public class KycWidgetController {
             dto.setPhone(phone);
             dto.setEmail(email);
             dto.setVerificationType("individual");
+            dto.setExternalReference((String) httpRequest.getAttribute("widget.externalReference"));
             dto.setSelfie(selfie);
             dto.setIdFront(idFront);
             dto.setIdBack(idBack);

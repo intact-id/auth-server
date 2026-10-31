@@ -11,6 +11,7 @@ import java.util.Map;
 @Builder
 public class VerificationStatusResponseDto {
     private String verificationId;
+    private String externalReference;
     private String companyName;
     private String status;
     private String tier;
