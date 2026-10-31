@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -51,6 +52,8 @@ public class KycWidgetController {
             @RequestParam MultipartFile idFront,
             @RequestParam(required = false) MultipartFile idBack,
             @RequestParam(required = false) MultipartFile proofOfAddress,
+            @RequestParam(required = false) List<MultipartFile> livenessFrames,
+            @RequestParam(required = false) String livenessLabels,
             HttpServletRequest httpRequest) {
 
         try {
@@ -73,6 +76,8 @@ public class KycWidgetController {
             dto.setIdFront(idFront);
             dto.setIdBack(idBack);
             dto.setProofOfAddress(proofOfAddress);
+            dto.setLivenessFrames(livenessFrames);
+            dto.setLivenessLabels(livenessLabels);
 
             KycVerificationResponseDto result = verificationService.submitVerification(tier, dto, company, environment);
 

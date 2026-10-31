@@ -5,6 +5,7 @@ import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -52,6 +53,11 @@ public class KycVerificationRequestDto {
     private MultipartFile idFront;
     private MultipartFile idBack;
     private MultipartFile proofOfAddress;
+
+    // Active liveness (widget only): frames captured live during the head-turn challenge,
+    // with one comma-separated label per frame, in the same order — neutral, turn_left, turn_right
+    private List<MultipartFile> livenessFrames;
+    private String livenessLabels;
 
     // Metadata
     private String verificationType = "individual"; // individual, business
