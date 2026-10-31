@@ -17,6 +17,9 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # Local postgres keeps the dev default password so host-run services (billing from the IDE) still connect
       DB_PASSWORD: admin
+      # /actuator/health otherwise logs in to Gmail SMTP on every call (docker healthcheck = every 30s),
+      # which gets the account throttled and makes health checks hang on SMTP timeouts.
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
       # billing-service runs on the host (IDE), not in docker
       BILLING_SERVICE_URL: http://host.docker.internal:8086
       # Vercel partner site + ngrok static domain + local dashboard
