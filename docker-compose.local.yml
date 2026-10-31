@@ -1,10 +1,12 @@
 # Local-machine overrides — layered on top of docker-compose.yml, never used on the VPS.
 #   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 # `environment:` wins over `env_file: .env`, so .env stays exactly as the VPS expects it.
+# To run unpushed code, build it and point AUTH_IMAGE at it:
+#   docker build -t intact-auth:local . && AUTH_IMAGE=intact-auth:local docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 services:
 
   auth-server:
-    image: frankmwangi8118/intact-auth:latest
+    image: ${AUTH_IMAGE:-frankmwangi8118/intact-auth:latest}
     # Host 8080 is taken by sactions-service locally; 8085 is what ngrok and the dashboard use.
     ports: !override
       - "8085:8080"
