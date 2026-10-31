@@ -43,6 +43,7 @@ public class CorsConfig {
         widgetConfig.setAllowCredentials(false);
         widgetConfig.setMaxAge(3600L);
         source.registerCorsConfiguration("/api/v1/kyc/widget/**", widgetConfig);
+        source.registerCorsConfiguration("/api/v1/kyc/handoff/**", widgetConfig);
 
         // All other endpoints: restrict to known dashboard/API origins.
         CorsConfiguration configuration = new CorsConfiguration();

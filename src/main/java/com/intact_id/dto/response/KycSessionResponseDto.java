@@ -10,4 +10,5 @@ public class KycSessionResponseDto {
     private long expiresInSeconds;
     private String tier;
     private String environment;
+    private String externalReference;
 }

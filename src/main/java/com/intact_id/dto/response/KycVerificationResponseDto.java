@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 @Builder
 public class KycVerificationResponseDto {
     private String verificationId;
+    private String externalReference;
     private String status;
     private String tier;
     private LocalDateTime estimatedCompletion;

@@ -1,6 +1,8 @@
 package com.intact_id.service.kyc;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
+import com.intact_id.constant.enums.kyc.WidgetChannel;
+import com.intact_id.security.authentication.WidgetSessionContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -29,21 +31,34 @@ public class KycSessionService {
     @Value("${jwt.issuer}")
     private String issuer;
 
-    public String createSessionToken(String companyId, ApiKeyEnvironment environment, String tier) {
+    public String createSessionToken(String companyId, ApiKeyEnvironment environment, String tier,
+                                     String externalReference) {
+        String normalizedReference = externalReference != null && !externalReference.isBlank()
+                ? externalReference.trim()
+                : null;
+        WidgetSessionContext context = new WidgetSessionContext(
+                companyId, environment, tier, normalizedReference, null, null, WidgetChannel.EMBEDDED);
+        return issueToken(context, new Date(System.currentTimeMillis() + SESSION_TTL_MS));
+    }
+
+    public String issueToken(WidgetSessionContext context, Date expiresAt) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("tokenType", TOKEN_TYPE);
-        claims.put("companyId", companyId);
-        claims.put("environment", environment.name());
-        claims.put("tier", tier);
+        claims.put("companyId", context.companyId());
+        claims.put("environment", context.environment().name());
+        claims.put("tier", context.tier());
+        claims.put("channel", context.channel().name());
+        putIfPresent(claims, "externalReference", context.externalReference());
+        putIfPresent(claims, "draftId", context.draftId());
+        putIfPresent(claims, "handoffId", context.handoffId());
         claims.put("jti", UUID.randomUUID().toString());
 
-        Date now = new Date();
         return Jwts.builder()
                 .claims(claims)
                 .subject("widget-session")
                 .issuer(issuer)
-                .issuedAt(now)
-                .expiration(new Date(now.getTime() + SESSION_TTL_MS))
+                .issuedAt(new Date())
+                .expiration(expiresAt)
                 .signWith(signingKey(), Jwts.SIG.HS256)
                 .compact();
     }
@@ -63,6 +78,24 @@ public class KycSessionService {
         } catch (JwtException e) {
             log.warn("Invalid widget session token: {}", e.getMessage());
             throw e;
+        }
+    }
+
+    public WidgetSessionContext toContext(Claims claims) {
+        String channel = claims.get("channel", String.class);
+        return new WidgetSessionContext(
+                claims.get("companyId", String.class),
+                ApiKeyEnvironment.valueOf(claims.get("environment", String.class)),
+                claims.get("tier", String.class),
+                claims.get("externalReference", String.class),
+                claims.get("draftId", String.class),
+                claims.get("handoffId", String.class),
+                channel != null ? WidgetChannel.valueOf(channel) : WidgetChannel.EMBEDDED);
+    }
+
+    private static void putIfPresent(Map<String, Object> claims, String key, String value) {
+        if (value != null) {
+            claims.put(key, value);
         }
     }
 

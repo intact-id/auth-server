@@ -1,9 +1,9 @@
 package com.intact_id.security.filter;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.repository.CompanyRepository;
 import com.intact_id.security.authentication.CompanyAuthentication;
+import com.intact_id.security.authentication.WidgetSessionContext;
 import com.intact_id.service.kyc.KycSessionService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -55,17 +55,19 @@ public class KycWidgetAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String companyId = claims.get("companyId", String.class);
-        Company company = companyRepository.findById(companyId).orElse(null);
+        WidgetSessionContext context = kycSessionService.toContext(claims);
+        Company company = companyRepository.findById(context.companyId()).orElse(null);
         if (company == null) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Company not found");
             return;
         }
 
         // Attach session metadata so the controller can read them
-        request.setAttribute("widget.companyId", companyId);
-        request.setAttribute("widget.environment", ApiKeyEnvironment.valueOf(claims.get("environment", String.class)));
-        request.setAttribute("widget.tier", claims.get("tier", String.class));
+        request.setAttribute(WidgetSessionContext.ATTRIBUTE, context);
+        request.setAttribute("widget.companyId", context.companyId());
+        request.setAttribute("widget.environment", context.environment());
+        request.setAttribute("widget.tier", context.tier());
+        request.setAttribute("widget.externalReference", context.externalReference());
 
         CompanyAuthentication auth = new CompanyAuthentication(company);
         SecurityContextHolder.getContext().setAuthentication(auth);

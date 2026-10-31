@@ -58,6 +58,7 @@ public class KycVerificationController {
                         @RequestParam(required = false) String email,
                         @RequestParam(required = false) String verificationType,
                         @RequestParam(required = false) String webhookUrl,
+                        @RequestParam(required = false) String externalReference,
                         @RequestParam MultipartFile selfie,
                         @RequestParam MultipartFile idFront,
                         @RequestParam(required = false) MultipartFile idBack,
@@ -66,7 +67,7 @@ public class KycVerificationController {
 
                 return submitVerificationInternal(ApiKeyEnvironment.PROD, tier, firstName, lastName, dateOfBirth,
                                 idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
-                                webhookUrl, selfie, idFront, idBack, proofOfAddress, authentication);
+                                webhookUrl, externalReference, selfie, idFront, idBack, proofOfAddress, authentication);
         }
 
         @PostMapping(value = "/dev/verify/{tier}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -87,6 +88,7 @@ public class KycVerificationController {
                         @RequestParam(required = false) String email,
                         @RequestParam(required = false) String verificationType,
                         @RequestParam(required = false) String webhookUrl,
+                        @RequestParam(required = false) String externalReference,
                         @RequestParam MultipartFile selfie,
                         @RequestParam MultipartFile idFront,
                         @RequestParam(required = false) MultipartFile idBack,
@@ -95,7 +97,7 @@ public class KycVerificationController {
 
                 return submitVerificationInternal(ApiKeyEnvironment.DEV, tier, firstName, lastName, dateOfBirth,
                                 idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
-                                webhookUrl, selfie, idFront, idBack, proofOfAddress, authentication);
+                                webhookUrl, externalReference, selfie, idFront, idBack, proofOfAddress, authentication);
         }
 
         private ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerificationInternal(
@@ -112,6 +114,7 @@ public class KycVerificationController {
                         String email,
                         String verificationType,
                         String webhookUrl,
+                        String externalReference,
                         MultipartFile selfie,
                         MultipartFile idFront,
                         MultipartFile idBack,
@@ -137,6 +140,7 @@ public class KycVerificationController {
                         request.setEmail(email);
                         request.setVerificationType(verificationType != null ? verificationType : "individual");
                         request.setWebhookUrl(webhookUrl);
+                        request.setExternalReference(externalReference);
                         request.setSelfie(selfie);
                         request.setIdFront(idFront);
                         request.setIdBack(idBack);
@@ -254,6 +258,7 @@ public class KycVerificationController {
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
                         @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
+                        @Parameter(description = "Filter by your own reference (exact match)") @RequestParam(required = false) String externalReference,
                         @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "10") int size,
@@ -271,7 +276,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, search, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, externalReference, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()
@@ -280,6 +285,50 @@ public class KycVerificationController {
                                                 .success(true)
                                                 .data(verifications)
                                                 .build());
+        }
+
+        @GetMapping("/verifications/by-reference")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @Operation(summary = "Get latest PROD verification by your reference", description = "Returns the most recent PROD verification submitted with this externalReference")
+        public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getLatestByExternalReference(
+                        @RequestParam String externalReference,
+                        @Parameter(description = "Company to search (Admin only)") @RequestParam(required = false) String companyId) {
+                return latestByExternalReference(externalReference, companyId, ApiKeyEnvironment.PROD);
+        }
+
+        @GetMapping("/dev/verifications/by-reference")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @Operation(summary = "Get latest DEV verification by your reference", description = "Returns the most recent DEV verification submitted with this externalReference")
+        public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getLatestByExternalReferenceDev(
+                        @RequestParam String externalReference,
+                        @Parameter(description = "Company to search (Admin only)") @RequestParam(required = false) String companyId) {
+                return latestByExternalReference(externalReference, companyId, ApiKeyEnvironment.DEV);
+        }
+
+        private ResponseEntity<ApiResponse<VerificationStatusResponseDto>> latestByExternalReference(
+                        String externalReference, String companyId, ApiKeyEnvironment environment) {
+                try {
+                        VerificationStatusResponseDto response = verificationService.getLatestByExternalReference(
+                                        externalReference, companyId, environment);
+                        return ResponseEntity.ok(ApiResponse.<VerificationStatusResponseDto>builder()
+                                        .responseCode(HttpStatus.OK.value())
+                                        .responseMessage("Verification status retrieved successfully")
+                                        .success(true)
+                                        .data(response)
+                                        .build());
+                } catch (ApplicationExceptions.IntactResourceNotFoundException e) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.<VerificationStatusResponseDto>builder()
+                                        .responseCode(HttpStatus.NOT_FOUND.value())
+                                        .responseMessage(e.getMessage())
+                                        .success(false)
+                                        .build());
+                } catch (ApplicationExceptions.IntactBadRequestException e) {
+                        return ResponseEntity.badRequest().body(ApiResponse.<VerificationStatusResponseDto>builder()
+                                        .responseCode(HttpStatus.BAD_REQUEST.value())
+                                        .responseMessage(e.getMessage())
+                                        .success(false)
+                                        .build());
+                }
         }
 
         @GetMapping("/prod/verify/{verificationId}")
@@ -324,6 +373,7 @@ public class KycVerificationController {
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
                         @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
+                        @Parameter(description = "Filter by your own reference (exact match)") @RequestParam(required = false) String externalReference,
                         @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "10") int size,
@@ -341,7 +391,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, fromDate, toDate, search, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, externalReference, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()
@@ -394,6 +444,7 @@ public class KycVerificationController {
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
                         @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
+                        @Parameter(description = "Filter by your own reference (exact match)") @RequestParam(required = false) String externalReference,
                         @Parameter(description = "Filter by company (Admin only)") @RequestParam(required = false) String companyId,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "10") int size,
@@ -411,7 +462,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.DEV, status, tier, fromDate, toDate, search, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.DEV, status, tier, externalReference, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()

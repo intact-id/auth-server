@@ -18,6 +18,9 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
 
         Optional<VerificationRequest> findByIdAndEnvironment(String id, com.intact_id.constant.enums.ApiKeyEnvironment environment);
 
+        Optional<VerificationRequest> findFirstByCompanyIdAndEnvironmentAndExternalReferenceOrderByCreatedAtDesc(
+                String companyId, com.intact_id.constant.enums.ApiKeyEnvironment environment, String externalReference);
+
         Page<VerificationRequest> findByCompanyId(String companyId, Pageable pageable);
 
         Page<VerificationRequest> findByCompanyIdAndStatus(String companyId, GlobalStatuses status, Pageable pageable);
@@ -28,6 +31,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         "AND (:environment IS NULL OR v.environment = :environment) " +
                         "AND (:status IS NULL OR v.status = :status) " +
                         "AND (:tier IS NULL OR v.tier = :tier) " +
+                        "AND (:externalReference IS NULL OR v.external_reference = :externalReference) " +
                         "AND (CAST(:fromDate AS timestamp) IS NULL OR v.created_at >= :fromDate) " +
                         "AND (CAST(:toDate AS timestamp) IS NULL OR v.created_at <= :toDate) " +
                         "AND (:search IS NULL OR (" +
@@ -43,6 +47,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                                         "AND (:environment IS NULL OR v.environment = :environment) " +
                                         "AND (:status IS NULL OR v.status = :status) " +
                                         "AND (:tier IS NULL OR v.tier = :tier) " +
+                                        "AND (:externalReference IS NULL OR v.external_reference = :externalReference) " +
                                         "AND (CAST(:fromDate AS timestamp) IS NULL OR v.created_at >= :fromDate) " +
                                         "AND (CAST(:toDate AS timestamp) IS NULL OR v.created_at <= :toDate) " +
                                         "AND (:search IS NULL OR (" +
@@ -57,6 +62,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         @Param("environment") String environment,
                         @Param("status") String status,
                         @Param("tier") String tier,
+                        @Param("externalReference") String externalReference,
                         @Param("fromDate") LocalDateTime fromDate,
                         @Param("toDate") LocalDateTime toDate,
                         @Param("search") String search,

@@ -46,6 +46,13 @@ public class ApplicationExceptions {
         }
     }
 
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public static class IntactForbiddenException extends RuntimeException {
+        public IntactForbiddenException(String message) {
+            super(message);
+        }
+    }
+
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public static class IntactInternalServerException extends RuntimeException {
         public IntactInternalServerException(String message) {
