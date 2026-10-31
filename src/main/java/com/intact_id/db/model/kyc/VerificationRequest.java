@@ -76,6 +76,9 @@ public class VerificationRequest extends Auditable {
     @Column(name = "billed_at")
     private LocalDateTime billedAt;
 
+    @Column(name = "external_reference")
+    private String externalReference; // company-supplied ID, not unique
+
     // Helper methods
     public boolean isCompleted() {
         return status == GlobalStatuses.COMPLETED ||

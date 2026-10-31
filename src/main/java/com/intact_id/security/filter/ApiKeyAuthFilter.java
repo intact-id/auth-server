@@ -52,6 +52,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
             "/api/company-approval/",
             "/api/v1/tiers",
             "/api/v1/kyc/widget/",
+            "/api/v1/kyc/handoff/",
             "/swagger-ui",
             "/webjars",
             "/v3/api-docs",

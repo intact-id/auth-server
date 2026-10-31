@@ -126,6 +126,21 @@ app:
   dashboard-url: ${DASHBOARD_URL:https://dashboard.intact-id.com}
   docs-url: ${DOCS_URL:https://docs.intact-id.com}
 
+kyc:
+  storage:
+    type: ${KYC_STORAGE_TYPE:local}
+    local:
+      base-dir: ${APP_DOCUMENTS_BASE_DIR:${user.dir}/uploads}
+  drafts:
+    ttl: ${KYC_DRAFT_TTL:24h}
+    token-ttl: 15m
+    cleanup-interval-ms: 900000
+  handoff:
+    code-ttl: 10m
+    mobile-base-url: ${KYC_WIDGET_MOBILE_URL:http://localhost:5173/m}
+    claim-max-attempts: 20
+    claim-window: 10m
+
 # CORS — origins supplied via env var (comma-separated)
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5175}

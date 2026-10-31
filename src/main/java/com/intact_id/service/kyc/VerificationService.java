@@ -73,6 +73,7 @@ public class VerificationService {
 
         // Validate tier-specific requirements — in-memory, no DB/IO involved
         tierValidationService.validateTier(tier, request);
+        String externalReference = normalizeExternalReference(request.getExternalReference());
 
         VerificationRequest savedRequest = new TransactionTemplate(transactionManager).execute(status -> {
             // Create verification request
@@ -83,6 +84,7 @@ public class VerificationService {
             verificationRequest.setStatus(GlobalStatuses.SUBMITTED);
             verificationRequest.setWebhookUrl(request.getWebhookUrl());
             verificationRequest.setEnvironment(environment);
+            verificationRequest.setExternalReference(externalReference);
 
             // Store customer data
             Map<String, Object> customerData = new HashMap<>();
@@ -123,6 +125,7 @@ public class VerificationService {
 
         return KycVerificationResponseDto.builder()
                 .verificationId(savedRequest.getId())
+                .externalReference(savedRequest.getExternalReference())
                 .status(savedRequest.getStatus().name())
                 .tier(tier)
                 .estimatedCompletion(LocalDateTime.now().plusMinutes(10))
@@ -185,14 +188,41 @@ public class VerificationService {
                             "Verification not found: " + verificationId));
         }
 
+        return toDetailedStatusDto(request);
+    }
+
+    public VerificationStatusResponseDto getLatestByExternalReference(
+            String externalReference,
+            String companyId,
+            ApiKeyEnvironment environment) {
+        String normalizedReference = normalizeExternalReference(externalReference);
+        if (normalizedReference == null) {
+            throw new ApplicationExceptions.IntactBadRequestException("externalReference is required");
+        }
+        String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
+        if (resolvedCompanyId == null) {
+            throw new ApplicationExceptions.IntactBadRequestException("companyId is required");
+        }
+
+        VerificationRequest request = verificationRequestRepository
+                .findFirstByCompanyIdAndEnvironmentAndExternalReferenceOrderByCreatedAtDesc(
+                        resolvedCompanyId, environment, normalizedReference)
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
+                        "No verification found for externalReference: " + normalizedReference));
+
+        return toDetailedStatusDto(request);
+    }
+
+    private VerificationStatusResponseDto toDetailedStatusDto(VerificationRequest request) {
         List<VerificationStep> steps = verificationStepRepository
-                .findByVerificationRequestIdOrderByCreatedAtAsc(verificationId);
+                .findByVerificationRequestIdOrderByCreatedAtAsc(request.getId());
 
         List<VerificationDocument> documents = verificationDocumentRepository
-                .findByVerificationRequestId(verificationId);
+                .findByVerificationRequestId(request.getId());
 
         return VerificationStatusResponseDto.builder()
                 .verificationId(request.getId())
+                .externalReference(request.getExternalReference())
                 .companyName(request.getCompany() != null ? request.getCompany().getLegalName() : null)
                 .status(request.getStatus().name())
                 .tier(request.getTier())
@@ -214,6 +244,7 @@ public class VerificationService {
             ApiKeyEnvironment environment,
             GlobalStatuses status,
             String tier,
+            String externalReference,
             LocalDateTime fromDate,
             LocalDateTime toDate,
             String search,
@@ -221,13 +252,16 @@ public class VerificationService {
 
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
         String normalizedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+        String normalizedReference = normalizeExternalReference(externalReference);
         String environmentName = environment != null ? environment.name() : null;
         String statusName = status != null ? status.name() : null;
         Page<VerificationRequest> requests = verificationRequestRepository.findByFilters(
-                resolvedCompanyId, environmentName, statusName, tier, fromDate, toDate, normalizedSearch, pageable);
+                resolvedCompanyId, environmentName, statusName, tier, normalizedReference,
+                fromDate, toDate, normalizedSearch, pageable);
 
         return requests.map(request -> VerificationStatusResponseDto.builder()
                 .verificationId(request.getId())
+                .externalReference(request.getExternalReference())
                 .companyName(request.getCompany() != null ? request.getCompany().getLegalName() : null)
                 .status(request.getStatus().name())
                 .tier(request.getTier())
@@ -265,6 +299,18 @@ public class VerificationService {
         verificationRequestRepository.saveAll(held);
         log.info("Released {} held verification(s) for companyId={}", held.size(), companyId != null ? companyId : "ALL");
         return held.size();
+    }
+
+    private String normalizeExternalReference(String externalReference) {
+        if (externalReference == null || externalReference.isBlank()) {
+            return null;
+        }
+        String trimmed = externalReference.trim();
+        if (trimmed.length() > 255) {
+            throw new ApplicationExceptions.IntactBadRequestException(
+                    "externalReference must be at most 255 characters");
+        }
+        return trimmed;
     }
 
     private VerificationStatusResponseDto.VerificationStepDto mapStepToDto(VerificationStep step) {

@@ -53,6 +53,7 @@ public class SecurityConfig {
                                                                 "/api/auth/2fa/login-verify",
                                                                 "/api/v1/auth/token",
                                                                 "/api/v1/tiers/**",
+                                                                "/api/v1/kyc/handoff/claim",
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
                                                                 "/webjars/**",

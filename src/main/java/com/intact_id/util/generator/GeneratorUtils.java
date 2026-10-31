@@ -116,6 +116,15 @@ public class GeneratorUtils {
     }
 
     /**
+     * Generate an unguessable URL-safe token (base64url, no padding)
+     */
+    public String generateUrlSafeToken(int numBytes) {
+        byte[] bytes = new byte[numBytes];
+        secureRandom.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /**
      * Hash string using SHA-256
      */
     public String hashString(String input) {

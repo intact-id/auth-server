@@ -29,7 +29,7 @@ public class ManualReviewService {
     public Page<VerificationStatusResponseDto> getPendingReviewQueue(Pageable pageable) {
         return verificationRequestRepository
                 .findByFilters(null, null, GlobalStatuses.PENDING_APPROVAL.name(),
-                        null, null, null, null, pageable)
+                        null, null, null, null, null, pageable)
                 .map(r -> verificationService.getVerificationStatus(r.getId(), null, r.getEnvironment()));
     }
 
