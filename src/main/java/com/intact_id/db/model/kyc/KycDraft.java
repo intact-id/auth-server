@@ -53,6 +53,9 @@ public class KycDraft extends Auditable {
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
+    @Column(name = "status_changed_at")
+    private LocalDateTime statusChangedAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;

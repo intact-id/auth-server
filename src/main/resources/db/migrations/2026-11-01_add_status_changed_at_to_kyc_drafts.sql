@@ -1,0 +1,2 @@
+ALTER TABLE kyc_drafts
+    ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMP WITHOUT TIME ZONE;

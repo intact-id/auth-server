@@ -86,7 +86,8 @@ public class VerificationService {
             verificationRequest.setCompany(company);
             verificationRequest.setTier(tier);
             verificationRequest.setVerificationType(request.getVerificationType());
-            verificationRequest.setStatus(GlobalStatuses.SUBMITTED);
+            // DRAFT until its files are saved, so the scheduler never picks up a request without documents
+            verificationRequest.setStatus(GlobalStatuses.DRAFT);
             verificationRequest.setWebhookUrl(request.getWebhookUrl());
             verificationRequest.setEnvironment(environment);
             verificationRequest.setExternalReference(externalReference);
@@ -112,33 +113,48 @@ public class VerificationService {
             verificationRequest
                     .setMetadata(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
 
-            VerificationRequest saved = verificationRequestRepository.save(verificationRequest);
-            billingService.handleVerificationSubmitted(saved);
-            return saved;
+            return verificationRequestRepository.save(verificationRequest);
         });
 
         // Save documents AFTER the transaction above has committed and released its
         // connection — MultipartFile objects are tied to the HTTP request lifecycle and
         // won't be available when the scheduler processes them later, so they still have to
         // happen here, just no longer while pinning a DB connection.
-        saveDocument(savedRequest, request.getSelfie(), "selfie");
-        saveDocument(savedRequest, request.getIdFront(), "id_front");
-        if (request.getIdBack() != null)
-            saveDocument(savedRequest, request.getIdBack(), "id_back");
-        if (request.getProofOfAddress() != null)
-            saveDocument(savedRequest, request.getProofOfAddress(), "proof_of_address");
-        // Index keeps capture order; label tells the face service which challenge the frame answers
-        for (int i = 0; i < livenessLabels.size(); i++)
-            saveDocument(savedRequest, request.getLivenessFrames().get(i),
-                    LIVENESS_DOC_PREFIX + i + "_" + livenessLabels.get(i));
+        try {
+            saveDocument(savedRequest, request.getSelfie(), "selfie");
+            saveDocument(savedRequest, request.getIdFront(), "id_front");
+            if (request.getIdBack() != null)
+                saveDocument(savedRequest, request.getIdBack(), "id_back");
+            if (request.getProofOfAddress() != null)
+                saveDocument(savedRequest, request.getProofOfAddress(), "proof_of_address");
+            // Index keeps capture order; label tells the face service which challenge the frame answers
+            for (int i = 0; i < livenessLabels.size(); i++)
+                saveDocument(savedRequest, request.getLivenessFrames().get(i),
+                        LIVENESS_DOC_PREFIX + i + "_" + livenessLabels.get(i));
+        } catch (RuntimeException e) {
+            // Cancelled requests are never processed, billed or reported by webhook
+            cancelIncompleteRequest(savedRequest.getId());
+            throw e;
+        }
+
+        String requestId = savedRequest.getId();
+        VerificationRequest submittedRequest = new TransactionTemplate(transactionManager).execute(status -> {
+            VerificationRequest ready = verificationRequestRepository.findById(requestId)
+                    .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
+                            "Verification not found: " + requestId));
+            ready.setStatus(GlobalStatuses.SUBMITTED);
+            VerificationRequest saved = verificationRequestRepository.save(ready);
+            billingService.handleVerificationSubmitted(saved);
+            return saved;
+        });
 
         return KycVerificationResponseDto.builder()
-                .verificationId(savedRequest.getId())
-                .externalReference(savedRequest.getExternalReference())
-                .status(savedRequest.getStatus().name())
+                .verificationId(submittedRequest.getId())
+                .externalReference(submittedRequest.getExternalReference())
+                .status(submittedRequest.getStatus().name())
                 .tier(tier)
                 .estimatedCompletion(LocalDateTime.now().plusMinutes(10))
-                .webhookUrl(savedRequest.getWebhookUrl())
+                .webhookUrl(submittedRequest.getWebhookUrl())
                 .message("Verification submitted successfully and is being processed")
                 .build();
     }
@@ -173,6 +189,33 @@ public class VerificationService {
         return labels;
     }
 
+    private void cancelIncompleteRequest(String requestId) {
+        try {
+            verificationRequestRepository.findById(requestId).ifPresent(request -> {
+                request.setStatus(GlobalStatuses.CANCELLED);
+                verificationRequestRepository.save(request);
+            });
+            log.warn("Verification {} cancelled: its documents could not be saved", requestId);
+        } catch (RuntimeException e) {
+            log.error("Failed to cancel incomplete verification {}", requestId, e);
+        }
+    }
+
+    private static String fileExtension(MultipartFile file) {
+        String name = file.getOriginalFilename();
+        if (name != null) {
+            String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+            if (name.contains(".") && ext.matches("[a-z0-9]{1,5}")) {
+                return "." + ext;
+            }
+        }
+        String contentType = file.getContentType();
+        if ("image/png".equals(contentType)) return ".png";
+        if ("image/jpeg".equals(contentType)) return ".jpg";
+        if ("application/pdf".equals(contentType)) return ".pdf";
+        return "";
+    }
+
     private VerificationDocument saveDocument(VerificationRequest request, MultipartFile file, String documentType) {
         if (file == null || file.isEmpty())
             return null;
@@ -184,9 +227,12 @@ public class VerificationService {
                 java.nio.file.Files.createDirectories(uploadPath);
             }
 
-            // Generate unique filename
-            String filename = request.getId() + "_" + documentType + "_" + file.getOriginalFilename();
+            // Never put the client's filename in the path; keep only a safe extension
+            String filename = request.getId() + "_" + documentType + fileExtension(file);
             java.nio.file.Path filePath = uploadPath.resolve(filename).normalize();
+            if (!filePath.startsWith(uploadPath)) {
+                throw new ApplicationExceptions.IntactBadRequestException("Invalid document type");
+            }
 
             // Save file
             file.transferTo(filePath.toFile());

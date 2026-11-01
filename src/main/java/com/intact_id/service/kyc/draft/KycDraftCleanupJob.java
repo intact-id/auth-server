@@ -22,8 +22,13 @@ public class KycDraftCleanupJob {
 
     @Scheduled(fixedDelayString = "${kyc.drafts.cleanup-interval-ms:900000}")
     public void purgeExpiredDrafts() {
-        List<String> expiredIds = draftRepository.findExpiredIds(
-                LocalDateTime.now(), PageRequest.of(0, config.getCleanupBatchSize()));
+        LocalDateTime now = LocalDateTime.now();
+        int released = draftRepository.releaseStuckSubmissions(now.minus(config.getSubmittingTimeout()), now);
+        if (released > 0) {
+            log.warn("Released {} KYC draft(s) stuck in SUBMITTING", released);
+        }
+
+        List<String> expiredIds = draftRepository.findExpiredIds(now, PageRequest.of(0, config.getCleanupBatchSize()));
         if (expiredIds.isEmpty()) {
             return;
         }

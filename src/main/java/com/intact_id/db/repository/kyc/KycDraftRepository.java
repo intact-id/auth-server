@@ -20,11 +20,23 @@ public interface KycDraftRepository extends JpaRepository<KycDraft, String> {
         // Compare-and-set so two devices can't both submit the same draft
         @Transactional
         @Modifying(clearAutomatically = true, flushAutomatically = true)
-        @Query("UPDATE KycDraft d SET d.status = :to, d.version = d.version + 1 WHERE d.id = :id AND d.status = :from")
+        @Query("UPDATE KycDraft d SET d.status = :to, d.statusChangedAt = :now, d.version = d.version + 1 "
+                        + "WHERE d.id = :id AND d.status = :from")
         int transitionStatus(@Param("id") String id,
                         @Param("from") KycDraftStatus from,
-                        @Param("to") KycDraftStatus to);
+                        @Param("to") KycDraftStatus to,
+                        @Param("now") LocalDateTime now);
 
-        @Query("SELECT d.id FROM KycDraft d WHERE d.expiresAt < :now ORDER BY d.expiresAt ASC")
+        // SUBMITTING drafts are left alone; the cleanup job releases stuck ones first
+        @Query("SELECT d.id FROM KycDraft d WHERE d.expiresAt < :now "
+                        + "AND d.status <> com.intact_id.constant.enums.kyc.KycDraftStatus.SUBMITTING ORDER BY d.expiresAt ASC")
         List<String> findExpiredIds(@Param("now") LocalDateTime now, Pageable pageable);
+
+        @Transactional
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query("UPDATE KycDraft d SET d.status = com.intact_id.constant.enums.kyc.KycDraftStatus.IN_PROGRESS, "
+                        + "d.statusChangedAt = :now, d.version = d.version + 1 "
+                        + "WHERE d.status = com.intact_id.constant.enums.kyc.KycDraftStatus.SUBMITTING "
+                        + "AND (d.statusChangedAt IS NULL OR d.statusChangedAt < :cutoff)")
+        int releaseStuckSubmissions(@Param("cutoff") LocalDateTime cutoff, @Param("now") LocalDateTime now);
 }

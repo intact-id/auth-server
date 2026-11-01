@@ -4,6 +4,10 @@ spring:
       ddl-auto: update
     show-sql: false
 
+kyc:
+  handoff:
+    mobile-base-url: ${KYC_WIDGET_MOBILE_URL:https://widget.intact-io.com/m}
+
 # Prod CORS — CORS_ALLOWED_ORIGINS must be explicitly set (no fallback)
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
