@@ -2,6 +2,7 @@ package com.intact_id.service.kyc;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.kyc.WidgetChannel;
+import com.intact_id.db.model.Company;
 import com.intact_id.security.authentication.WidgetSessionContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -31,13 +32,13 @@ public class KycSessionService {
     @Value("${jwt.issuer}")
     private String issuer;
 
-    public String createSessionToken(String companyId, ApiKeyEnvironment environment, String tier,
-                                     String externalReference) {
+    public String createSessionToken(String companyId, String companyName, ApiKeyEnvironment environment,
+                                     String tier, String externalReference) {
         String normalizedReference = externalReference != null && !externalReference.isBlank()
                 ? externalReference.trim()
                 : null;
         WidgetSessionContext context = new WidgetSessionContext(
-                companyId, environment, tier, normalizedReference, null, null, WidgetChannel.EMBEDDED);
+                companyId, companyName, environment, tier, normalizedReference, null, null, WidgetChannel.EMBEDDED);
         return issueToken(context, new Date(System.currentTimeMillis() + SESSION_TTL_MS));
     }
 
@@ -48,6 +49,7 @@ public class KycSessionService {
         claims.put("environment", context.environment().name());
         claims.put("tier", context.tier());
         claims.put("channel", context.channel().name());
+        putIfPresent(claims, "companyName", context.companyName());
         putIfPresent(claims, "externalReference", context.externalReference());
         putIfPresent(claims, "draftId", context.draftId());
         putIfPresent(claims, "handoffId", context.handoffId());
@@ -85,12 +87,22 @@ public class KycSessionService {
         String channel = claims.get("channel", String.class);
         return new WidgetSessionContext(
                 claims.get("companyId", String.class),
+                claims.get("companyName", String.class),
                 ApiKeyEnvironment.valueOf(claims.get("environment", String.class)),
                 claims.get("tier", String.class),
                 claims.get("externalReference", String.class),
                 claims.get("draftId", String.class),
                 claims.get("handoffId", String.class),
                 channel != null ? WidgetChannel.valueOf(channel) : WidgetChannel.EMBEDDED);
+    }
+
+    /** The name end users know the business by: trading name, falling back to the legal name. */
+    public static String displayName(Company company) {
+        if (company == null) {
+            return null;
+        }
+        String trading = company.getTradingName();
+        return trading != null && !trading.isBlank() ? trading.trim() : company.getLegalName();
     }
 
     private static void putIfPresent(Map<String, Object> claims, String key, String value) {
