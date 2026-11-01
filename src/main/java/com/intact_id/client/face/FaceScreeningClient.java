@@ -25,4 +25,16 @@ public interface FaceScreeningClient {
             @RequestHeader("X-API-Key") String apiKey,
             @RequestHeader("X-API-Secret") String apiSecret,
             @RequestPart("photo") MultipartFile photo);
+
+    /**
+     * Active liveness: frames captured during the widget's head-turn challenge.
+     * labels is comma-separated, one per frame, in the same order (neutral, turn_left, turn_right).
+     * Returns the same shape as checkLiveness.
+     */
+    @PostMapping(value = "/api/face/liveness/sequence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    LivenessResponse checkLivenessSequence(
+            @RequestHeader("X-API-Key") String apiKey,
+            @RequestHeader("X-API-Secret") String apiSecret,
+            @RequestPart("frames") MultipartFile[] frames,
+            @RequestPart("labels") String labels);
 }

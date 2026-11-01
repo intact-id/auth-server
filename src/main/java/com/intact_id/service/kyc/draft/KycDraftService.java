@@ -35,6 +35,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -42,6 +43,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -50,6 +53,8 @@ import java.util.regex.Pattern;
 public class KycDraftService {
 
     private static final Set<String> DOCUMENT_TYPES = Set.of("selfie", "id_front", "id_back", "proof_of_address");
+    // Same naming the one-shot submit uses: liveness_{index}_{label}
+    private static final Pattern LIVENESS_TYPE = Pattern.compile("liveness_([0-7])_(neutral|turn_left|turn_right)");
     private static final Pattern UNSAFE_FILENAME_CHARS = Pattern.compile("[^A-Za-z0-9._-]");
     private static final int RESUME_TOKEN_BYTES = 32;
 
@@ -167,20 +172,25 @@ public class KycDraftService {
     }
 
     public KycVerificationResponseDto submitDraft(WidgetSessionContext context, String draftId) {
-        KycDraft draft = requireEditableDraft(context, draftId);
-        KycVerificationRequestDto request = buildVerificationRequest(draft);
+        requireEditableDraft(context, draftId);
 
-        if (draftRepository.transitionStatus(draftId, KycDraftStatus.IN_PROGRESS, KycDraftStatus.SUBMITTING) == 0) {
+        // Lock first so no upload can change the files between reading and submitting them
+        if (draftRepository.transitionStatus(draftId, KycDraftStatus.IN_PROGRESS, KycDraftStatus.SUBMITTING,
+                LocalDateTime.now()) == 0) {
             throw new ApplicationExceptions.InvalidActionException("Draft is already being submitted");
         }
 
         KycVerificationResponseDto result;
         try {
+            KycDraft draft = draftRepository.findById(draftId)
+                    .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Draft not found"));
+            KycVerificationRequestDto request = buildVerificationRequest(draft);
             Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
             result = verificationService.submitVerification(
                     draft.getTier(), request, company, draft.getEnvironment());
         } catch (RuntimeException e) {
-            draftRepository.transitionStatus(draftId, KycDraftStatus.SUBMITTING, KycDraftStatus.IN_PROGRESS);
+            draftRepository.transitionStatus(draftId, KycDraftStatus.SUBMITTING, KycDraftStatus.IN_PROGRESS,
+                    LocalDateTime.now());
             throw e;
         }
 
@@ -314,8 +324,14 @@ public class KycDraftService {
         request.setVerificationType("individual");
         request.setExternalReference(draft.getExternalReference());
 
+        TreeMap<Integer, KycDraftDocument> livenessByIndex = new TreeMap<>();
         for (KycDraftDocument document : documentRepository.findByDraftId(draft.getId())) {
             MultipartFile file = new StoredDocumentMultipartFile(documentStorage, document);
+            Matcher liveness = LIVENESS_TYPE.matcher(document.getDocumentType());
+            if (liveness.matches()) {
+                livenessByIndex.put(Integer.parseInt(liveness.group(1)), document);
+                continue;
+            }
             switch (document.getDocumentType()) {
                 case "selfie" -> request.setSelfie(file);
                 case "id_front" -> request.setIdFront(file);
@@ -324,6 +340,21 @@ public class KycDraftService {
                 default -> log.warn("Ignoring unknown draft document type {}", document.getDocumentType());
             }
         }
+
+        // Drafts must carry the active-liveness frames; the single-photo fallback is for API callers only
+        if (livenessByIndex.isEmpty()) {
+            throw new ApplicationExceptions.IntactBadRequestException("Complete the liveness check before submitting");
+        }
+        List<MultipartFile> frames = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        livenessByIndex.values().forEach(document -> {
+            Matcher m = LIVENESS_TYPE.matcher(document.getDocumentType());
+            m.matches();
+            frames.add(new StoredDocumentMultipartFile(documentStorage, document));
+            labels.add(m.group(2));
+        });
+        request.setLivenessFrames(frames);
+        request.setLivenessLabels(String.join(",", labels));
         return request;
     }
 
@@ -350,9 +381,10 @@ public class KycDraftService {
 
     private String normalizeDocumentType(String documentType) {
         String type = documentType != null ? documentType.trim().toLowerCase() : "";
-        if (!DOCUMENT_TYPES.contains(type)) {
+        if (!DOCUMENT_TYPES.contains(type) && !LIVENESS_TYPE.matcher(type).matches()) {
             throw new ApplicationExceptions.IntactBadRequestException(
-                    "Invalid document type. Must be one of: selfie, id_front, id_back, proof_of_address");
+                    "Invalid document type. Must be one of: selfie, id_front, id_back, proof_of_address, "
+                            + "liveness_{0-7}_{neutral|turn_left|turn_right}");
         }
         return type;
     }

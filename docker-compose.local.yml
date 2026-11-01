@@ -1,0 +1,48 @@
+# Local-machine overrides — layered on top of docker-compose.yml, never used on the VPS.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+# `environment:` wins over `env_file: .env`, so .env stays exactly as the VPS expects it.
+# To run unpushed code, build it and point AUTH_IMAGE at it:
+#   docker build -t intact-auth:local . && AUTH_IMAGE=intact-auth:local docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+services:
+
+  auth-server:
+    image: ${AUTH_IMAGE:-frankmwangi8118/intact-auth:latest}
+    # Host 8080 is taken by sactions-service locally; 8085 is what ngrok and the dashboard use.
+    ports: !override
+      - "8085:8080"
+    environment:
+      # Container names/aliases on app-net as they exist on this machine
+      FACE_SERVICE_URL: http://face-service:8000
+      OCR_SERVICE_URL: http://ocr-service:8000
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Local postgres keeps the dev default password so host-run services (billing from the IDE) still connect
+      DB_PASSWORD: admin
+      # /actuator/health otherwise logs in to Gmail SMTP on every call (docker healthcheck = every 30s),
+      # which gets the account throttled and makes health checks hang on SMTP timeouts.
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+      # billing-service runs on the host (IDE), not in docker
+      BILLING_SERVICE_URL: http://host.docker.internal:8086
+      # Vercel partner site + ngrok static domain + local dashboard
+      CORS_ALLOWED_ORIGINS: https://widget.intact-io.com,https://id.intact-io.com,https://idpartner.intact-io.com,https://playmate-heaving-utter.ngrok-free.dev,http://localhost:8085,http://localhost:5173
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Named volume instead of the VPS bind mount — /var/data on this machine is root-owned,
+    # so the container's non-root user couldn't write uploads there.
+    volumes: !override
+      - uploads:/var/data/intact-id/uploads
+
+  # Two listeners: containers use kafka:9092, host-run apps (billing from the IDE) use localhost:9092.
+  kafka:
+    ports: !override
+      - "9092:19092"
+    environment:
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # The image writes to /tmp/kafka-logs by default, i.e. inside the container — every recreate
+      # wiped all messages. Point it at the kafka-data volume mounted by docker-compose.yml.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+volumes:
+  uploads:

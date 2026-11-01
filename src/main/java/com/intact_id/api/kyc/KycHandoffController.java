@@ -7,7 +7,6 @@ import com.intact_id.dto.response.kyc.KycDraftSessionResponseDto;
 import com.intact_id.dto.response.kyc.KycHandoffResponseDto;
 import com.intact_id.security.authentication.WidgetSessionContext;
 import com.intact_id.service.kyc.handoff.KycHandoffService;
-import com.intact_id.util.security.RequestHeaderUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,7 +28,6 @@ import static com.intact_id.api.kyc.WidgetResponses.respond;
 public class KycHandoffController {
 
     private final KycHandoffService handoffService;
-    private final RequestHeaderUtil requestHeaderUtil;
 
     @PostMapping("/widget/drafts/{draftId}/handoff")
     @PreAuthorize("hasRole('COMPANY')")
@@ -55,9 +53,10 @@ public class KycHandoffController {
     public ResponseEntity<ApiResponse<KycDraftSessionResponseDto>> claim(
             @Valid @RequestBody ClaimHandoffRequestDto request,
             HttpServletRequest httpRequest) {
+        // Not X-Forwarded-For directly: clients can rotate it. RemoteIpValve resolves it from trusted proxies only.
         KycDraftSessionResponseDto session = handoffService.claim(
                 request.getCode(),
-                requestHeaderUtil.getClientIp(httpRequest),
+                httpRequest.getRemoteAddr(),
                 httpRequest.getHeader(HttpHeaders.USER_AGENT));
         return respond(HttpStatus.OK, "Handoff claimed", session);
     }

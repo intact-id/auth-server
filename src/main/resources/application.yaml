@@ -51,6 +51,8 @@ server:
   port: ${SERVER_PORT:8085}
   servlet:
     context-path: /
+  # Honour X-Forwarded-* only from private-network proxies (Tomcat RemoteIpValve defaults)
+  forward-headers-strategy: native
 
 jwt:
   secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}

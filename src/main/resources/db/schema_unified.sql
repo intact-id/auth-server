@@ -716,6 +716,7 @@ CREATE TABLE kyc_drafts
     verification_id    VARCHAR(255),
     resume_token_hash  VARCHAR(64)  NOT NULL,
     expires_at         TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    status_changed_at  TIMESTAMP WITHOUT TIME ZONE,
     version            BIGINT       NOT NULL DEFAULT 0,
     CONSTRAINT pk_kyc_drafts PRIMARY KEY (id),
     CONSTRAINT fk_kyc_drafts_company FOREIGN KEY (company_id) REFERENCES company_tbl (id),

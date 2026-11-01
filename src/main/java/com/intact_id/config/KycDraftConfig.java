@@ -19,5 +19,8 @@ public class KycDraftConfig {
 
     private int cleanupBatchSize = 200;
 
+    // A submit that hasn't finished in this time crashed; the draft is made editable again
+    private Duration submittingTimeout = Duration.ofMinutes(10);
+
     private long maxDocumentSizeBytes = 10L * 1024 * 1024;
 }

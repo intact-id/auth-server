@@ -391,44 +391,27 @@ public class BillingService {
         }
     }
 
-    @Transactional
+    /**
+     * Billing for a final verification outcome goes straight to billing-service over Kafka — it owns
+     * pricing, wallets and usage (and already answers the pre-processing balance check). The local
+     * CompanyBillingProfile / BillingCharge bookkeeping is deprecated and no longer consulted here;
+     * previously this returned early for any company without a local profile, so companies set up
+     * only in billing-service were never charged.
+     *
+     * Duplicate outcome events are safe: the event id is the verification id, and billing-service
+     * records each external_ref once. Failures caused by our own services are never billed.
+     */
     public void handleVerificationOutcome(VerificationRequest verificationRequest) {
-        // Fresh read, not cached — same reason as handleVerificationSubmitted above.
-        Optional<CompanyBillingProfile> optionalProfile = billingProfileRepository
-                .findByCompanyId(verificationRequest.getCompany().getId());
-        if (optionalProfile.isEmpty()) {
-            log.info("handleVerificationOutcome: no billing profile for company {} — skipping billing for verification {}",
-                    verificationRequest.getCompany().getId(), verificationRequest.getId());
-            return;
-        }
-
-        CompanyBillingProfile profile = optionalProfile.get();
-        if (billingChargeRepository.findByVerificationRequestId(verificationRequest.getId()).isPresent()) {
-            log.info("handleVerificationOutcome: charge already exists for verification {} — skipping (duplicate outcome event)",
+        BillingEvent event = determineBillingEvent(verificationRequest);
+        if (event == BillingEvent.FAILURE_SYSTEM) {
+            log.info("handleVerificationOutcome: verification {} failed on our side — not billed",
                     verificationRequest.getId());
             return;
         }
-
-        BillingEvent event = determineBillingEvent(verificationRequest);
-        boolean billable = isBillable(profile, event);
-        log.info("handleVerificationOutcome: verification {} company {} event={} billable={}",
-                verificationRequest.getId(), verificationRequest.getCompany().getId(), event, billable);
-
-        if (!billable) {
-            createWaivedCharge(profile, verificationRequest, event, "Charge waived by billing profile rule");
-            return;
-        }
-
         publishBillingEvent(verificationRequest, event);
-        createOrApplyCharge(profile, verificationRequest, event, "Billed by final verification outcome");
     }
 
-    /**
-     * Publishes a usage event to Kafka for the external billing consumer, alongside (not
-     * instead of) the local charge/wallet bookkeeping above. Only called on the same path as
-     * createOrApplyCharge — waived charges (see isBillable) never reach here, so the consumer
-     * never sees a billing event for something the local profile rules opted out of.
-     */
+    /** Publishes a usage event to Kafka (intact-id.billing.events) for billing-service. */
     private void publishBillingEvent(VerificationRequest verificationRequest, BillingEvent event) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("billingEvent", event.name());

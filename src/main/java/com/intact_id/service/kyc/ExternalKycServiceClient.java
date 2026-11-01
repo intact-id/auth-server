@@ -72,11 +72,25 @@ public class ExternalKycServiceClient {
                         .findFirst()
                         .orElseThrow(() -> new RuntimeException("ID document not found"));
 
+                // Active-liveness frames from the widget (liveness_{index}_{label}), in capture order.
+                // Absent for API submissions with a single selfie — those keep the photo check.
+                List<VerificationDocument> livenessDocs = documents.stream()
+                        .filter(d -> d.getDocumentType() != null
+                                && d.getDocumentType().startsWith(VerificationService.LIVENESS_DOC_PREFIX))
+                        .sorted(Comparator.comparingInt(ExternalKycServiceClient::livenessFrameIndex))
+                        .toList();
+
                 // Each service call gets its own MultipartFile instance to avoid shared stream state
                 MultipartFile selfieForFace = createMultipartFile(selfieDoc);
                 MultipartFile selfieForLiveness = createMultipartFile(selfieDoc);
                 MultipartFile idFileForFace = createMultipartFile(idDoc);
                 MultipartFile idFileForOcr = createMultipartFile(idDoc);
+                MultipartFile[] livenessFrames = new MultipartFile[livenessDocs.size()];
+                for (int i = 0; i < livenessDocs.size(); i++)
+                    livenessFrames[i] = createMultipartFile(livenessDocs.get(i));
+                String livenessLabels = livenessDocs.stream()
+                        .map(ExternalKycServiceClient::livenessFrameLabel)
+                        .collect(java.util.stream.Collectors.joining(","));
 
                 CircuitBreaker faceBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.FACE_SERVICE);
                 CircuitBreaker ocrBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.OCR_SERVICE);
@@ -88,8 +102,9 @@ public class ExternalKycServiceClient {
 
                 // Liveness — degrades to manual_review if service is down (or breaker is open)
                 CompletableFuture<LivenessResponse> livenessFuture = CompletableFuture
-                        .supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> faceScreeningClient.checkLiveness(
-                                faceApiKey, faceApiSecret, selfieForLiveness)))
+                        .supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> livenessFrames.length > 0
+                                ? faceScreeningClient.checkLivenessSequence(faceApiKey, faceApiSecret, livenessFrames, livenessLabels)
+                                : faceScreeningClient.checkLiveness(faceApiKey, faceApiSecret, selfieForLiveness)))
                         .exceptionally(ex -> {
                             log.warn("Liveness check unavailable for {}: {}", request.getId(), ex.getMessage());
                             return null;
@@ -275,6 +290,22 @@ public class ExternalKycServiceClient {
         File file = new File(doc.getFilePath());
         return new FileMultipartFile(file, doc.getDocumentType(),
                 doc.getOriginalFilename(), doc.getMimeType());
+    }
+
+    /** liveness_{index}_{label} → index */
+    private static int livenessFrameIndex(VerificationDocument doc) {
+        String rest = doc.getDocumentType().substring(VerificationService.LIVENESS_DOC_PREFIX.length());
+        try {
+            return Integer.parseInt(rest.substring(0, rest.indexOf('_')));
+        } catch (RuntimeException e) {
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    /** liveness_{index}_{label} → label */
+    private static String livenessFrameLabel(VerificationDocument doc) {
+        String rest = doc.getDocumentType().substring(VerificationService.LIVENESS_DOC_PREFIX.length());
+        return rest.substring(rest.indexOf('_') + 1);
     }
 
     private boolean isManualReview(FaceVerificationResponse faceResponse) {

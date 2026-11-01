@@ -51,6 +51,10 @@ public class VerificationService {
     @Value("${app.documents.base-dir:${user.dir}/uploads}")
     private String documentsBaseDir;
 
+    /** Document type prefix for active-liveness frames: liveness_{index}_{label}. */
+    public static final String LIVENESS_DOC_PREFIX = "liveness_";
+    private static final List<String> LIVENESS_LABELS = List.of("neutral", "turn_left", "turn_right");
+
     /**
      * Deliberately NOT @Transactional at the method level. The old version was, which meant
      * the DB connection stayed checked out for the entire method — including the synchronous
@@ -73,6 +77,7 @@ public class VerificationService {
 
         // Validate tier-specific requirements — in-memory, no DB/IO involved
         tierValidationService.validateTier(tier, request);
+        List<String> livenessLabels = parseLivenessLabels(request);
         String externalReference = normalizeExternalReference(request.getExternalReference());
 
         VerificationRequest savedRequest = new TransactionTemplate(transactionManager).execute(status -> {
@@ -81,7 +86,8 @@ public class VerificationService {
             verificationRequest.setCompany(company);
             verificationRequest.setTier(tier);
             verificationRequest.setVerificationType(request.getVerificationType());
-            verificationRequest.setStatus(GlobalStatuses.SUBMITTED);
+            // DRAFT until its files are saved, so the scheduler never picks up a request without documents
+            verificationRequest.setStatus(GlobalStatuses.DRAFT);
             verificationRequest.setWebhookUrl(request.getWebhookUrl());
             verificationRequest.setEnvironment(environment);
             verificationRequest.setExternalReference(externalReference);
@@ -107,31 +113,107 @@ public class VerificationService {
             verificationRequest
                     .setMetadata(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
 
-            VerificationRequest saved = verificationRequestRepository.save(verificationRequest);
-            billingService.handleVerificationSubmitted(saved);
-            return saved;
+            return verificationRequestRepository.save(verificationRequest);
         });
 
         // Save documents AFTER the transaction above has committed and released its
         // connection — MultipartFile objects are tied to the HTTP request lifecycle and
         // won't be available when the scheduler processes them later, so they still have to
         // happen here, just no longer while pinning a DB connection.
-        saveDocument(savedRequest, request.getSelfie(), "selfie");
-        saveDocument(savedRequest, request.getIdFront(), "id_front");
-        if (request.getIdBack() != null)
-            saveDocument(savedRequest, request.getIdBack(), "id_back");
-        if (request.getProofOfAddress() != null)
-            saveDocument(savedRequest, request.getProofOfAddress(), "proof_of_address");
+        try {
+            saveDocument(savedRequest, request.getSelfie(), "selfie");
+            saveDocument(savedRequest, request.getIdFront(), "id_front");
+            if (request.getIdBack() != null)
+                saveDocument(savedRequest, request.getIdBack(), "id_back");
+            if (request.getProofOfAddress() != null)
+                saveDocument(savedRequest, request.getProofOfAddress(), "proof_of_address");
+            // Index keeps capture order; label tells the face service which challenge the frame answers
+            for (int i = 0; i < livenessLabels.size(); i++)
+                saveDocument(savedRequest, request.getLivenessFrames().get(i),
+                        LIVENESS_DOC_PREFIX + i + "_" + livenessLabels.get(i));
+        } catch (RuntimeException e) {
+            // Cancelled requests are never processed, billed or reported by webhook
+            cancelIncompleteRequest(savedRequest.getId());
+            throw e;
+        }
+
+        String requestId = savedRequest.getId();
+        VerificationRequest submittedRequest = new TransactionTemplate(transactionManager).execute(status -> {
+            VerificationRequest ready = verificationRequestRepository.findById(requestId)
+                    .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
+                            "Verification not found: " + requestId));
+            ready.setStatus(GlobalStatuses.SUBMITTED);
+            VerificationRequest saved = verificationRequestRepository.save(ready);
+            billingService.handleVerificationSubmitted(saved);
+            return saved;
+        });
 
         return KycVerificationResponseDto.builder()
-                .verificationId(savedRequest.getId())
-                .externalReference(savedRequest.getExternalReference())
-                .status(savedRequest.getStatus().name())
+                .verificationId(submittedRequest.getId())
+                .externalReference(submittedRequest.getExternalReference())
+                .status(submittedRequest.getStatus().name())
                 .tier(tier)
                 .estimatedCompletion(LocalDateTime.now().plusMinutes(10))
-                .webhookUrl(savedRequest.getWebhookUrl())
+                .webhookUrl(submittedRequest.getWebhookUrl())
                 .message("Verification submitted successfully and is being processed")
                 .build();
+    }
+
+    /**
+     * Validates the optional active-liveness frames before anything is persisted. Returns the
+     * labels (one per frame), or an empty list when the submission has no liveness frames — e.g.
+     * API customers that upload a single selfie, who stay on the single-photo liveness check.
+     */
+    private List<String> parseLivenessLabels(KycVerificationRequestDto request) {
+        List<MultipartFile> frames = request.getLivenessFrames() == null ? List.of()
+                : request.getLivenessFrames().stream().filter(f -> f != null && !f.isEmpty()).toList();
+        String rawLabels = request.getLivenessLabels();
+        if (frames.isEmpty() && (rawLabels == null || rawLabels.isBlank()))
+            return List.of();
+
+        List<String> labels = rawLabels == null ? List.of()
+                : java.util.Arrays.stream(rawLabels.split(","))
+                        .map(l -> l.trim().toLowerCase(Locale.ROOT))
+                        .filter(l -> !l.isEmpty())
+                        .toList();
+        if (labels.size() != frames.size())
+            throw new ApplicationExceptions.IntactBadRequestException(
+                    "livenessLabels must have exactly one label per liveness frame");
+        if (frames.size() < 3 || frames.size() > 8)
+            throw new ApplicationExceptions.IntactBadRequestException("Between 3 and 8 liveness frames are required");
+        if (!LIVENESS_LABELS.containsAll(labels) || !labels.containsAll(LIVENESS_LABELS))
+            throw new ApplicationExceptions.IntactBadRequestException(
+                    "livenessLabels must only use, and include each of: " + String.join(", ", LIVENESS_LABELS));
+
+        request.setLivenessFrames(frames);
+        return labels;
+    }
+
+    private void cancelIncompleteRequest(String requestId) {
+        try {
+            verificationRequestRepository.findById(requestId).ifPresent(request -> {
+                request.setStatus(GlobalStatuses.CANCELLED);
+                verificationRequestRepository.save(request);
+            });
+            log.warn("Verification {} cancelled: its documents could not be saved", requestId);
+        } catch (RuntimeException e) {
+            log.error("Failed to cancel incomplete verification {}", requestId, e);
+        }
+    }
+
+    private static String fileExtension(MultipartFile file) {
+        String name = file.getOriginalFilename();
+        if (name != null) {
+            String ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+            if (name.contains(".") && ext.matches("[a-z0-9]{1,5}")) {
+                return "." + ext;
+            }
+        }
+        String contentType = file.getContentType();
+        if ("image/png".equals(contentType)) return ".png";
+        if ("image/jpeg".equals(contentType)) return ".jpg";
+        if ("application/pdf".equals(contentType)) return ".pdf";
+        return "";
     }
 
     private VerificationDocument saveDocument(VerificationRequest request, MultipartFile file, String documentType) {
@@ -145,9 +227,12 @@ public class VerificationService {
                 java.nio.file.Files.createDirectories(uploadPath);
             }
 
-            // Generate unique filename
-            String filename = request.getId() + "_" + documentType + "_" + file.getOriginalFilename();
+            // Never put the client's filename in the path; keep only a safe extension
+            String filename = request.getId() + "_" + documentType + fileExtension(file);
             java.nio.file.Path filePath = uploadPath.resolve(filename).normalize();
+            if (!filePath.startsWith(uploadPath)) {
+                throw new ApplicationExceptions.IntactBadRequestException("Invalid document type");
+            }
 
             // Save file
             file.transferTo(filePath.toFile());
