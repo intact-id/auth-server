@@ -92,7 +92,7 @@ webhook:
 verification:
   processing:
     enabled: true
-    poll-interval-ms: 15000
+    poll-interval-ms: 2000   # how often SUBMITTED verifications are picked up (one indexed query)
     batch-size: 7
     max-concurrent: 4
 
