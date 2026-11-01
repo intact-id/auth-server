@@ -8,6 +8,7 @@ import com.intact_id.db.model.Company;
 import com.intact_id.db.model.kyc.KycDraft;
 import com.intact_id.db.model.kyc.KycDraftDocument;
 import com.intact_id.db.model.kyc.KycHandoff;
+import com.intact_id.db.repository.CompanyRepository;
 import com.intact_id.db.repository.kyc.KycDraftDocumentRepository;
 import com.intact_id.db.repository.kyc.KycDraftRepository;
 import com.intact_id.db.repository.kyc.KycHandoffRepository;
@@ -59,6 +60,7 @@ public class KycDraftService {
     private static final int RESUME_TOKEN_BYTES = 32;
 
     private final KycDraftRepository draftRepository;
+    private final CompanyRepository companyRepository;
     private final KycDraftDocumentRepository documentRepository;
     private final KycHandoffRepository handoffRepository;
     private final DocumentStorage documentStorage;
@@ -256,9 +258,11 @@ public class KycDraftService {
             if (tokenExpiry.isAfter(draft.getExpiresAt())) {
                 tokenExpiry = draft.getExpiresAt();
             }
+            String companyName = KycSessionService.displayName(
+                    companyRepository.findById(draft.getCompanyId()).orElse(null));
             WidgetSessionContext tokenContext = new WidgetSessionContext(
-                    draft.getCompanyId(), draft.getEnvironment(), draft.getTier(), draft.getExternalReference(),
-                    draft.getId(), handoffId, channel);
+                    draft.getCompanyId(), companyName, draft.getEnvironment(), draft.getTier(),
+                    draft.getExternalReference(), draft.getId(), handoffId, channel);
             response.setDraftToken(kycSessionService.issueToken(
                     tokenContext, Date.from(tokenExpiry.atZone(ZoneId.systemDefault()).toInstant())));
             response.setDraftTokenExpiresInSeconds(Duration.between(now, tokenExpiry).getSeconds());

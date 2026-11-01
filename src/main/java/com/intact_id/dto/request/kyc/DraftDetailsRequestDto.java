@@ -23,7 +23,8 @@ public class DraftDetailsRequestDto {
     @Past(message = "Date of birth must be in the past")
     private LocalDate dateOfBirth;
 
-    @Pattern(regexp = "^[0-9]{8}$", message = "ID number must be 8 digits")
+    // Any document type: national IDs, passports, licences and alien cards have different formats
+    @Pattern(regexp = "^[A-Za-z0-9 -]{4,30}$", message = "Document number must be 4 to 30 letters or digits")
     private String idNumber;
 
     @Size(max = 30)

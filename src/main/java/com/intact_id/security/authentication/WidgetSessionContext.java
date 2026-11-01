@@ -8,6 +8,8 @@ import com.intact_id.constant.enums.kyc.WidgetChannel;
  */
 public record WidgetSessionContext(
         String companyId,
+        // Shown on the widget's first screen ("Acme Pay verification")
+        String companyName,
         ApiKeyEnvironment environment,
         String tier,
         String externalReference,
