@@ -20,8 +20,10 @@ services:
       # /actuator/health otherwise logs in to Gmail SMTP on every call (docker healthcheck = every 30s),
       # which gets the account throttled and makes health checks hang on SMTP timeouts.
       MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
-      # billing-service runs on the host (IDE), not in docker
-      BILLING_SERVICE_URL: http://host.docker.internal:8086
+      # billing-service runs as the api-billing-service container on app-net
+      # (api-billing-service/docker-compose.yml); use http://host.docker.internal:8086 when
+      # running it from the IDE instead
+      BILLING_SERVICE_URL: http://api-billing-service:8086
       # Vercel partner site + ngrok static domain + local dashboard
       CORS_ALLOWED_ORIGINS: https://widget.intact-io.com,https://docs.intact-io.com,https://intact-id-widget.vercel.app,http://localhost:5175,https://id.intact-io.com,https://idpartner.intact-io.com,https://playmate-heaving-utter.ngrok-free.dev,http://localhost:8085,http://localhost:5173
     extra_hosts:
