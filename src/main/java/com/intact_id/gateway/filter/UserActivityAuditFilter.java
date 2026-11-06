@@ -1,4 +1,4 @@
-package com.intact_id.security.filter;
+package com.intact_id.gateway.filter;
 
 import com.intact_id.identity.User;
 import com.intact_id.identity.AuditService;
