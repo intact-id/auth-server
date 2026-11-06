@@ -2,7 +2,7 @@ package com.intact_id.billing.model;
 
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.tenancy.Company;
+import com.intact_id.accounts.Company;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

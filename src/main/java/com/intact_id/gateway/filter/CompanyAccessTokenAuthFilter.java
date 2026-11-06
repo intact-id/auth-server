@@ -2,10 +2,10 @@ package com.intact_id.gateway.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
-import com.intact_id.tenancy.Company;
-import com.intact_id.tenancy.CompanyRepository;
-import com.intact_id.identity.CompanyAuthentication;
-import com.intact_id.identity.JwtService;
+import com.intact_id.accounts.Company;
+import com.intact_id.accounts.CompanyRepository;
+import com.intact_id.accounts.CompanyAuthentication;
+import com.intact_id.accounts.JwtService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

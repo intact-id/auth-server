@@ -1,8 +1,6 @@
 package com.intact_id.notifications.webhook.events;
 
 import com.intact_id.config.events.InternalEventHandler;
-import com.intact_id.tenancy.Company;
-import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.notifications.WebhookEventDto;
 import com.intact_id.notifications.WebhookService;
 import com.intact_id.util.exception.ApplicationExceptions;
@@ -25,7 +23,6 @@ import java.util.UUID;
 public class WebhookNotificationEventHandler implements InternalEventHandler<WebhookNotificationEvent> {
 
     private final WebhookService webhookService;
-    private final CompanyRepository companyRepository;
 
     // Dispatched exclusively via InternalApplicationEventListener, which routes InternalEvent
     // subtypes to the matching InternalEventHandler bean. Do NOT add @EventListener here —
@@ -40,24 +37,19 @@ public class WebhookNotificationEventHandler implements InternalEventHandler<Web
                 data.getEventType(), data.getCompanyId());
 
         try {
-            // Fetch company
-            Company company = companyRepository.findById(data.getCompanyId())
-                    .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
-                            "Company not found: " + data.getCompanyId()));
-
             // Build webhook event DTO
             WebhookEventDto webhookEvent = WebhookEventDto.builder()
                     .eventType(data.getEventType())
                     .eventId(UUID.randomUUID().toString())
                     .timestamp(LocalDateTime.now())
                     .companyId(data.getCompanyId())
-                    .companyName(company.getLegalName())
+                    .companyName(data.getCompanyName())
                     .verificationId(data.getVerificationId())
                     .data(convertToMap(data.getEventData()))
                     .build();
 
             // Send webhook (synchronously in async context)
-            webhookService.sendWebhookNotification(company, webhookEvent);
+            webhookService.sendWebhookNotification(data.getCompanyId(), webhookEvent);
 
         } catch (Exception e) {
             log.error("Failed to process webhook notification event for company: {}",

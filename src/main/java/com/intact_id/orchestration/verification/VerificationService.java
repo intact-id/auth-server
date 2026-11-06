@@ -2,7 +2,7 @@ package com.intact_id.orchestration.verification;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.tenancy.Company;
+import com.intact_id.accounts.Company;
 import com.intact_id.orchestration.VerificationDocument;
 import com.intact_id.orchestration.VerificationRequest;
 import com.intact_id.orchestration.model.VerificationStep;
@@ -16,7 +16,7 @@ import com.intact_id.orchestration.VerificationSubmitted;
 import org.springframework.context.ApplicationEventPublisher;
 import com.intact_id.checks.DocumentStorage;
 import com.intact_id.checks.StorageMultipartFile;
-import com.intact_id.identity.TenantContext;
+import com.intact_id.accounts.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

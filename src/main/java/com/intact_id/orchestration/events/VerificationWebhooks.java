@@ -113,7 +113,8 @@ public class VerificationWebhooks {
 
         eventData.put("results", results);
 
-        webhookService.publish(verificationRequest.getCompany().getId(), verificationRequest.getId(),
+        webhookService.publish(verificationRequest.getCompany().getId(), verificationRequest.getCompany().getLegalName(),
+                verificationRequest.getId(),
                 "verification.completed", eventData);
     }
 
@@ -218,7 +219,8 @@ public class VerificationWebhooks {
 
         eventData.put("results", results);
 
-        webhookService.publish(verificationRequest.getCompany().getId(), verificationRequest.getId(),
+        webhookService.publish(verificationRequest.getCompany().getId(), verificationRequest.getCompany().getLegalName(),
+                verificationRequest.getId(),
                 "verification.failed", eventData);
     }
 }

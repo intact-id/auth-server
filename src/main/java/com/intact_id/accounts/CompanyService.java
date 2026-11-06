@@ -1,0 +1,49 @@
+package com.intact_id.accounts;
+
+import com.intact_id.notifications.CompanyCommunicationDetails;
+import com.intact_id.constant.enums.GlobalStatuses;
+import com.intact_id.accounts.model.CompanyApplication;
+import com.intact_id.accounts.web.CompanyUpdateRequestDto;
+import com.intact_id.accounts.web.WebhookSettingsRequestDto;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+
+/**
+ * @Author frank
+ *         email frank.mwangi@dadanadagroup.com
+ *         Created on 22/11/2025 14:04
+ */
+
+@Service
+public interface CompanyService {
+
+    Company createCompanyFromApplication(CompanyApplication application);
+
+    Company getCompanyById(String companyId);
+
+    Company getCompanyByCustomerId(String customerId);
+
+    Company suspendCompany(String companyId, String adminId, String reason);
+
+    Company activateCompany(String companyId, String adminId);
+
+    void suspendCredentials(String companyId, String environment);
+
+    void activateCredentials(String companyId, String environment);
+
+    Company updateCompany(String companyId, CompanyUpdateRequestDto request);
+
+    Page<Company> getAllCompanies(GlobalStatuses status, String country, String businessType, Pageable pageable);
+
+    // Webhook/Communication methods
+    CompanyCommunicationDetails getCompanyCommunication(String companyId);
+
+    CompanyCommunicationDetails updateWebhookSettings(String companyId, WebhookSettingsRequestDto request);
+
+    CompanyCommunicationDetails rotateWebhookSecret(String companyId);
+
+    CompanyCommunicationDetails updateApplicantNotifications(String companyId, boolean onApproval, boolean onRejection, boolean onPendingReview);
+
+    void deleteCompany(String companyId);
+}

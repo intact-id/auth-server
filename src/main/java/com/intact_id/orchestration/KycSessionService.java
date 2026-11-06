@@ -2,7 +2,7 @@ package com.intact_id.orchestration;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.orchestration.model.WidgetChannel;
-import com.intact_id.tenancy.Company;
+import com.intact_id.accounts.Company;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
