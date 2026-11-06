@@ -11,7 +11,6 @@ import com.intact_id.dto.response.face.LivenessResponse;
 import com.intact_id.dto.response.ocr.OcrExtractionResponse;
 import com.intact_id.service.kyc.OcrValidationService.ValidationDecision;
 import com.intact_id.service.kyc.OcrValidationService.ValidationOutcome;
-import com.intact_id.util.FileMultipartFile;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.Builder;
@@ -22,8 +21,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.LinkedHashMap;
@@ -39,6 +36,7 @@ public class ExternalKycServiceClient {
     private final OcrValidationService ocrValidationService;
     private final VerificationDocumentRepository verificationDocumentRepository;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final VerificationDocumentFiles verificationDocumentFiles;
 
     @Value("${face-service.api-key}")
     private String faceApiKey;
@@ -286,10 +284,8 @@ public class ExternalKycServiceClient {
         return data;
     }
 
-    private MultipartFile createMultipartFile(VerificationDocument doc) throws IOException {
-        File file = new File(doc.getFilePath());
-        return new FileMultipartFile(file, doc.getDocumentType(),
-                doc.getOriginalFilename(), doc.getMimeType());
+    private MultipartFile createMultipartFile(VerificationDocument doc) {
+        return verificationDocumentFiles.asMultipartFile(doc);
     }
 
     /** liveness_{index}_{label} → index */

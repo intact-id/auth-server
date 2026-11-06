@@ -2,21 +2,17 @@ package com.intact_id.api.kyc;
 
 import com.intact_id.db.model.kyc.VerificationDocument;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
+import com.intact_id.service.kyc.VerificationDocumentFiles;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 @Slf4j
 @RestController
@@ -25,9 +21,7 @@ import java.nio.file.Paths;
 public class DocumentController {
 
     private final VerificationDocumentRepository documentRepository;
-
-    @Value("${app.documents.base-dir:${user.dir}/uploads}")
-    private String documentsBaseDir;
+    private final VerificationDocumentFiles verificationDocumentFiles;
 
     /**
      * Get document image by verification ID and document ID
@@ -39,72 +33,31 @@ public class DocumentController {
 
         log.info("Fetching document: {} for verification: {}", documentId, verificationId);
 
-        // Find document
         VerificationDocument document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                         "Document not found: " + documentId));
 
-        // Verify document belongs to the verification
         if (!document.getVerificationRequest().getId().equals(verificationId)) {
             throw new ApplicationExceptions.IntactUnauthorizedException(
                     "Document does not belong to this verification");
         }
 
+        MediaType contentType;
         try {
-            // Load from absolute path if present, otherwise resolve from configured base directory.
-            Path filePath = resolveDocumentPath(document.getFilePath());
-
-            File file = filePath.toFile();
-
-            log.info("Attempting to serve file: {}", filePath.toAbsolutePath());
-
-            if (!file.exists()) {
-                log.error("Document file not found at: {}", filePath.toAbsolutePath());
-                log.error("Stored path in DB: {}", document.getFilePath());
-                log.error("Working directory: {}", System.getProperty("user.dir"));
-                throw new ApplicationExceptions.IntactCompanyNotFoundException(
-                        "Document file not found");
-            }
-
-            Resource resource = new FileSystemResource(file);
-
-            // Determine content type
-            String contentType = document.getMimeType();
-            if (contentType == null) {
-                contentType = Files.probeContentType(filePath);
-            }
-            if (contentType == null) {
-                contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
-            }
-
-            log.info("Serving document: {} with content type: {}", document.getOriginalFilename(), contentType);
-
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "inline; filename=\"" + document.getOriginalFilename() + "\"")
-                    .body(resource);
-
-        } catch (Exception e) {
-            log.error("Error serving document: {}", documentId, e);
-            throw new ApplicationExceptions.IntactBadRequestException(
-                    "Failed to serve document: " + e.getMessage());
-        }
-    }
-
-    private Path resolveDocumentPath(String storedPath) {
-        Path rawPath = Paths.get(storedPath);
-        if (rawPath.isAbsolute()) {
-            return rawPath.normalize();
+            contentType = document.getMimeType() != null
+                    ? MediaType.parseMediaType(document.getMimeType())
+                    : MediaType.APPLICATION_OCTET_STREAM;
+        } catch (IllegalArgumentException e) {
+            contentType = MediaType.APPLICATION_OCTET_STREAM;
         }
 
-        Path basePath = Paths.get(documentsBaseDir).toAbsolutePath().normalize();
-        Path resolved = basePath.resolve(rawPath).normalize();
-        if (Files.exists(resolved)) {
-            return resolved;
-        }
+        String filename = document.getOriginalFilename() != null
+                ? document.getOriginalFilename()
+                : document.getDocumentType();
 
-        // Backward compatibility: older records may be relative to process working directory.
-        return Paths.get(System.getProperty("user.dir"), storedPath).toAbsolutePath().normalize();
+        return ResponseEntity.ok()
+                .contentType(contentType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(filename).build().toString())
+                .body(new InputStreamResource(verificationDocumentFiles.open(document)));
     }
 }

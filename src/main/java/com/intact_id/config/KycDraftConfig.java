@@ -23,4 +23,7 @@ public class KycDraftConfig {
     private Duration submittingTimeout = Duration.ofMinutes(10);
 
     private long maxDocumentSizeBytes = 10L * 1024 * 1024;
+
+    // How long a presigned direct-upload URL stays valid
+    private Duration uploadUrlTtl = Duration.ofMinutes(5);
 }
