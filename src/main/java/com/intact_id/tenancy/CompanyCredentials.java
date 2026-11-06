@@ -1,7 +1,6 @@
-package com.intact_id.identity;
+package com.intact_id.tenancy;
 
 
-import com.intact_id.tenancy.Company;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.ApiKeyEnvironment;

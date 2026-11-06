@@ -3,7 +3,7 @@ package com.intact_id.identity.web;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.identity.user.UserService;
-import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;

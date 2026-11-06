@@ -1,7 +1,9 @@
-package com.intact_id.identity.web;
+package com.intact_id.tenancy.web;
 
 import com.intact_id.dto.response.ApiResponse;
-import com.intact_id.identity.apikey.ApiKeyService;
+import com.intact_id.identity.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
+import com.intact_id.tenancy.credentials.ApiKeyService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,7 +32,7 @@ public class ApiKeyController {
             @RequestParam(required = false) String companyId) {
 
         try {
-            String resolvedCompanyId = com.intact_id.util.SecurityContextUtil.resolveCompanyId(companyId);
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
             var response = apiKeyService.generateProdApiKey(resolvedCompanyId);
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<ApiKeyGenerationResponseDto>builder()
@@ -56,7 +58,7 @@ public class ApiKeyController {
             @RequestParam(required = false) String companyId) {
 
         try {
-            String resolvedCompanyId = com.intact_id.util.SecurityContextUtil.resolveCompanyId(companyId);
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
             var response = apiKeyService.generateDevApiKey(resolvedCompanyId);
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<ApiKeyGenerationResponseDto>builder()
@@ -82,7 +84,7 @@ public class ApiKeyController {
             @RequestParam(required = false) String companyId) {
 
         try {
-            String resolvedCompanyId = com.intact_id.util.SecurityContextUtil.resolveCompanyId(companyId);
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
             var response = apiKeyService.generateProdApiKey(resolvedCompanyId);
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<ApiKeyGenerationResponseDto>builder()
@@ -108,7 +110,7 @@ public class ApiKeyController {
             @RequestParam(required = false) String companyId) {
 
         try {
-            String resolvedCompanyId = com.intact_id.util.SecurityContextUtil.resolveCompanyId(companyId);
+            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
             apiKeyService.revokeApiKey(resolvedCompanyId, keyId);
             return ResponseEntity.ok(
                     ApiResponse.<Void>builder()
@@ -132,7 +134,7 @@ public class ApiKeyController {
     public ResponseEntity<ApiResponse<List<ApiKeyGenerationResponseDto>>> getApiKeys(
             @RequestParam(required = false) String companyId) {
 
-        String resolvedCompanyId = com.intact_id.util.SecurityContextUtil.resolveCompanyId(companyId);
+        String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
         var response = apiKeyService.getApiKeys(resolvedCompanyId);
         return ResponseEntity.ok(
                 ApiResponse.<List<ApiKeyGenerationResponseDto>>builder()
@@ -149,7 +151,7 @@ public class ApiKeyController {
     public ResponseEntity<ApiResponse<ApiKeyUsageResponseDto>> getUsage(
             @RequestParam(required = false) String companyId) {
 
-        String resolvedCompanyId = com.intact_id.util.SecurityContextUtil.resolveCompanyId(companyId);
+        String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
         ApiKeyUsageResponseDto response = apiKeyService.getUsage(resolvedCompanyId);
         return ResponseEntity.ok(
                 ApiResponse.<ApiKeyUsageResponseDto>builder()

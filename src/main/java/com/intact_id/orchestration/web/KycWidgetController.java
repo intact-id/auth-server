@@ -6,7 +6,7 @@ import com.intact_id.tenancy.Company;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.orchestration.WidgetSessionContext;
 import com.intact_id.orchestration.verification.VerificationService;
-import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

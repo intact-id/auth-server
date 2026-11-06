@@ -6,7 +6,7 @@ import com.intact_id.tenancy.Company;
 import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.notifications.NotificationRequestDto;
 import com.intact_id.notifications.NotificationResponseDto;
-import com.intact_id.util.TenantContext;
+import com.intact_id.identity.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

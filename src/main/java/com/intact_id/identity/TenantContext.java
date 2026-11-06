@@ -1,4 +1,4 @@
-package com.intact_id.util;
+package com.intact_id.identity;
 
 import com.intact_id.util.exception.ApplicationExceptions;
 import org.springframework.security.core.Authentication;

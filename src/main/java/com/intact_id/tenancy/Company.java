@@ -1,7 +1,6 @@
 package com.intact_id.tenancy;
 
 
-import com.intact_id.identity.CompanyCredentials;
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.util.converter.PgJsonbToMapConverter;

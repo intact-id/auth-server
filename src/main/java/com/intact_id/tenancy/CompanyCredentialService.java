@@ -1,4 +1,4 @@
-package com.intact_id.identity;
+package com.intact_id.tenancy;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;

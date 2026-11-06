@@ -24,7 +24,7 @@ import com.intact_id.orchestration.KycSessionService;
 import com.intact_id.orchestration.verification.VerificationService;
 import com.intact_id.checks.DocumentStorage;
 import com.intact_id.checks.StorageMultipartFile;
-import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import lombok.RequiredArgsConstructor;

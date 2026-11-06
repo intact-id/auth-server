@@ -1,4 +1,4 @@
-package com.intact_id.identity.config;
+package com.intact_id.tenancy.credentials;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

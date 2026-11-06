@@ -2,7 +2,7 @@ package com.intact_id.tenancy.web;
 
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.tenancy.application.CheckerApprovalService;
-import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
