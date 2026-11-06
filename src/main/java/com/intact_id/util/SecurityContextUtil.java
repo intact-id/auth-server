@@ -2,7 +2,7 @@ package com.intact_id.util;
 
 import com.intact_id.tenancy.Company;
 import com.intact_id.identity.User;
-import com.intact_id.security.authentication.CompanyAuthentication;
+import com.intact_id.gateway.CompanyAuthentication;
 import com.intact_id.util.exception.ApplicationExceptions;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

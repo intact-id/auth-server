@@ -1,10 +1,10 @@
-package com.intact_id.config;
+package com.intact_id.gateway.config;
 
-import com.intact_id.security.filter.ApiKeyAuthFilter;
-import com.intact_id.security.filter.CompanyAccessTokenAuthFilter;
-import com.intact_id.security.filter.JwtAuthenticationFilter;
-import com.intact_id.security.filter.KycWidgetAuthFilter;
-import com.intact_id.security.filter.UserActivityAuditFilter;
+import com.intact_id.gateway.filter.ApiKeyAuthFilter;
+import com.intact_id.gateway.filter.CompanyAccessTokenAuthFilter;
+import com.intact_id.gateway.filter.JwtAuthenticationFilter;
+import com.intact_id.gateway.filter.KycWidgetAuthFilter;
+import com.intact_id.gateway.filter.UserActivityAuditFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

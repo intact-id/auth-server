@@ -1,8 +1,8 @@
-package com.intact_id.security.filter;
+package com.intact_id.gateway.filter;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.identity.CompanyCredentials;
-import com.intact_id.security.authentication.CompanyAuthentication;
+import com.intact_id.gateway.CompanyAuthentication;
 import com.intact_id.identity.CredentialsValidator;
 import com.intact_id.identity.CompanyCredentialService;
 import com.intact_id.util.exception.ApplicationExceptions;

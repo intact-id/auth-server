@@ -1,4 +1,4 @@
-package com.intact_id.security.authentication;
+package com.intact_id.gateway;
 
 import com.intact_id.tenancy.Company;
 import lombok.Getter;
