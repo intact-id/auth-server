@@ -7,7 +7,7 @@ import com.intact_id.db.model.CompanyApplicationApproval;
 import com.intact_id.db.repository.CompanyApplicationApprovalRepository;
 import com.intact_id.db.repository.CompanyApplicationRepository;
 import com.intact_id.db.repository.CompanyRepository;
-import com.intact_id.db.repository.user.UserRepository;
+import com.intact_id.identity.UserRepository;
 import com.intact_id.dto.request.ApplicationApprovalDecisionDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.dto.response.CheckerApprovalQueueResponseDto;

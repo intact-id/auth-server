@@ -5,7 +5,7 @@ import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.repository.CompanyRepository;
 import com.intact_id.security.authentication.CompanyAuthentication;
-import com.intact_id.service.jwt.JwtService;
+import com.intact_id.identity.JwtService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

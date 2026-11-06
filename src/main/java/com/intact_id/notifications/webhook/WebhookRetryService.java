@@ -1,7 +1,7 @@
 package com.intact_id.notifications.webhook;
 
 
-import com.intact_id.notifications.WebhookService;import com.intact_id.notifications.webhook.WebhookConfig;
+import com.intact_id.notifications.WebhookService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
