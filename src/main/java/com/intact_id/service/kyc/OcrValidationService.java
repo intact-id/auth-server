@@ -1,6 +1,6 @@
 package com.intact_id.service.kyc;
 
-import com.intact_id.dto.response.ocr.OcrExtractionResponse;
+import com.intact_id.checks.OcrExtractionResponse;
 import com.intact_id.service.kyc.ExternalKycServiceClient.CheckResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

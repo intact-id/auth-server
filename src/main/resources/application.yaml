@@ -157,8 +157,8 @@ cors:
 
 logging:
   level:
-    com.intact_id.client.face.FaceScreeningClient: DEBUG
-    com.intact_id.client.ocr.OcrScreeningClient: DEBUG
+    com.intact_id.checks.FaceScreeningClient: DEBUG
+    com.intact_id.checks.OcrScreeningClient: DEBUG
 
 springdoc:
   swagger-ui:

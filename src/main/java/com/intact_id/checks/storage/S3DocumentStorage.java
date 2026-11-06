@@ -1,6 +1,7 @@
-package com.intact_id.service.storage;
+package com.intact_id.checks.storage;
 
-import com.intact_id.config.S3StorageProperties;
+
+import com.intact_id.checks.DocumentStorage;import com.intact_id.checks.storage.S3StorageProperties;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;

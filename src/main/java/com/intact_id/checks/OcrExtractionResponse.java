@@ -1,4 +1,4 @@
-package com.intact_id.dto.response.ocr;
+package com.intact_id.checks;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;

@@ -1,4 +1,4 @@
-package com.intact_id.service.storage;
+package com.intact_id.checks;
 
 import java.io.InputStream;
 import java.time.Duration;

@@ -1,4 +1,4 @@
-package com.intact_id.service.storage;
+package com.intact_id.checks;
 
 import org.springframework.web.multipart.MultipartFile;
 

@@ -1,8 +1,8 @@
 package com.intact_id.service.kyc;
 
 import com.intact_id.db.model.kyc.VerificationDocument;
-import com.intact_id.service.storage.DocumentStorage;
-import com.intact_id.service.storage.StorageMultipartFile;
+import com.intact_id.checks.DocumentStorage;
+import com.intact_id.checks.StorageMultipartFile;
 import com.intact_id.util.FileMultipartFile;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
