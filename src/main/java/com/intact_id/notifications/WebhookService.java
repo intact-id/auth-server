@@ -2,10 +2,7 @@ package com.intact_id.notifications;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intact_id.notifications.webhook.WebhookConfig;
-import com.intact_id.tenancy.Company;
-import com.intact_id.tenancy.CompanyCommunicationDetails;
 import com.intact_id.notifications.webhook.WebhookDelivery;
-import com.intact_id.tenancy.CompanyCommunicationRepository;
 import com.intact_id.notifications.webhook.WebhookDeliveryRepository;
 import com.intact_id.notifications.webhook.events.WebhookEventData;
 import com.intact_id.notifications.webhook.events.WebhookNotificationEvent;
@@ -51,27 +48,28 @@ public class WebhookService {
     /**
      * Queues a webhook for the company; delivery, signing and retries run in the background.
      */
-    public void publish(String companyId, String referenceId, String eventType, Map<String, Object> eventData) {
+    public void publish(String companyId, String companyName, String referenceId, String eventType,
+                        Map<String, Object> eventData) {
         if (!webhookConfig.isEnabled()) {
             log.debug("Webhooks are disabled, skipping notification");
             return;
         }
         eventPublisher.publishEvent(new WebhookNotificationEvent(this,
-                new WebhookEventData(companyId, referenceId, eventType, eventData)));
+                new WebhookEventData(companyId, companyName, referenceId, eventType, eventData)));
     }
 
     /**
      * Send webhook notification (called by event handler)
      */
-    public void sendWebhookNotification(Company company, WebhookEventDto event) {
+    public void sendWebhookNotification(String companyId, WebhookEventDto event) {
         try {
             // Get webhook configuration from company communication details
             CompanyCommunicationDetails communication = communicationRepository
-                    .findByCompanyId(company.getId())
+                    .findByCompanyId(companyId)
                     .orElse(null);
 
             if (communication == null || !communication.isWebhookEnabled()) {
-                log.debug("Webhooks not enabled for company: {}", company.getId());
+                log.debug("Webhooks not enabled for company: {}", companyId);
                 return;
             }
 
@@ -84,14 +82,14 @@ public class WebhookService {
             // Generate signature using the company's dedicated webhook secret
             String secret = communication.getWebhookSecret();
             if (secret == null || secret.isBlank()) {
-                log.error("No webhook secret configured for company: {} — skipping delivery", company.getId());
+                log.error("No webhook secret configured for company: {} — skipping delivery", companyId);
                 return;
             }
             String signature = webhookSigner.sign(payload, secret);
 
             // Create delivery record
             WebhookDelivery delivery = new WebhookDelivery();
-            delivery.setCompany(company);
+            delivery.setCompanyId(companyId);
             delivery.setVerificationId(event.getVerificationId());
             delivery.setWebhookUrl(webhookUrl);
             delivery.setEventType(event.getEventType());
@@ -104,7 +102,7 @@ public class WebhookService {
             sendHttpRequest(delivery, webhookUrl, payload, signature, communication.getWebhookTimeoutSeconds());
 
         } catch (Exception e) {
-            log.error("Failed to send webhook notification for company: {}", company.getId(), e);
+            log.error("Failed to send webhook notification for company: {}", companyId, e);
         }
     }
 
@@ -246,7 +244,7 @@ public class WebhookService {
             log.info("Retrying webhook delivery: {} (attempt {})", delivery.getId(), delivery.getRetryCount() + 1);
 
             CompanyCommunicationDetails communication = communicationRepository
-                    .findByCompanyId(delivery.getCompany().getId())
+                    .findByCompanyId(delivery.getCompanyId())
                     .orElseThrow();
 
             String signature = webhookSigner.sign(delivery.getPayload(), communication.getWebhookSecret());
@@ -277,7 +275,7 @@ public class WebhookService {
             testEvent.put("event_id", java.util.UUID.randomUUID().toString());
             testEvent.put("timestamp", LocalDateTime.now().toString());
             testEvent.put("message", "This is a test webhook from IntactID");
-            testEvent.put("company_id", communication.getCompany().getId());
+            testEvent.put("company_id", communication.getCompanyId());
 
             String payload = objectMapper.writeValueAsString(testEvent);
 

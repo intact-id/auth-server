@@ -1,8 +1,8 @@
 package com.intact_id.gateway.filter;
 
-import com.intact_id.tenancy.Company;
-import com.intact_id.tenancy.CompanyRepository;
-import com.intact_id.identity.CompanyAuthentication;
+import com.intact_id.accounts.Company;
+import com.intact_id.accounts.CompanyRepository;
+import com.intact_id.accounts.CompanyAuthentication;
 import com.intact_id.orchestration.WidgetSessionContext;
 import com.intact_id.orchestration.KycSessionService;
 import io.jsonwebtoken.Claims;

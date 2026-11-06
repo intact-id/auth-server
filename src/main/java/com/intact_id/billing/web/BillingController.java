@@ -2,7 +2,7 @@ package com.intact_id.billing.web;
 
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.billing.BillingService;
-import com.intact_id.identity.SecurityContextUtil;
+import com.intact_id.accounts.SecurityContextUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

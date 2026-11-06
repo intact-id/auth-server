@@ -1,7 +1,6 @@
 package com.intact_id.notifications.webhook;
 
 
-import com.intact_id.tenancy.Company;
 import com.intact_id.constant.base.Auditable;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -24,9 +23,8 @@ import java.time.LocalDateTime;
 })
 public class WebhookDelivery extends Auditable {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "company_id", nullable = false)
-    private Company company;
+    @Column(name = "company_id", nullable = false)
+    private String companyId;
 
     @Column(name = "verification_id")
     private String verificationId;

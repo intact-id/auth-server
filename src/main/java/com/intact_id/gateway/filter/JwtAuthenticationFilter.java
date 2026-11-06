@@ -1,8 +1,8 @@
 package com.intact_id.gateway.filter;
 
-import com.intact_id.identity.User;
-import com.intact_id.identity.UserRepository;
-import com.intact_id.identity.JwtService;
+import com.intact_id.accounts.User;
+import com.intact_id.accounts.UserRepository;
+import com.intact_id.accounts.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

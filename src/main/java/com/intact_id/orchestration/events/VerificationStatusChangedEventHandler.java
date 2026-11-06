@@ -2,9 +2,9 @@ package com.intact_id.orchestration.events;
 
 import org.springframework.scheduling.annotation.Async;
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.tenancy.CompanyCommunicationDetails;
+import com.intact_id.notifications.CompanyCommunicationDetails;
 import com.intact_id.orchestration.VerificationRequest;
-import com.intact_id.tenancy.CompanyCommunicationRepository;
+import com.intact_id.notifications.CompanyCommunicationRepository;
 import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.notifications.EmailService;
 import lombok.RequiredArgsConstructor;
