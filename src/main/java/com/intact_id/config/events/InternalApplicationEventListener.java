@@ -1,5 +1,6 @@
 package com.intact_id.config.events;
 
+import org.springframework.scheduling.annotation.Async;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -18,6 +19,8 @@ public class InternalApplicationEventListener {
 
     private final List<InternalEventHandler<?>> internalEventHandlers;
 
+    // Off the publishing thread, as before (the app used to make every event async)
+    @Async
     @EventListener(InternalEvent.class)
     public void handle(InternalEvent<?> event) {
         internalEventHandlers.stream()

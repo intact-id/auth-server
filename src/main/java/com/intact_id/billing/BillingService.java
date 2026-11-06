@@ -14,7 +14,8 @@ import com.intact_id.billing.model.BillingInvoice;
 import com.intact_id.billing.model.BillingInvoiceLine;
 import com.intact_id.billing.model.CompanyBillingProfile;
 import com.intact_id.billing.model.WalletTransaction;
-import com.intact_id.orchestration.VerificationRequest;
+import com.intact_id.orchestration.VerificationOutcome;
+import com.intact_id.orchestration.VerificationSubmitted;
 import com.intact_id.tenancy.CompanyCommunicationRepository;
 import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.billing.model.BillingChargeRepository;
@@ -339,55 +340,19 @@ public class BillingService {
         return toInvoiceResponse(billingInvoiceRepository.save(invoice));
     }
 
-    public record InsufficientBalance(BigDecimal available, BigDecimal required) {}
-
-    /**
-     * @deprecated the pre-verification balance gate now goes through billing-service, via
-     * RemoteBalanceCheckService (called from VerificationProcessor.process instead of this).
-     * Left in place, unused, rather than deleted — createOrApplyCharge/debitWallet still use
-     * this class's local CompanyBillingProfile for charge/wallet bookkeeping, only the
-     * credit-limit gate moved.
-     */
-    @Deprecated
-    @Transactional(readOnly = true)
-    public InsufficientBalance checkSufficientBalance(VerificationRequest verificationRequest) {
-        // Cached: this is advisory only (never mutates), and it's the hottest read in this
-        // class — called once per verification, including on rapid same-company bursts. The
-        // actual credit-limit enforcement that matters happens fresh, in debitWallet.
-        Optional<CompanyBillingProfile> optionalProfile = getCachedBillingProfile(
-                verificationRequest.getCompany().getId());
-        if (optionalProfile.isEmpty()) return null;
-
-        CompanyBillingProfile profile = optionalProfile.get();
-        if (profile.getBillingMode() != BillingMode.PREPAID) return null;
-        if (profile.getUnitPrice() == null || profile.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) return null;
-
-        BigDecimal currentBalance = defaultDecimal(profile.getCurrentBalance());
-        BigDecimal creditLimit = defaultDecimal(profile.getCreditLimit());
-        BigDecimal walletBalance = currentBalance.max(BigDecimal.ZERO);
-        BigDecimal usedCredit = currentBalance.signum() < 0 ? currentBalance.abs() : BigDecimal.ZERO;
-        BigDecimal remainingCredit = creditLimit.subtract(usedCredit).max(BigDecimal.ZERO);
-        BigDecimal availableToSpend = walletBalance.add(remainingCredit);
-
-        if (availableToSpend.compareTo(profile.getUnitPrice()) < 0) {
-            return new InsufficientBalance(availableToSpend, profile.getUnitPrice());
-        }
-        return null;
-    }
-
     @Transactional
-    public void handleVerificationSubmitted(VerificationRequest verificationRequest) {
+    public void handleVerificationSubmitted(VerificationSubmitted submitted) {
         // Fresh read, not cached — may flow into createOrApplyCharge -> debitWallet, a
         // read-modify-write of currentBalance. Do not swap this for getCachedBillingProfile.
         Optional<CompanyBillingProfile> optionalProfile = billingProfileRepository
-                .findByCompanyId(verificationRequest.getCompany().getId());
+                .findByCompanyId(submitted.companyId());
         if (optionalProfile.isEmpty()) {
             return;
         }
 
         CompanyBillingProfile profile = optionalProfile.get();
         if (Boolean.TRUE.equals(profile.getBillOnSubmission())) {
-            createOrApplyCharge(profile, verificationRequest, BillingEvent.SUBMISSION, "Billed on submission");
+            createOrApplyCharge(profile, submitted.verificationId(), BillingEvent.SUBMISSION, "Billed on submission");
         }
     }
 
@@ -401,42 +366,42 @@ public class BillingService {
      * Duplicate outcome events are safe: the event id is the verification id, and billing-service
      * records each external_ref once. Failures caused by our own services are never billed.
      */
-    public void handleVerificationOutcome(VerificationRequest verificationRequest) {
-        BillingEvent event = determineBillingEvent(verificationRequest);
+    public void handleVerificationOutcome(VerificationOutcome outcome) {
+        BillingEvent event = determineBillingEvent(outcome);
         if (event == BillingEvent.FAILURE_SYSTEM) {
             log.info("handleVerificationOutcome: verification {} failed on our side — not billed",
-                    verificationRequest.getId());
+                    outcome.verificationId());
             return;
         }
-        publishBillingEvent(verificationRequest, event);
+        publishBillingEvent(outcome, event);
     }
 
     /** Publishes a usage event to Kafka (intact-id.billing.events) for billing-service. */
-    private void publishBillingEvent(VerificationRequest verificationRequest, BillingEvent event) {
+    private void publishBillingEvent(VerificationOutcome outcome, BillingEvent event) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("billingEvent", event.name());
-        metadata.put("tier", verificationRequest.getTier());
-        metadata.put("overallDecision", verificationRequest.getOverallDecision());
-        metadata.put("verificationId", verificationRequest.getId());
+        metadata.put("tier", outcome.tier());
+        metadata.put("overallDecision", outcome.overallDecision());
+        metadata.put("verificationId", outcome.verificationId());
 
-        String clientIdentifier = verificationRequest.getCompany().getCompanyIdentifierCode();
+        String clientIdentifier = outcome.clientIdentifier();
         log.info("Publishing billing event: client={} eventType={} verification={} billingEvent={}",
-                clientIdentifier, KafkaBillingEventType.KYC_VERIFICATION_CALL, verificationRequest.getId(), event);
+                clientIdentifier, KafkaBillingEventType.KYC_VERIFICATION_CALL, outcome.verificationId(), event);
 
         billingEventPublisher.publish(
-                verificationRequest.getId(),
+                outcome.verificationId(),
                 clientIdentifier,
                 KafkaBillingEventType.KYC_VERIFICATION_CALL,
                 1,
                 metadata);
     }
 
-    private BillingEvent determineBillingEvent(VerificationRequest verificationRequest) {
-        if (verificationRequest.getStatus() == GlobalStatuses.FAILED) {
-            return isSystemFailure(verificationRequest) ? BillingEvent.FAILURE_SYSTEM : BillingEvent.FAILURE_NON_SYSTEM;
+    private BillingEvent determineBillingEvent(VerificationOutcome outcome) {
+        if (outcome.status() == GlobalStatuses.FAILED) {
+            return isSystemFailure(outcome) ? BillingEvent.FAILURE_SYSTEM : BillingEvent.FAILURE_NON_SYSTEM;
         }
 
-        if ("rejected".equalsIgnoreCase(verificationRequest.getOverallDecision())) {
+        if ("rejected".equalsIgnoreCase(outcome.overallDecision())) {
             return BillingEvent.REJECTION;
         }
 
@@ -453,17 +418,17 @@ public class BillingService {
         };
     }
 
-    private boolean isSystemFailure(VerificationRequest verificationRequest) {
-        return verificationRequest.getFailureReason() != null
-                && "systemerror".equalsIgnoreCase(verificationRequest.getFailureReason().replace("_", ""));
+    private boolean isSystemFailure(VerificationOutcome outcome) {
+        return outcome.failureReason() != null
+                && "systemerror".equalsIgnoreCase(outcome.failureReason().replace("_", ""));
     }
 
-    private void createWaivedCharge(CompanyBillingProfile profile, VerificationRequest verificationRequest,
+    private void createWaivedCharge(CompanyBillingProfile profile, String verificationId,
             BillingEvent event, String reason) {
         BillingCharge charge = new BillingCharge();
         charge.setCompany(profile.getCompany());
         charge.setBillingProfile(profile);
-        charge.setVerificationRequest(verificationRequest);
+        charge.setVerificationRequestId(verificationId);
         charge.setBillingEvent(event);
         charge.setStatus(BillingChargeStatus.WAIVED);
         charge.setBillingTierCode(profile.getBillingTierCode());
@@ -475,12 +440,12 @@ public class BillingService {
         billingChargeRepository.save(charge);
     }
 
-    private void createOrApplyCharge(CompanyBillingProfile profile, VerificationRequest verificationRequest,
+    private void createOrApplyCharge(CompanyBillingProfile profile, String verificationId,
             BillingEvent event, String reason) {
         BillingCharge charge = new BillingCharge();
         charge.setCompany(profile.getCompany());
         charge.setBillingProfile(profile);
-        charge.setVerificationRequest(verificationRequest);
+        charge.setVerificationRequestId(verificationId);
         charge.setBillingEvent(event);
         charge.setBillingTierCode(profile.getBillingTierCode());
         charge.setCurrency(profile.getCurrency());
@@ -490,8 +455,8 @@ public class BillingService {
         charge.setChargeableAt(LocalDateTime.now());
 
         if (profile.getBillingMode() == BillingMode.PREPAID) {
-            WalletTransaction transaction = debitWallet(profile, verificationRequest, profile.getUnitPrice(),
-                    "Verification charge for " + verificationRequest.getId());
+            WalletTransaction transaction = debitWallet(profile, verificationId, profile.getUnitPrice(),
+                    "Verification charge for " + verificationId);
             charge.setStatus(BillingChargeStatus.DEBITED);
             charge.setChargedAt(LocalDateTime.now());
             charge.setDecisionReason(reason + " via wallet debit " + transaction.getId());
@@ -502,7 +467,7 @@ public class BillingService {
         billingChargeRepository.save(charge);
     }
 
-    private WalletTransaction debitWallet(CompanyBillingProfile profile, VerificationRequest verificationRequest,
+    private WalletTransaction debitWallet(CompanyBillingProfile profile, String verificationId,
             BigDecimal amount, String description) {
         BigDecimal before = defaultDecimal(profile.getCurrentBalance());
         BigDecimal after = before.subtract(amount);
@@ -524,9 +489,9 @@ public class BillingService {
         transaction.setType(WalletTransactionType.DEBIT);
         transaction.setAmount(scale(amount));
         transaction.setCurrency(profile.getCurrency());
-        transaction.setReference("verification:" + verificationRequest.getId());
+        transaction.setReference("verification:" + verificationId);
         transaction.setDescription(description);
-        transaction.setVerificationRequestId(verificationRequest.getId());
+        transaction.setVerificationRequestId(verificationId);
         transaction.setBalanceBefore(before);
         transaction.setBalanceAfter(after);
         return walletTransactionRepository.save(transaction);

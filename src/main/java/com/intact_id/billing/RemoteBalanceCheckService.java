@@ -1,5 +1,7 @@
 package com.intact_id.billing;
 
+import com.intact_id.orchestration.BalanceCheck;
+import com.intact_id.orchestration.BalanceCheck.HoldDecision;
 import com.intact_id.billing.client.BalanceCheckReason;
 import com.intact_id.billing.client.BalanceCheckRequest;
 import com.intact_id.billing.client.BalanceCheckResponse;
@@ -13,19 +15,17 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RemoteBalanceCheckService {
+public class RemoteBalanceCheckService implements BalanceCheck {
 
     private final BillingServiceClient billingServiceClient;
 
-    public record HoldDecision(boolean hold, String reason) {
-        public static final HoldDecision ALLOW = new HoldDecision(false, null);
-    }
 
     /**
      * verificationId doubles as the check-balance lock's externalRef — BillingService later
      * publishes the outcome's Kafka event with this same id as eventId, so the real debit it
      * triggers in billing-service releases this exact lock instead of waiting out its TTL.
      */
+    @Override
     public HoldDecision check(String clientIdentifier, String verificationId) {
         BillingApiResult<BalanceCheckResponse> result;
         try {

@@ -152,7 +152,13 @@
 			<version>2.55.16</version>
 		</dependency>
 
-		<!-- Module boundary checks and generated module docs (test only for now) -->
+		<!-- Events between modules, stored in event_publication until every listener has handled them -->
+		<dependency>
+			<groupId>org.springframework.modulith</groupId>
+			<artifactId>spring-modulith-starter-jpa</artifactId>
+		</dependency>
+
+		<!-- Module boundary checks and generated module docs -->
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
 			<artifactId>spring-modulith-starter-test</artifactId>

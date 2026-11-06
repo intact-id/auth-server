@@ -4,8 +4,9 @@ import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.orchestration.VerificationRequest;
 import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.orchestration.web.VerificationStatusResponseDto;
-import com.intact_id.billing.BillingService;
-import com.intact_id.notifications.WebhookService;
+import com.intact_id.orchestration.VerificationOutcome;
+import org.springframework.context.ApplicationEventPublisher;
+import com.intact_id.orchestration.events.VerificationWebhooks;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +24,8 @@ public class ManualReviewService {
 
     private final VerificationRequestRepository verificationRequestRepository;
     private final VerificationService verificationService;
-    private final WebhookService webhookService;
-    private final BillingService billingService;
+    private final VerificationWebhooks verificationWebhooks;
+    private final ApplicationEventPublisher eventPublisher;
 
     public Page<VerificationStatusResponseDto> getPendingReviewQueue(Pageable pageable) {
         return verificationRequestRepository
@@ -51,11 +52,11 @@ public class ManualReviewService {
 
         request.resolveManualReview(decision, notes);
         verificationRequestRepository.save(request);
-        billingService.handleVerificationOutcome(request);
+        eventPublisher.publishEvent(VerificationOutcome.of(request));
 
         log.info("Manual review resolved for {} by {}: decision={}", verificationId, reviewerEmail, decision);
 
-        webhookService.sendVerificationCompletedWebhook(request.getCompany(), request);
+        verificationWebhooks.completed(request);
 
         return verificationService.getVerificationStatus(verificationId, null, request.getEnvironment());
     }

@@ -1,12 +1,12 @@
 package com.intact_id.orchestration.events;
 
+import org.springframework.scheduling.annotation.Async;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.tenancy.CompanyCommunicationDetails;
 import com.intact_id.orchestration.VerificationRequest;
 import com.intact_id.tenancy.CompanyCommunicationRepository;
 import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.notifications.EmailService;
-import com.intact_id.notifications.WebhookService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class VerificationStatusChangedEventHandler {
 
-    private final WebhookService webhookService;
+    private final VerificationWebhooks verificationWebhooks;
     private final EmailService emailService;
     private final VerificationRequestRepository verificationRequestRepository;
     private final CompanyCommunicationRepository companyCommunicationRepository;
@@ -29,6 +29,7 @@ public class VerificationStatusChangedEventHandler {
      * Fires after the scheduler's transaction commits, so the handler always
      * reads the final persisted status from the DB.
      */
+    @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void handle(VerificationStatusChangedEvent event) {
         VerificationStatusChangedData data = event.getData();
@@ -46,9 +47,9 @@ public class VerificationStatusChangedEventHandler {
         log.info("Handling status change event: {} → {}", data.getVerificationId(), status);
 
         if (status == GlobalStatuses.COMPLETED || status == GlobalStatuses.REJECTED) {
-            webhookService.sendVerificationCompletedWebhook(request.getCompany(), request);
+            verificationWebhooks.completed(request);
         } else if (status == GlobalStatuses.FAILED) {
-            webhookService.sendVerificationFailedWebhook(request.getCompany(), request);
+            verificationWebhooks.failed(request);
         } else {
             log.debug("No webhook action for status: {}", status);
         }
