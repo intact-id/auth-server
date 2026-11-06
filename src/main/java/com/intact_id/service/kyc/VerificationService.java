@@ -13,11 +13,12 @@ import com.intact_id.dto.request.KycVerificationRequestDto;
 import com.intact_id.dto.response.KycVerificationResponseDto;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
 import com.intact_id.service.billing.BillingService;
+import com.intact_id.service.storage.DocumentStorage;
+import com.intact_id.service.storage.StorageMultipartFile;
 import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
@@ -27,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -47,9 +50,7 @@ public class VerificationService {
     private final com.intact_id.service.webhook.WebhookService webhookService;
     private final BillingService billingService;
     private final PlatformTransactionManager transactionManager;
-
-    @Value("${app.documents.base-dir:${user.dir}/uploads}")
-    private String documentsBaseDir;
+    private final DocumentStorage documentStorage;
 
     /** Document type prefix for active-liveness frames: liveness_{index}_{label}. */
     public static final String LIVENESS_DOC_PREFIX = "liveness_";
@@ -220,36 +221,30 @@ public class VerificationService {
         if (file == null || file.isEmpty())
             return null;
 
-        try {
-            // Persist all documents under a configurable base directory.
-            java.nio.file.Path uploadPath = java.nio.file.Paths.get(documentsBaseDir).toAbsolutePath().normalize();
-            if (!java.nio.file.Files.exists(uploadPath)) {
-                java.nio.file.Files.createDirectories(uploadPath);
+        // Never put the client's filename in the key; keep only a safe extension
+        String key = "verifications/" + request.getId() + "_" + documentType + fileExtension(file);
+        if (file instanceof StorageMultipartFile stored) {
+            // Draft files are already in storage; copy them there instead of downloading and re-uploading
+            documentStorage.copy(stored.getStorageKey(), key);
+        } else {
+            try (InputStream in = file.getInputStream()) {
+                documentStorage.put(key, in, file.getSize(), file.getContentType());
+            } catch (IOException e) {
+                log.error("Failed to save document: {}", documentType, e);
+                throw new ApplicationExceptions.IntactBadRequestException("Failed to save document");
             }
-
-            // Never put the client's filename in the path; keep only a safe extension
-            String filename = request.getId() + "_" + documentType + fileExtension(file);
-            java.nio.file.Path filePath = uploadPath.resolve(filename).normalize();
-            if (!filePath.startsWith(uploadPath)) {
-                throw new ApplicationExceptions.IntactBadRequestException("Invalid document type");
-            }
-
-            // Save file
-            file.transferTo(filePath.toFile());
-
-            VerificationDocument document = new VerificationDocument();
-            document.setVerificationRequest(request);
-            document.setDocumentType(documentType);
-            document.setFilePath(filePath.toString());
-            document.setFileSize(file.getSize());
-            document.setMimeType(file.getContentType());
-            document.setOriginalFilename(file.getOriginalFilename());
-
-            return verificationDocumentRepository.save(document);
-        } catch (java.io.IOException e) {
-            log.error("Failed to save document: {}", documentType, e);
-            throw new ApplicationExceptions.IntactBadRequestException("Failed to save document");
         }
+
+        VerificationDocument document = new VerificationDocument();
+        document.setVerificationRequest(request);
+        document.setDocumentType(documentType);
+        document.setFilePath(key);
+        document.setStorageKey(key);
+        document.setFileSize(file.getSize());
+        document.setMimeType(file.getContentType());
+        document.setOriginalFilename(file.getOriginalFilename());
+
+        return verificationDocumentRepository.save(document);
     }
 
     public VerificationStatusResponseDto getVerificationStatus(

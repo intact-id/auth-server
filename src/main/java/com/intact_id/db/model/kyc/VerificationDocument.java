@@ -26,7 +26,11 @@ public class VerificationDocument extends Auditable {
     private String documentType; // selfie, id_front, id_back, proof_of_address
 
     @Column(name = "file_path", nullable = false)
-    private String filePath; // S3/MinIO path
+    private String filePath;
+
+    // Key in DocumentStorage; null for older rows, whose file_path is a path on local disk
+    @Column(name = "storage_key", length = 512)
+    private String storageKey;
 
     @Column(name = "file_size")
     private Long fileSize;

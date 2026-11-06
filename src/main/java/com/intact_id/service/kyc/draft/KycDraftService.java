@@ -13,14 +13,17 @@ import com.intact_id.db.repository.kyc.KycDraftDocumentRepository;
 import com.intact_id.db.repository.kyc.KycDraftRepository;
 import com.intact_id.db.repository.kyc.KycHandoffRepository;
 import com.intact_id.dto.request.KycVerificationRequestDto;
+import com.intact_id.dto.request.kyc.DirectUploadRequestDto;
 import com.intact_id.dto.request.kyc.DraftDetailsRequestDto;
 import com.intact_id.dto.response.KycVerificationResponseDto;
+import com.intact_id.dto.response.kyc.DirectUploadResponseDto;
 import com.intact_id.dto.response.kyc.KycDraftResponseDto;
 import com.intact_id.dto.response.kyc.KycDraftSessionResponseDto;
 import com.intact_id.security.authentication.WidgetSessionContext;
 import com.intact_id.service.kyc.KycSessionService;
 import com.intact_id.service.kyc.VerificationService;
 import com.intact_id.service.storage.DocumentStorage;
+import com.intact_id.service.storage.StorageMultipartFile;
 import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
@@ -31,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,10 +45,12 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -58,6 +64,10 @@ public class KycDraftService {
     private static final Pattern LIVENESS_TYPE = Pattern.compile("liveness_([0-7])_(neutral|turn_left|turn_right)");
     private static final Pattern UNSAFE_FILENAME_CHARS = Pattern.compile("[^A-Za-z0-9._-]");
     private static final int RESUME_TOKEN_BYTES = 32;
+    private static final Pattern UPLOAD_ID = Pattern.compile(
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    private static final Set<String> DIRECT_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
+    private static final int FILE_SIGNATURE_BYTES = 12;
 
     private final KycDraftRepository draftRepository;
     private final CompanyRepository companyRepository;
@@ -148,18 +158,96 @@ public class KycDraftService {
             throw new ApplicationExceptions.IntactBadRequestException("Failed to read uploaded file");
         }
 
+        recordDocument(draftId, type, key, file.getContentType(), file.getSize(),
+                sanitizeFilename(file.getOriginalFilename(), type));
+        return toResponse(draft);
+    }
+
+    /** Step 1 of a direct upload: a short-lived URL the browser PUTs the file to. */
+    public DirectUploadResponseDto requestUpload(WidgetSessionContext context, String draftId,
+                                                 String documentType, DirectUploadRequestDto request) {
+        if (!documentStorage.supportsDirectUpload()) {
+            throw new ApplicationExceptions.IntactBadRequestException(
+                    "Direct upload is not available; upload the file to /documents/{documentType}");
+        }
+        requireEditableDraft(context, draftId);
+        String type = normalizeDocumentType(documentType);
+        String contentType = normalizeContentType(request.getContentType());
+        validateDirectUpload(type, contentType, request.getSize());
+
+        // A new key per attempt, so a retake never overwrites the file the draft currently points to
+        String key = storageKey(draftId, type) + "/" + UUID.randomUUID();
+        DocumentStorage.PresignedUpload upload = documentStorage.presignUpload(
+                key, contentType, request.getSize(), config.getUploadUrlTtl());
+
+        return DirectUploadResponseDto.builder()
+                .key(key)
+                .uploadUrl(upload.url())
+                .method("PUT")
+                .headers(upload.headers())
+                .expiresAt(LocalDateTime.ofInstant(upload.expiresAt(), ZoneId.systemDefault()))
+                .build();
+    }
+
+    /** Step 2 of a direct upload: check what actually landed in storage, then attach it to the draft. */
+    public KycDraftResponseDto completeUpload(WidgetSessionContext context, String draftId,
+                                              String documentType, String key) {
+        KycDraft draft = requireEditableDraft(context, draftId);
+        String type = normalizeDocumentType(documentType);
+        String expectedPrefix = storageKey(draftId, type) + "/";
+        if (!key.startsWith(expectedPrefix) || !UPLOAD_ID.matcher(key.substring(expectedPrefix.length())).matches()) {
+            throw new ApplicationExceptions.IntactBadRequestException("Invalid upload key");
+        }
+
+        boolean alreadyAttached = documentRepository.findByDraftIdAndDocumentType(draftId, type)
+                .filter(document -> key.equals(document.getStorageKey()))
+                .isPresent();
+        if (alreadyAttached) {
+            return toResponse(draft);
+        }
+
+        DocumentStorage.StoredObject stored;
+        try {
+            stored = documentStorage.head(key);
+        } catch (ApplicationExceptions.IntactResourceNotFoundException e) {
+            throw new ApplicationExceptions.IntactBadRequestException("Upload not found; upload the file again");
+        }
+
+        // The bytes never passed through us, so check them now and drop anything that fails
+        String contentType = normalizeContentType(stored.contentType());
+        try {
+            validateDirectUpload(type, contentType, stored.size());
+            byte[] start = documentStorage.readStart(key, FILE_SIGNATURE_BYTES);
+            if (!matchesSignature(contentType, start)) {
+                throw new ApplicationExceptions.IntactBadRequestException(type + " is not a valid "
+                        + contentType + " file");
+            }
+        } catch (ApplicationExceptions.IntactBadRequestException e) {
+            documentStorage.delete(key);
+            throw e;
+        }
+
+        recordDocument(draftId, type, key, contentType, stored.size(), type + extensionFor(contentType));
+        return toResponse(draft);
+    }
+
+    private void recordDocument(String draftId, String type, String key, String contentType, long size,
+                                String filename) {
         KycDraftDocument document = documentRepository.findByDraftIdAndDocumentType(draftId, type)
                 .orElseGet(KycDraftDocument::new);
+        String previousKey = document.getStorageKey();
         document.setDraftId(draftId);
         document.setDocumentType(type);
         document.setStorageKey(key);
-        document.setMimeType(file.getContentType());
-        document.setFileSize(file.getSize());
-        document.setOriginalFilename(sanitizeFilename(file.getOriginalFilename(), type));
+        document.setMimeType(contentType);
+        document.setFileSize(size);
+        document.setOriginalFilename(filename);
         document.setUploadedAt(LocalDateTime.now());
         documentRepository.save(document);
 
-        return toResponse(draft);
+        if (previousKey != null && !previousKey.equals(key)) {
+            documentStorage.delete(previousKey);
+        }
     }
 
     public KycDraftResponseDto deleteDocument(WidgetSessionContext context, String draftId, String documentType) {
@@ -296,6 +384,7 @@ public class KycDraftService {
                 .details(maskDetails(draft.getDetails()))
                 .documents(documents)
                 .handoff(handoff)
+                .uploadMode(documentStorage.supportsDirectUpload() ? "direct" : "proxy")
                 .build();
     }
 
@@ -330,7 +419,7 @@ public class KycDraftService {
 
         TreeMap<Integer, KycDraftDocument> livenessByIndex = new TreeMap<>();
         for (KycDraftDocument document : documentRepository.findByDraftId(draft.getId())) {
-            MultipartFile file = new StoredDocumentMultipartFile(documentStorage, document);
+            MultipartFile file = asMultipartFile(document);
             Matcher liveness = LIVENESS_TYPE.matcher(document.getDocumentType());
             if (liveness.matches()) {
                 livenessByIndex.put(Integer.parseInt(liveness.group(1)), document);
@@ -354,12 +443,17 @@ public class KycDraftService {
         livenessByIndex.values().forEach(document -> {
             Matcher m = LIVENESS_TYPE.matcher(document.getDocumentType());
             m.matches();
-            frames.add(new StoredDocumentMultipartFile(documentStorage, document));
+            frames.add(asMultipartFile(document));
             labels.add(m.group(2));
         });
         request.setLivenessFrames(frames);
         request.setLivenessLabels(String.join(",", labels));
         return request;
+    }
+
+    private MultipartFile asMultipartFile(KycDraftDocument document) {
+        return new StorageMultipartFile(documentStorage, document.getStorageKey(), document.getDocumentType(),
+                document.getOriginalFilename(), document.getMimeType(), document.getFileSize());
     }
 
     private boolean isHandoffActive(String handoffId, String draftId) {
@@ -381,6 +475,52 @@ public class KycDraftService {
         if (!isImage && !isPdfProof) {
             throw new ApplicationExceptions.IntactBadRequestException(type + " must be an image file");
         }
+    }
+
+    private void validateDirectUpload(String type, String contentType, long size) {
+        if (size <= 0) {
+            throw new ApplicationExceptions.IntactBadRequestException(type + " is empty");
+        }
+        if (size > config.getMaxDocumentSizeBytes()) {
+            throw new ApplicationExceptions.IntactBadRequestException(type + " exceeds maximum size of 10MB");
+        }
+        boolean isImage = DIRECT_IMAGE_TYPES.contains(contentType);
+        boolean isPdfProof = "proof_of_address".equals(type) && "application/pdf".equals(contentType);
+        if (!isImage && !isPdfProof) {
+            throw new ApplicationExceptions.IntactBadRequestException(type + " must be a JPEG, PNG or WebP image");
+        }
+    }
+
+    private static String normalizeContentType(String contentType) {
+        if (contentType == null) {
+            return "";
+        }
+        int params = contentType.indexOf(';');
+        return (params >= 0 ? contentType.substring(0, params) : contentType).trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean matchesSignature(String contentType, byte[] b) {
+        return switch (contentType) {
+            case "image/jpeg" -> b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF;
+            case "image/png" -> b.length >= 4 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G';
+            case "image/webp" -> b.length >= 12 && ascii(b, 0, 4).equals("RIFF") && ascii(b, 8, 4).equals("WEBP");
+            case "application/pdf" -> b.length >= 4 && ascii(b, 0, 4).equals("%PDF");
+            default -> false;
+        };
+    }
+
+    private static String ascii(byte[] bytes, int offset, int length) {
+        return new String(bytes, offset, length, StandardCharsets.US_ASCII);
+    }
+
+    private static String extensionFor(String contentType) {
+        return switch (contentType) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "application/pdf" -> ".pdf";
+            default -> "";
+        };
     }
 
     private String normalizeDocumentType(String documentType) {

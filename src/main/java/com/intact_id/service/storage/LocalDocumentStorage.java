@@ -69,6 +69,39 @@ public class LocalDocumentStorage implements DocumentStorage {
     }
 
     @Override
+    public StoredObject head(String key) {
+        Path path = resolve(key);
+        try {
+            return new StoredObject(Files.size(path), Files.probeContentType(path));
+        } catch (NoSuchFileException e) {
+            throw new ApplicationExceptions.IntactResourceNotFoundException("Document not found");
+        } catch (IOException e) {
+            log.error("Failed to read document {}", key, e);
+            throw new ApplicationExceptions.IntactInternalServerException("Failed to read document");
+        }
+    }
+
+    @Override
+    public byte[] readStart(String key, int length) {
+        try (InputStream in = get(key)) {
+            return in.readNBytes(length);
+        } catch (IOException e) {
+            log.error("Failed to read document {}", key, e);
+            throw new ApplicationExceptions.IntactInternalServerException("Failed to read document");
+        }
+    }
+
+    @Override
+    public void copy(String sourceKey, String targetKey) {
+        try (InputStream in = get(sourceKey)) {
+            put(targetKey, in, -1, null);
+        } catch (IOException e) {
+            log.error("Failed to copy document {} to {}", sourceKey, targetKey, e);
+            throw new ApplicationExceptions.IntactInternalServerException("Failed to store document");
+        }
+    }
+
+    @Override
     public void delete(String key) {
         try {
             Files.deleteIfExists(resolve(key));

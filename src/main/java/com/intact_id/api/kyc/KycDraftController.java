@@ -1,9 +1,12 @@
 package com.intact_id.api.kyc;
 
+import com.intact_id.dto.request.kyc.CompleteUploadRequestDto;
+import com.intact_id.dto.request.kyc.DirectUploadRequestDto;
 import com.intact_id.dto.request.kyc.DraftDetailsRequestDto;
 import com.intact_id.dto.request.kyc.ResumeDraftRequestDto;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.dto.response.KycVerificationResponseDto;
+import com.intact_id.dto.response.kyc.DirectUploadResponseDto;
 import com.intact_id.dto.response.kyc.KycDraftResponseDto;
 import com.intact_id.dto.response.kyc.KycDraftSessionResponseDto;
 import com.intact_id.security.authentication.WidgetSessionContext;
@@ -78,6 +81,30 @@ public class KycDraftController {
             @RequestPart("file") MultipartFile file) {
         return respond(HttpStatus.OK, "Document uploaded",
                 draftService.uploadDocument(context, draftId, documentType, file));
+    }
+
+    @PostMapping("/{draftId}/documents/{documentType}/upload-url")
+    @Operation(summary = "Get a direct upload URL",
+            description = "Only when the draft's uploadMode is \"direct\". PUT the file to uploadUrl with exactly the "
+                    + "returned headers, then call /complete with the key.")
+    public ResponseEntity<ApiResponse<DirectUploadResponseDto>> requestUpload(
+            @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context,
+            @PathVariable String draftId,
+            @PathVariable String documentType,
+            @Valid @RequestBody DirectUploadRequestDto request) {
+        return respond(HttpStatus.OK, "Upload URL created",
+                draftService.requestUpload(context, draftId, documentType, request));
+    }
+
+    @PostMapping("/{draftId}/documents/{documentType}/complete")
+    @Operation(summary = "Finish a direct upload", description = "Checks the uploaded file and attaches it to the draft.")
+    public ResponseEntity<ApiResponse<KycDraftResponseDto>> completeUpload(
+            @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context,
+            @PathVariable String draftId,
+            @PathVariable String documentType,
+            @Valid @RequestBody CompleteUploadRequestDto request) {
+        return respond(HttpStatus.OK, "Document uploaded",
+                draftService.completeUpload(context, draftId, documentType, request.getKey()));
     }
 
     @DeleteMapping("/{draftId}/documents/{documentType}")

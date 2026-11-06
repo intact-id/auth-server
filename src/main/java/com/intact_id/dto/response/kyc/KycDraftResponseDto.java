@@ -22,6 +22,8 @@ public class KycDraftResponseDto {
     private Map<String, String> details;
     private List<String> documents;
     private HandoffSummary handoff;
+    // "direct": upload via /upload-url then /complete; "proxy": multipart to /documents/{type}
+    private String uploadMode;
 
     @Data
     @Builder
