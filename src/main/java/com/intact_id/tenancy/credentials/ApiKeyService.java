@@ -1,7 +1,7 @@
-package com.intact_id.identity.apikey;
+package com.intact_id.tenancy.credentials;
 
-import com.intact_id.identity.web.ApiKeyGenerationResponseDto;
-import com.intact_id.identity.web.ApiKeyUsageResponseDto;
+import com.intact_id.tenancy.web.ApiKeyGenerationResponseDto;
+import com.intact_id.tenancy.web.ApiKeyUsageResponseDto;
 
 import java.util.List;
 

@@ -1,12 +1,12 @@
-package com.intact_id.identity.auth;
+package com.intact_id.tenancy.credentials;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.tenancy.Company;
-import com.intact_id.identity.CompanyCredentials;
-import com.intact_id.identity.web.CompanyAccessTokenResponseDto;
-import com.intact_id.identity.CredentialsValidator;
-import com.intact_id.identity.CompanyCredentialService;
+import com.intact_id.tenancy.CompanyCredentials;
+import com.intact_id.tenancy.web.CompanyAccessTokenResponseDto;
+import com.intact_id.tenancy.CredentialsValidator;
+import com.intact_id.tenancy.CompanyCredentialService;
 import com.intact_id.identity.JwtService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.security.RequestHeaderUtil;

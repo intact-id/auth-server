@@ -2,9 +2,9 @@ package com.intact_id.orchestration.verification;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.identity.CompanyCredentials;
+import com.intact_id.tenancy.CompanyCredentials;
 import com.intact_id.orchestration.VerificationRequest;
-import com.intact_id.identity.CompanyCredentialsRepository;
+import com.intact_id.tenancy.CompanyCredentialsRepository;
 import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.orchestration.events.RateLimitConsumedEvent;
 import lombok.RequiredArgsConstructor;

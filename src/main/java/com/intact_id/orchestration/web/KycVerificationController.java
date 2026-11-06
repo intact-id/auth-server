@@ -5,7 +5,7 @@ import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.tenancy.Company;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.orchestration.verification.VerificationService;
-import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

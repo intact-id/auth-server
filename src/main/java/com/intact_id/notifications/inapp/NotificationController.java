@@ -4,7 +4,7 @@ import com.intact_id.notifications.NotificationRequestDto;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.notifications.NotificationResponseDto;
 import com.intact_id.notifications.NotificationService;
-import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

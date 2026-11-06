@@ -1,4 +1,4 @@
-package com.intact_id.identity.web;
+package com.intact_id.tenancy.web;
 
 import lombok.Builder;
 import lombok.Data;

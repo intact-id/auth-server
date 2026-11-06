@@ -4,7 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.tenancy.Company;
 import com.intact_id.tenancy.CompanyRepository;
-import com.intact_id.gateway.CompanyAuthentication;
+import com.intact_id.identity.CompanyAuthentication;
 import com.intact_id.identity.JwtService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;

@@ -1,8 +1,7 @@
-package com.intact_id.identity.auth;
+package com.intact_id.tenancy.credentials;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.intact_id.identity.config.CompanyAccessTokenConfig;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

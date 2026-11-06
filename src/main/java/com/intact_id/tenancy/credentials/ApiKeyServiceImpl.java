@@ -1,18 +1,18 @@
-package com.intact_id.identity.apikey;
+package com.intact_id.tenancy.credentials;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.tenancy.Company;
 import com.intact_id.tenancy.CompanyCommunicationDetails;
-import com.intact_id.identity.CompanyCredentials;
+import com.intact_id.tenancy.CompanyCredentials;
 import com.intact_id.tenancy.CompanyCommunicationRepository;
-import com.intact_id.identity.CompanyCredentialsRepository;
+import com.intact_id.tenancy.CompanyCredentialsRepository;
 import com.intact_id.tenancy.CompanyRepository;
-import com.intact_id.identity.web.ApiKeyGenerationResponseDto;
-import com.intact_id.identity.web.ApiKeyUsageResponseDto;
+import com.intact_id.tenancy.web.ApiKeyGenerationResponseDto;
+import com.intact_id.tenancy.web.ApiKeyUsageResponseDto;
 import com.intact_id.notifications.NotificationService;
 import com.intact_id.notifications.EmailService;
-import com.intact_id.util.TenantContext;
+import com.intact_id.identity.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import lombok.RequiredArgsConstructor;

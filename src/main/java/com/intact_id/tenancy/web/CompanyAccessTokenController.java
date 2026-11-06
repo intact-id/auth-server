@@ -1,7 +1,7 @@
-package com.intact_id.identity.web;
+package com.intact_id.tenancy.web;
 
 import com.intact_id.dto.response.ApiResponse;
-import com.intact_id.identity.auth.CompanyAccessTokenService;
+import com.intact_id.tenancy.credentials.CompanyAccessTokenService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

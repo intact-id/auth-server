@@ -16,7 +16,7 @@ import com.intact_id.orchestration.VerificationSubmitted;
 import org.springframework.context.ApplicationEventPublisher;
 import com.intact_id.checks.DocumentStorage;
 import com.intact_id.checks.StorageMultipartFile;
-import com.intact_id.util.TenantContext;
+import com.intact_id.identity.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -5,7 +5,7 @@ import com.intact_id.identity.User;
 import com.intact_id.identity.model.BackupCodeRepository;
 import com.intact_id.identity.web.BackupCodesResponseDto;
 import com.intact_id.identity.user.UserService;
-import com.intact_id.util.SecurityContextUtil;
+import com.intact_id.identity.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
