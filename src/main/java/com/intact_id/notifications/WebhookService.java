@@ -5,7 +5,7 @@ import com.intact_id.notifications.webhook.WebhookConfig;
 import com.intact_id.tenancy.Company;
 import com.intact_id.tenancy.CompanyCommunicationDetails;
 import com.intact_id.notifications.webhook.WebhookDelivery;
-import com.intact_id.db.model.kyc.VerificationRequest;
+import com.intact_id.orchestration.VerificationRequest;
 import com.intact_id.tenancy.CompanyCommunicationRepository;
 import com.intact_id.notifications.webhook.WebhookDeliveryRepository;
 import com.intact_id.notifications.webhook.events.WebhookEventData;
