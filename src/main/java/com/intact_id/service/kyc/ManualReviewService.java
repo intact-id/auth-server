@@ -4,7 +4,7 @@ import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.db.model.kyc.VerificationRequest;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
-import com.intact_id.service.billing.BillingService;
+import com.intact_id.billing.BillingService;
 import com.intact_id.notifications.WebhookService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;

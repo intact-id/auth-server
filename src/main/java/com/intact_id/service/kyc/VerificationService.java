@@ -12,7 +12,7 @@ import com.intact_id.db.repository.kyc.VerificationStepRepository;
 import com.intact_id.dto.request.KycVerificationRequestDto;
 import com.intact_id.dto.response.KycVerificationResponseDto;
 import com.intact_id.dto.response.VerificationStatusResponseDto;
-import com.intact_id.service.billing.BillingService;
+import com.intact_id.billing.BillingService;
 import com.intact_id.service.storage.DocumentStorage;
 import com.intact_id.service.storage.StorageMultipartFile;
 import com.intact_id.util.TenantContext;
