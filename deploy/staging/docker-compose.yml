@@ -82,7 +82,9 @@ services:
 
   face-service:
     <<: *app
-    image: frankmwangi8118/intact-id:latest
+    # :develop (id-ingestion develop) — :latest is production's and lacks the liveness/sequence
+    # endpoint the :develop auth-server calls
+    image: frankmwangi8118/intact-id:develop
     env_file: env/face.env
     environment:
       PORT: 9000
