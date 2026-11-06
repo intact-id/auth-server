@@ -1,8 +1,6 @@
 package com.intact_id.identity.web;
 
-import com.intact_id.dto.response.ApiKeyGenerationResponseDto;
 import com.intact_id.dto.response.ApiResponse;
-import com.intact_id.dto.response.ApiKeyUsageResponseDto;
 import com.intact_id.identity.apikey.ApiKeyService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;

@@ -1,22 +1,22 @@
 package com.intact_id.billing;
 
-import com.intact_id.config.TiersConfig;
+import com.intact_id.tenancy.TiersConfig;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.billing.model.BillingChargeStatus;
 import com.intact_id.billing.model.BillingEvent;
 import com.intact_id.billing.model.BillingInvoiceStatus;
 import com.intact_id.billing.model.BillingMode;
 import com.intact_id.billing.model.WalletTransactionType;
-import com.intact_id.db.model.Company;
-import com.intact_id.db.model.CompanyCommunicationDetails;
+import com.intact_id.tenancy.Company;
+import com.intact_id.tenancy.CompanyCommunicationDetails;
 import com.intact_id.billing.model.BillingCharge;
 import com.intact_id.billing.model.BillingInvoice;
 import com.intact_id.billing.model.BillingInvoiceLine;
 import com.intact_id.billing.model.CompanyBillingProfile;
 import com.intact_id.billing.model.WalletTransaction;
 import com.intact_id.db.model.kyc.VerificationRequest;
-import com.intact_id.db.repository.CompanyCommunicationRepository;
-import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.tenancy.CompanyCommunicationRepository;
+import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.billing.model.BillingChargeRepository;
 import com.intact_id.billing.model.BillingInvoiceLineRepository;
 import com.intact_id.billing.model.BillingInvoiceRepository;

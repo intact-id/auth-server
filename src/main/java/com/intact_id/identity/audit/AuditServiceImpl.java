@@ -2,15 +2,15 @@ package com.intact_id.identity.audit;
 
 
 import com.intact_id.identity.AuditService;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.identity.model.RefreshToken;
 import com.intact_id.identity.User;
 import com.intact_id.identity.model.UserActivityLog;
 import com.intact_id.identity.model.UserSession;
 import com.intact_id.identity.model.UserActivityLogRepository;
 import com.intact_id.identity.model.UserSessionRepository;
-import com.intact_id.dto.response.UserActivityLogResponseDto;
-import com.intact_id.dto.response.UserSessionResponseDto;
+import com.intact_id.identity.UserActivityLogResponseDto;
+import com.intact_id.identity.UserSessionResponseDto;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

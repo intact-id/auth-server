@@ -1,8 +1,6 @@
 package com.intact_id.identity;
 
 import com.intact_id.identity.model.RefreshToken;
-import com.intact_id.dto.response.UserActivityLogResponseDto;
-import com.intact_id.dto.response.UserSessionResponseDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

@@ -1,6 +1,6 @@
 package com.intact_id.security.authentication;
 
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import lombok.Getter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;

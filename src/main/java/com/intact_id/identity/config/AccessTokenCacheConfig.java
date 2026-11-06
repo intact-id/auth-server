@@ -2,7 +2,7 @@ package com.intact_id.identity.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

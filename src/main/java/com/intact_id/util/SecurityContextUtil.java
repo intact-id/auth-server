@@ -1,6 +1,6 @@
 package com.intact_id.util;
 
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.identity.User;
 import com.intact_id.security.authentication.CompanyAuthentication;
 import com.intact_id.util.exception.ApplicationExceptions;

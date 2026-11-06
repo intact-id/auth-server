@@ -2,8 +2,8 @@ package com.intact_id.security.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
-import com.intact_id.db.model.Company;
-import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.tenancy.Company;
+import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.security.authentication.CompanyAuthentication;
 import com.intact_id.identity.JwtService;
 import io.jsonwebtoken.JwtException;

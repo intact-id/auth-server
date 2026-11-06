@@ -1,8 +1,8 @@
 package com.intact_id.notifications.webhook.events;
 
 import com.intact_id.config.events.InternalEventHandler;
-import com.intact_id.db.model.Company;
-import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.tenancy.Company;
+import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.notifications.WebhookEventDto;
 import com.intact_id.notifications.WebhookService;
 import com.intact_id.util.exception.ApplicationExceptions;

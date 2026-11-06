@@ -2,8 +2,8 @@ package com.intact_id.notifications.inapp;
 
 
 import com.intact_id.notifications.NotificationService;
-import com.intact_id.db.model.Company;
-import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.tenancy.Company;
+import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.notifications.NotificationRequestDto;
 import com.intact_id.notifications.NotificationResponseDto;
 import com.intact_id.util.TenantContext;
