@@ -47,7 +47,7 @@ public class VerificationService {
     private final VerificationStepRepository verificationStepRepository;
     private final TierValidationService tierValidationService;
     private final ExternalKycServiceClient externalKycServiceClient;
-    private final com.intact_id.service.webhook.WebhookService webhookService;
+    private final com.intact_id.notifications.WebhookService webhookService;
     private final BillingService billingService;
     private final PlatformTransactionManager transactionManager;
     private final DocumentStorage documentStorage;

@@ -1,6 +1,5 @@
-package com.intact_id.db.repository;
+package com.intact_id.notifications.inapp;
 
-import com.intact_id.db.model.Notification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

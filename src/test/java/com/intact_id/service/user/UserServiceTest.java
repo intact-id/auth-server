@@ -6,7 +6,7 @@ import com.intact_id.db.repository.user.RoleRepository;
 import com.intact_id.db.repository.user.UserRepository;
 import com.intact_id.dto.auth.UserCreateDto;
 import com.intact_id.dto.auth.UserResponseDto;
-import com.intact_id.service.email.EmailService;
+import com.intact_id.notifications.EmailService;
 import com.intact_id.util.generator.GeneratorUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

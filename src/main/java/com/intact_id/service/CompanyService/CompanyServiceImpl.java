@@ -39,8 +39,8 @@ public class CompanyServiceImpl implements CompanyService {
     private final CompanyCommunicationRepository communicationRepository;
     private final CompanyCredentialsRepository credentialsRepository;
     private final GeneratorUtils generatorUtils;
-    private final com.intact_id.service.email.EmailService emailService;
-    private final com.intact_id.service.NotificationService.NotificationService notificationService;
+    private final com.intact_id.notifications.EmailService emailService;
+    private final com.intact_id.notifications.NotificationService notificationService;
 
     @Transactional
     public Company createCompanyFromApplication(CompanyApplication application) {

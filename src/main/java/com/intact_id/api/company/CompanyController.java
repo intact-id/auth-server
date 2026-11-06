@@ -13,7 +13,7 @@ import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.dto.response.CompanyCommunicationResponseDto;
 import com.intact_id.dto.response.CompanyResponseDto;
 import com.intact_id.service.CompanyService.CompanyService;
-import com.intact_id.service.webhook.WebhookService;
+import com.intact_id.notifications.WebhookService;
 import com.intact_id.util.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;

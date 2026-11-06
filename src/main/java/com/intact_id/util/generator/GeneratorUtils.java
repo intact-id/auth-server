@@ -1,20 +1,16 @@
 package com.intact_id.util.generator;
 
-import com.intact_id.config.WebhookConfig;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.UUID;
 
 @Slf4j
@@ -27,7 +23,6 @@ public class GeneratorUtils {
     private static final SecureRandom random = new SecureRandom();
 
     private final SecureRandom secureRandom = new SecureRandom();
-    private final WebhookConfig webhookConfig;
 
     /**
      * Generate application number
@@ -166,22 +161,5 @@ public class GeneratorUtils {
                 .encodeToString(randomBytes)
                 .substring(0, length)
                 .toLowerCase();
-    }
-
-    public String generateWebhookSignature(String payload, String secret) {
-        try {
-            Mac mac = Mac.getInstance(webhookConfig.getSignatureAlgorithm());
-            SecretKeySpec secretKeySpec = new SecretKeySpec(
-                    secret.getBytes(StandardCharsets.UTF_8),
-                    webhookConfig.getSignatureAlgorithm());
-            mac.init(secretKeySpec);
-
-            byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-
-        } catch (Exception e) {
-            log.error("Failed to generate webhook signature", e);
-            throw new ApplicationExceptions.IntactInternalServerException("Signature generation failed" + e);
-        }
     }
 }
