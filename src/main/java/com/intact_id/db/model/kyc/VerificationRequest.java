@@ -3,7 +3,7 @@ package com.intact_id.db.model.kyc;
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.util.converter.PgJsonbToMapConverter;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;

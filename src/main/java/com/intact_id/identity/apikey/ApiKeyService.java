@@ -1,7 +1,7 @@
 package com.intact_id.identity.apikey;
 
-import com.intact_id.dto.response.ApiKeyGenerationResponseDto;
-import com.intact_id.dto.response.ApiKeyUsageResponseDto;
+import com.intact_id.identity.web.ApiKeyGenerationResponseDto;
+import com.intact_id.identity.web.ApiKeyUsageResponseDto;
 
 import java.util.List;
 

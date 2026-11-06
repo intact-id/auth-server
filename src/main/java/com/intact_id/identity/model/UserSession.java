@@ -3,7 +3,7 @@ package com.intact_id.identity.model;
 
 import com.intact_id.identity.User;
 import com.intact_id.constant.base.Auditable;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

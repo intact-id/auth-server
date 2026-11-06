@@ -1,11 +1,11 @@
 package com.intact_id.identity.user;
 
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.identity.model.RefreshToken;
 import com.intact_id.identity.Role;
 import com.intact_id.identity.User;
-import com.intact_id.db.repository.CompanyRepository;
+import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.identity.model.RefreshTokenRepository;
 import com.intact_id.identity.model.RoleRepository;
 import com.intact_id.identity.UserRepository;

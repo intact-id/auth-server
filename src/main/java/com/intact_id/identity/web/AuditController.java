@@ -1,8 +1,8 @@
 package com.intact_id.identity.web;
 
 import com.intact_id.dto.response.ApiResponse;
-import com.intact_id.dto.response.UserActivityLogResponseDto;
-import com.intact_id.dto.response.UserSessionResponseDto;
+import com.intact_id.identity.UserActivityLogResponseDto;
+import com.intact_id.identity.UserSessionResponseDto;
 import com.intact_id.identity.AuditService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

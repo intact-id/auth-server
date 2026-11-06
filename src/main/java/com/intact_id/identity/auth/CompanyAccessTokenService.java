@@ -2,7 +2,7 @@ package com.intact_id.identity.auth;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.identity.CompanyCredentials;
 import com.intact_id.identity.web.CompanyAccessTokenResponseDto;
 import com.intact_id.identity.CredentialsValidator;

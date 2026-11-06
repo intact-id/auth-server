@@ -2,7 +2,7 @@ package com.intact_id.service.kyc;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.kyc.WidgetChannel;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.security.authentication.WidgetSessionContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;

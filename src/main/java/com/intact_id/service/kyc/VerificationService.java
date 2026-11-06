@@ -2,7 +2,7 @@ package com.intact_id.service.kyc;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.db.model.kyc.VerificationDocument;
 import com.intact_id.db.model.kyc.VerificationRequest;
 import com.intact_id.db.model.kyc.VerificationStep;

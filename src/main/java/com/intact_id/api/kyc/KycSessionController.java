@@ -1,6 +1,6 @@
 package com.intact_id.api.kyc;
 
-import com.intact_id.db.model.Company;
+import com.intact_id.tenancy.Company;
 import com.intact_id.dto.request.KycSessionRequestDto;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.dto.response.KycSessionResponseDto;
