@@ -1,14 +1,14 @@
 package com.intact_id.service.kyc;
 
-import com.intact_id.client.face.FaceScreeningClient;
-import com.intact_id.client.ocr.OcrScreeningClient;
+import com.intact_id.checks.FaceScreeningClient;
+import com.intact_id.checks.OcrScreeningClient;
 import com.intact_id.config.ResilienceConfig;
 import com.intact_id.db.model.kyc.VerificationDocument;
 import com.intact_id.db.model.kyc.VerificationRequest;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
-import com.intact_id.dto.response.face.FaceVerificationResponse;
-import com.intact_id.dto.response.face.LivenessResponse;
-import com.intact_id.dto.response.ocr.OcrExtractionResponse;
+import com.intact_id.checks.FaceVerificationResponse;
+import com.intact_id.checks.LivenessResponse;
+import com.intact_id.checks.OcrExtractionResponse;
 import com.intact_id.service.kyc.OcrValidationService.ValidationDecision;
 import com.intact_id.service.kyc.OcrValidationService.ValidationOutcome;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;

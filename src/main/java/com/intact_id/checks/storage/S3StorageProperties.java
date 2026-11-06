@@ -1,4 +1,4 @@
-package com.intact_id.config;
+package com.intact_id.checks.storage;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

@@ -1,7 +1,6 @@
-package com.intact_id.client.ocr;
+package com.intact_id.checks;
 
 import com.intact_id.config.FeignConfig;
-import com.intact_id.dto.response.ocr.OcrExtractionResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
