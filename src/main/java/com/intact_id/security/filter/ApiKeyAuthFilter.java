@@ -1,10 +1,10 @@
 package com.intact_id.security.filter;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
-import com.intact_id.db.model.CompanyCredentials;
+import com.intact_id.identity.CompanyCredentials;
 import com.intact_id.security.authentication.CompanyAuthentication;
-import com.intact_id.security.validator.CredentialsValidator;
-import com.intact_id.service.credentials.CompanyCredentialService;
+import com.intact_id.identity.CredentialsValidator;
+import com.intact_id.identity.CompanyCredentialService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

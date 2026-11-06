@@ -2,9 +2,9 @@ package com.intact_id.service.kyc;
 
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
-import com.intact_id.db.model.CompanyCredentials;
+import com.intact_id.identity.CompanyCredentials;
 import com.intact_id.db.model.kyc.VerificationRequest;
-import com.intact_id.db.repository.CompanyCredentialsRepository;
+import com.intact_id.identity.CompanyCredentialsRepository;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
 import com.intact_id.service.kyc.events.RateLimitConsumedEvent;
 import lombok.RequiredArgsConstructor;

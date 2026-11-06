@@ -1,8 +1,8 @@
 package com.intact_id.security.filter;
 
-import com.intact_id.db.model.user.User;
-import com.intact_id.service.audit.AuditService;
-import com.intact_id.service.jwt.JwtService;
+import com.intact_id.identity.User;
+import com.intact_id.identity.AuditService;
+import com.intact_id.identity.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

@@ -1,7 +1,8 @@
 package com.intact_id.notifications.email;
 
 
-import com.intact_id.notifications.EmailService;import com.intact_id.notifications.EmailDTO;
+import com.intact_id.notifications.EmailService;
+import com.intact_id.notifications.EmailDTO;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
