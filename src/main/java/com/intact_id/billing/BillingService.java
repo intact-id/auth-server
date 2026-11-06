@@ -14,7 +14,7 @@ import com.intact_id.billing.model.BillingInvoice;
 import com.intact_id.billing.model.BillingInvoiceLine;
 import com.intact_id.billing.model.CompanyBillingProfile;
 import com.intact_id.billing.model.WalletTransaction;
-import com.intact_id.db.model.kyc.VerificationRequest;
+import com.intact_id.orchestration.VerificationRequest;
 import com.intact_id.tenancy.CompanyCommunicationRepository;
 import com.intact_id.tenancy.CompanyRepository;
 import com.intact_id.billing.model.BillingChargeRepository;
