@@ -3,7 +3,8 @@ name: Build & Publish
 on:
   push:
     branches:
-      - develop
+      - develop   # staging: tagged :develop
+      - main      # production: tagged :latest
 
 jobs:
   build-and-push:
@@ -27,5 +28,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/intact-auth:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/intact-auth:${{ github.ref_name == 'main' && 'latest' || 'develop' }}
             ${{ secrets.DOCKERHUB_USERNAME }}/intact-auth:${{ github.sha }}
