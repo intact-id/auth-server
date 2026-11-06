@@ -1,6 +1,12 @@
 spring:
   application:
     name: intact-id
+  modulith:
+    events:
+      # Re-run events a listener never finished (crash, error) when the app starts
+      republish-outstanding-events-on-restart: true
+      # Completed events are removed; the table only holds pending work
+      completion-mode: delete
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:intact_id}

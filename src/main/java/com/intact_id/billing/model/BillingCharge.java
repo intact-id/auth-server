@@ -2,7 +2,6 @@ package com.intact_id.billing.model;
 
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.tenancy.Company;
-import com.intact_id.orchestration.VerificationRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,7 +26,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_billing_charge_company_status", columnList = "company_id,status"),
         @Index(name = "idx_billing_charge_verification", columnList = "verification_request_id", unique = true)
 })
-@EqualsAndHashCode(callSuper = false, exclude = {"company", "billingProfile", "verificationRequest", "invoice"})
+@EqualsAndHashCode(callSuper = false, exclude = {"company", "billingProfile", "invoice"})
 public class BillingCharge extends Auditable {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -38,9 +37,9 @@ public class BillingCharge extends Auditable {
     @JoinColumn(name = "billing_profile_id", nullable = false)
     private CompanyBillingProfile billingProfile;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "verification_request_id", nullable = false, unique = true)
-    private VerificationRequest verificationRequest;
+    // The verification is owned by orchestration; billing keeps only its id
+    @Column(name = "verification_request_id", nullable = false, unique = true)
+    private String verificationRequestId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "invoice_id")

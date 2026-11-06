@@ -12,7 +12,8 @@ import com.intact_id.orchestration.model.VerificationStepRepository;
 import com.intact_id.orchestration.web.KycVerificationRequestDto;
 import com.intact_id.orchestration.web.KycVerificationResponseDto;
 import com.intact_id.orchestration.web.VerificationStatusResponseDto;
-import com.intact_id.billing.BillingService;
+import com.intact_id.orchestration.VerificationSubmitted;
+import org.springframework.context.ApplicationEventPublisher;
 import com.intact_id.checks.DocumentStorage;
 import com.intact_id.checks.StorageMultipartFile;
 import com.intact_id.util.TenantContext;
@@ -48,7 +49,7 @@ public class VerificationService {
     private final TierValidationService tierValidationService;
     private final ExternalKycServiceClient externalKycServiceClient;
     private final com.intact_id.notifications.WebhookService webhookService;
-    private final BillingService billingService;
+    private final ApplicationEventPublisher eventPublisher;
     private final PlatformTransactionManager transactionManager;
     private final DocumentStorage documentStorage;
 
@@ -145,7 +146,8 @@ public class VerificationService {
                             "Verification not found: " + requestId));
             ready.setStatus(GlobalStatuses.SUBMITTED);
             VerificationRequest saved = verificationRequestRepository.save(ready);
-            billingService.handleVerificationSubmitted(saved);
+            // Stored with this transaction; billing handles it after commit
+            eventPublisher.publishEvent(new VerificationSubmitted(saved.getId(), saved.getCompany().getId(), saved.getTier()));
             return saved;
         });
 

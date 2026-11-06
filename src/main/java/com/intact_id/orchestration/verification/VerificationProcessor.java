@@ -3,9 +3,11 @@ package com.intact_id.orchestration.verification;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.orchestration.VerificationDocument;
 import com.intact_id.orchestration.VerificationRequest;
-import com.intact_id.billing.BillingService;
-import com.intact_id.billing.RemoteBalanceCheckService;
-import com.intact_id.billing.RemoteBalanceCheckService.HoldDecision;
+import com.intact_id.orchestration.VerificationOutcome;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import com.intact_id.orchestration.BalanceCheck;
+import com.intact_id.orchestration.BalanceCheck.HoldDecision;
 import com.intact_id.orchestration.verification.RateLimitService.LimitExceeded;
 import com.intact_id.orchestration.model.VerificationStep;
 import com.intact_id.orchestration.model.VerificationDocumentRepository;
@@ -36,8 +38,8 @@ public class VerificationProcessor {
     private final ApplicationEventPublisher eventPublisher;
     private final EmailService emailService;
     private final RateLimitService rateLimitService;
-    private final BillingService billingService;
-    private final RemoteBalanceCheckService remoteBalanceCheckService;
+    private final PlatformTransactionManager transactionManager;
+    private final BalanceCheck balanceCheck;
 
     @Value("${app.support-email:support@intact-id.com}")
     private String supportEmail;
@@ -56,9 +58,9 @@ public class VerificationProcessor {
             return;
         }
 
-        // Wallet balance check — delegated to billing-service (see RemoteBalanceCheckService).
+        // Wallet balance check — billing implements BalanceCheck by asking billing-service.
         // The local check-and-hold path (BillingService.checkSufficientBalance) is deprecated.
-        HoldDecision balanceDecision = remoteBalanceCheckService.check(
+        HoldDecision balanceDecision = balanceCheck.check(
                 request.getCompany().getCompanyIdentifierCode(), request.getId());
         if (balanceDecision.hold()) {
             request.markAsHeld(balanceDecision.reason());
@@ -137,13 +139,9 @@ public class VerificationProcessor {
             if (result.getErrorDetails() != null) request.setErrorDetails(result.getErrorDetails());
         }
 
-        verificationRequestRepository.save(request);
+        // Manual-review outcomes aren't final yet; ManualReviewService publishes the outcome
+        saveWithOutcome(request, request.getStatus() != GlobalStatuses.PENDING_APPROVAL);
         log.info("Verification completed for: {} decision={}", request.getId(), result.getOverallDecision());
-        // Manual-review outcomes aren't final yet — billing fires once ManualReviewService
-        // resolves the review, not here (determineBillingEvent assumes a terminal status).
-        if (request.getStatus() != GlobalStatuses.PENDING_APPROVAL) {
-            billingService.handleVerificationOutcome(request);
-        }
         publishStatusChanged(request);
     }
 
@@ -153,8 +151,17 @@ public class VerificationProcessor {
         } else {
             request.markAsFailed(failureReason, errorDetails);
         }
-        verificationRequestRepository.save(request);
-        billingService.handleVerificationOutcome(request);
+        saveWithOutcome(request, true);
+    }
+
+    /** Saves the result and records the outcome event in one transaction, so neither happens without the other. */
+    private void saveWithOutcome(VerificationRequest request, boolean finalOutcome) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            verificationRequestRepository.save(request);
+            if (finalOutcome) {
+                eventPublisher.publishEvent(VerificationOutcome.of(request));
+            }
+        });
     }
 
     private void notifyManualReviewRequired(VerificationRequest request) {
