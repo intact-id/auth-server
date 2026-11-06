@@ -1,4 +1,4 @@
-package com.intact_id.service.webhook.events;
+package com.intact_id.notifications.webhook.events;
 
 import com.intact_id.config.events.InternalEvent;
 

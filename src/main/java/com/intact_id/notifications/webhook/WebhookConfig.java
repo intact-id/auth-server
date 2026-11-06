@@ -1,4 +1,4 @@
-package com.intact_id.config;
+package com.intact_id.notifications.webhook;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

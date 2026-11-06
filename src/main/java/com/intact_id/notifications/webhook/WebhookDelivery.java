@@ -1,6 +1,7 @@
-package com.intact_id.db.model;
+package com.intact_id.notifications.webhook;
 
-import com.intact_id.constant.base.Auditable;
+
+import com.intact_id.db.model.Company;import com.intact_id.constant.base.Auditable;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

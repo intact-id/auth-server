@@ -12,7 +12,7 @@ import com.intact_id.dto.request.CompanyApplicationRequestDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.dto.response.CompanyApplicationCreationResponseDto;
 import com.intact_id.dto.response.CompanyApplicationResponseDto;
-import com.intact_id.service.email.EmailService;
+import com.intact_id.notifications.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import com.intact_id.util.mapper.MapperUtils;

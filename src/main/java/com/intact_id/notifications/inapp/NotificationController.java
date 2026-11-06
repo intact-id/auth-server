@@ -1,9 +1,9 @@
-package com.intact_id.api.notification;
+package com.intact_id.notifications.inapp;
 
-import com.intact_id.dto.request.NotificationRequestDto;
+import com.intact_id.notifications.NotificationRequestDto;
 import com.intact_id.dto.response.ApiResponse;
-import com.intact_id.dto.response.NotificationResponseDto;
-import com.intact_id.service.NotificationService.NotificationService;
+import com.intact_id.notifications.NotificationResponseDto;
+import com.intact_id.notifications.NotificationService;
 import com.intact_id.util.SecurityContextUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

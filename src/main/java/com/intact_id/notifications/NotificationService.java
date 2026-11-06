@@ -1,7 +1,5 @@
-package com.intact_id.service.NotificationService;
+package com.intact_id.notifications;
 
-import com.intact_id.dto.request.NotificationRequestDto;
-import com.intact_id.dto.response.NotificationResponseDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

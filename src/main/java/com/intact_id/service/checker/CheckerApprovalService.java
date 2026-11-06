@@ -12,7 +12,7 @@ import com.intact_id.dto.request.ApplicationApprovalDecisionDto;
 import com.intact_id.dto.response.ApplicationApprovalResponseDto;
 import com.intact_id.dto.response.CheckerApprovalQueueResponseDto;
 import com.intact_id.service.CompanyService.CompanyService;
-import com.intact_id.service.email.EmailService;
+import com.intact_id.notifications.EmailService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.mapper.MapperUtils;
 import jakarta.transaction.Transactional;

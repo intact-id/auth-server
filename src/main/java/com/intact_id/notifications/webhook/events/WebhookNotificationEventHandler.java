@@ -1,10 +1,10 @@
-package com.intact_id.service.webhook.events;
+package com.intact_id.notifications.webhook.events;
 
 import com.intact_id.config.events.InternalEventHandler;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.repository.CompanyRepository;
-import com.intact_id.dto.webhook.WebhookEventDto;
-import com.intact_id.service.webhook.WebhookService;
+import com.intact_id.notifications.WebhookEventDto;
+import com.intact_id.notifications.WebhookService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

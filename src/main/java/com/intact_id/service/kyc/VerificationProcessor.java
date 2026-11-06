@@ -11,7 +11,7 @@ import com.intact_id.db.model.kyc.VerificationStep;
 import com.intact_id.db.repository.kyc.VerificationDocumentRepository;
 import com.intact_id.db.repository.kyc.VerificationRequestRepository;
 import com.intact_id.db.repository.kyc.VerificationStepRepository;
-import com.intact_id.service.email.EmailService;
+import com.intact_id.notifications.EmailService;
 import com.intact_id.service.kyc.events.VerificationStatusChangedData;
 import com.intact_id.service.kyc.events.VerificationStatusChangedEvent;
 import lombok.RequiredArgsConstructor;

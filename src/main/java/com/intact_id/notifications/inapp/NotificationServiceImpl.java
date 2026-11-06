@@ -1,11 +1,10 @@
-package com.intact_id.service.NotificationService;
+package com.intact_id.notifications.inapp;
 
-import com.intact_id.db.model.Company;
-import com.intact_id.db.model.Notification;
+
+import com.intact_id.notifications.NotificationService;import com.intact_id.db.model.Company;
 import com.intact_id.db.repository.CompanyRepository;
-import com.intact_id.db.repository.NotificationRepository;
-import com.intact_id.dto.request.NotificationRequestDto;
-import com.intact_id.dto.response.NotificationResponseDto;
+import com.intact_id.notifications.NotificationRequestDto;
+import com.intact_id.notifications.NotificationResponseDto;
 import com.intact_id.util.TenantContext;
 import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final CompanyRepository companyRepository;
-    private final com.intact_id.service.email.EmailService emailService;
+    private final com.intact_id.notifications.EmailService emailService;
 
     @Override
     @Transactional

@@ -1,18 +1,17 @@
-package com.intact_id.service.webhook;
+package com.intact_id.notifications;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.intact_id.config.WebhookConfig;
+import com.intact_id.notifications.webhook.WebhookConfig;
 import com.intact_id.db.model.Company;
 import com.intact_id.db.model.CompanyCommunicationDetails;
-import com.intact_id.db.model.WebhookDelivery;
+import com.intact_id.notifications.webhook.WebhookDelivery;
 import com.intact_id.db.model.kyc.VerificationRequest;
 import com.intact_id.db.repository.CompanyCommunicationRepository;
-import com.intact_id.db.repository.WebhookDeliveryRepository;
-import com.intact_id.dto.webhook.WebhookEventDto;
-import com.intact_id.service.webhook.events.WebhookEventData;
-import com.intact_id.service.webhook.events.WebhookNotificationEvent;
+import com.intact_id.notifications.webhook.WebhookDeliveryRepository;
+import com.intact_id.notifications.webhook.events.WebhookEventData;
+import com.intact_id.notifications.webhook.events.WebhookNotificationEvent;
 import com.intact_id.util.exception.ApplicationExceptions;
-import com.intact_id.util.generator.GeneratorUtils;
+import com.intact_id.notifications.webhook.WebhookSigner;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -44,7 +43,7 @@ public class WebhookService {
     private final CompanyCommunicationRepository communicationRepository;
     private final WebhookConfig webhookConfig;
     private final ObjectMapper objectMapper;
-    private final GeneratorUtils generatorUtils;
+    private final WebhookSigner webhookSigner;
     private final ApplicationEventPublisher eventPublisher;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -303,7 +302,7 @@ public class WebhookService {
                 log.error("No webhook secret configured for company: {} — skipping delivery", company.getId());
                 return;
             }
-            String signature = generatorUtils.generateWebhookSignature(payload, secret);
+            String signature = webhookSigner.sign(payload, secret);
 
             // Create delivery record
             WebhookDelivery delivery = new WebhookDelivery();
@@ -465,7 +464,7 @@ public class WebhookService {
                     .findByCompanyId(delivery.getCompany().getId())
                     .orElseThrow();
 
-            String signature = generatorUtils.generateWebhookSignature(delivery.getPayload(), communication.getWebhookSecret());
+            String signature = webhookSigner.sign(delivery.getPayload(), communication.getWebhookSecret());
 
             sendHttpRequest(delivery, delivery.getWebhookUrl(), delivery.getPayload(),
                     signature, communication.getWebhookTimeoutSeconds());
@@ -498,7 +497,7 @@ public class WebhookService {
             String payload = objectMapper.writeValueAsString(testEvent);
 
             // Generate signature using the company's dedicated webhook secret
-            String signature = generatorUtils.generateWebhookSignature(payload, communication.getWebhookSecret());
+            String signature = webhookSigner.sign(payload, communication.getWebhookSecret());
 
             // Send HTTP request
             HttpRequest request = HttpRequest.newBuilder()

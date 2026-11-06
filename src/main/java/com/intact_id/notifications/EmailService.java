@@ -1,6 +1,5 @@
-package com.intact_id.service.email;
+package com.intact_id.notifications;
 
-import com.intact_id.dto.email.EmailDTO;
 
 /**
  * Service interface for sending emails

@@ -1,6 +1,7 @@
-package com.intact_id.db.model;
+package com.intact_id.notifications.inapp;
 
-import jakarta.persistence.*;
+
+import com.intact_id.db.model.Company;import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

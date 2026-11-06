@@ -1,4 +1,4 @@
-package com.intact_id.dto.response;
+package com.intact_id.notifications;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

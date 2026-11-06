@@ -1,4 +1,4 @@
-package com.intact_id.dto.request;
+package com.intact_id.notifications;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
