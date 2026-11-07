@@ -1,7 +1,8 @@
 # Staging on a laptop
 
-`develop` builds `frankmwangi8118/intact-auth:develop`; this stack runs it and Watchtower
-redeploys within ~30 s of each push. Production (`main` → `:latest`) is unaffected.
+`develop` builds the `:develop` images of auth-server, billing-service and the face service; this
+stack runs them and Watchtower redeploys within ~30 s of each push. Production (`main` → `:latest`)
+is unaffected.
 
 1. Copy production's env files next to this file (they are not in git):
    `scp -r contabo-2:/opt/apps/intact-id/env ./env`
@@ -17,6 +18,15 @@ redeploys within ~30 s of each push. Production (`main` → `:latest`) is unaffe
 3. `docker login` (if the images are private), then `docker compose up -d`.
 4. Tables are created on first start (`ddl-auto: update`). The DB is reachable on
    `localhost:5433` (user/password from `env/postgres.env`) for seeding test data.
+
+billing-service does not create its own tables: on a fresh database, apply its schema from the
+billing-service repo once:
+```
+for f in Client BillingProfile Wallet WalletTransaction WalletLock RecurringFee Invoice UsageRecord PerCallPricing ServiceCharge; do
+  docker compose exec -T postgres psql -U postgres -d api-billing-service < <billing-repo>/src/main/resources/schema/ddl_$f.sql
+done
+```
+On a database that already has them, apply that repo's `schema/migrations/*.sql` instead.
 
 Email goes to Mailpit (http://localhost:8025), never to real people. The API is on
 http://localhost:8080; expose it with Cloudflare Tunnel or ngrok to test the widget on a phone.
