@@ -110,7 +110,7 @@ services:
 
   billing-service:
     <<: *app
-    image: frankmwangi8118/api-billing-service:latest
+    image: frankmwangi8118/api-billing-service:develop
     env_file: env/billing.env
     depends_on:
       postgres: { condition: service_healthy }
