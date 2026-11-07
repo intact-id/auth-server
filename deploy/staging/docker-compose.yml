@@ -94,7 +94,7 @@ services:
 
   ocr-service:
     <<: *app
-    image: frankmwangi8118/paddleocr-service:latest
+    image: frankmwangi8118/paddleocr-service:develop
     command: ./scripts/start.sh
     env_file: env/ocr.env
     volumes:
@@ -103,7 +103,7 @@ services:
 
   sactions-service:
     <<: *app
-    image: frankmwangi8118/sactions-service:latest
+    image: frankmwangi8118/sactions-service:develop
     env_file: env/sactions.env
     depends_on:
       postgres: { condition: service_healthy }

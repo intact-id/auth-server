@@ -1,6 +1,6 @@
 # Staging on a laptop
 
-`develop` builds the `:develop` images of auth-server, billing-service and the face service; this
+`develop` builds the `:develop` image of every service (auth, billing, face, OCR, sanctions); this
 stack runs them and Watchtower redeploys within ~30 s of each push. Production (`main` → `:latest`)
 is unaffected.
 
