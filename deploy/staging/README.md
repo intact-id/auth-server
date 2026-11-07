@@ -10,7 +10,10 @@ is unaffected.
    ```
    STAGING_JWT_SECRET=<a new random 64-char hex string, not production's>
    # optional:
-   STAGING_STORAGE_TYPE=local            # or s3 with a separate staging bucket
+   STAGING_STORAGE_TYPE=local            # or s3 with the staging bucket:
+   # STAGING_S3_BUCKET=intact-kyc-docs-staging
+   # STAGING_S3_ACCESS_KEY=<staging token access key id>
+   # STAGING_S3_SECRET_KEY=<staging token secret>
    STAGING_PUBLIC_URL=https://<tunnel-host>
    STAGING_WIDGET_URL=https://<widget-tunnel-host>
    STAGING_CORS_ORIGINS=https://<widget-tunnel-host>,http://localhost:5173

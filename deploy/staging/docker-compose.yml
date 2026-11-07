@@ -56,6 +56,9 @@ services:
       # Never touch production data or people from staging
       KYC_STORAGE_TYPE: ${STAGING_STORAGE_TYPE:-local}
       KYC_S3_BUCKET: ${STAGING_S3_BUCKET:-intact-kyc-docs-staging}
+      # Staging's own R2 token (scoped to the staging bucket); never production's
+      KYC_S3_ACCESS_KEY: ${STAGING_S3_ACCESS_KEY:-}
+      KYC_S3_SECRET_KEY: ${STAGING_S3_SECRET_KEY:-}
       JWT_SECRET: ${STAGING_JWT_SECRET:?set STAGING_JWT_SECRET in .env}
       MAIL_HOST: mailpit
       MAIL_PORT: "1025"
