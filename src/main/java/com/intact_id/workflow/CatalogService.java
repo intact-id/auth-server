@@ -18,9 +18,9 @@ public record CatalogService(
         String code,
         String name,
         String description,
-        String category,
+        ServiceCategory category,
         ServiceStatus status,
-        List<String> subjectTypes,
+        List<SubjectType> subjectTypes,
         List<String> countries,
         List<String> requires,
         List<String> requiredFields,
@@ -34,7 +34,7 @@ public record CatalogService(
         return country == null || countries.isEmpty() || countries.contains(country);
     }
 
-    public boolean supportsSubject(String subjectType) {
+    public boolean supportsSubject(SubjectType subjectType) {
         return subjectType == null || subjectTypes.isEmpty() || subjectTypes.contains(subjectType);
     }
 }

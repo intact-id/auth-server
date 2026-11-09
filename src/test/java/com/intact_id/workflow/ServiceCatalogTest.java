@@ -52,7 +52,7 @@ class ServiceCatalogTest {
     @Test
     void ordersDependenciesFirstAndCollectsWhatTheWidgetNeeds() {
         ServiceRequirements r = catalog.requirementsFor(List.of("FACE_MATCH", "LIVENESS", "DATA_CROSSCHECK", "DOCUMENT_CHECK"),
-                "INDIVIDUAL", "KEN", true);
+                SubjectType.INDIVIDUAL, "KEN", true);
 
         assertThat(r.valid()).isTrue();
         assertThat(r.services()).containsExactly("DOCUMENT_CHECK", "DATA_CROSSCHECK", "LIVENESS", "FACE_MATCH");
@@ -63,7 +63,7 @@ class ServiceCatalogTest {
 
     @Test
     void reportsMissingDependenciesUnavailableServicesAndCountries() {
-        ServiceRequirements r = catalog.requirementsFor(List.of("FACE_MATCH", "IPRS_LOOKUP", "NFC_CHIP"), "INDIVIDUAL", "NGA", true);
+        ServiceRequirements r = catalog.requirementsFor(List.of("FACE_MATCH", "IPRS_LOOKUP", "NFC_CHIP"), SubjectType.INDIVIDUAL, "NGA", true);
 
         assertThat(r.valid()).isFalse();
         assertThat(r.problems()).anySatisfy(p -> assertThat(p).contains("FACE_MATCH needs DOCUMENT_CHECK"))
@@ -88,7 +88,7 @@ class ServiceCatalogTest {
         CatalogServiceRequestDto request = new CatalogServiceRequestDto();
         request.setCode("NFC_CHIP");
         request.setName("NFC chip read");
-        request.setCategory("VERIFICATION");
+        request.setCategory(ServiceCategory.VERIFICATION);
         request.setRequires(List.of("DOCUMENT_CHECK"));
 
         assertThat(admin.create(request).status()).isEqualTo(ServiceStatus.IN_DEVELOPMENT);
@@ -132,7 +132,7 @@ class ServiceCatalogTest {
         Map<String, Object> ui = new HashMap<>();
         if (screen != null) ui.put("screen", screen);
         rows.put(code, CatalogServiceEntity.builder()
-                .code(code).name(code).category("VERIFICATION").status(status).sortOrder(order)
+                .code(code).name(code).category(ServiceCategory.VERIFICATION).status(status).sortOrder(order)
                 .requires(new ArrayList<>(requires)).requiredFields(new ArrayList<>(fields))
                 .captures(new ArrayList<>(captures)).ui(ui).countries(new ArrayList<>(countries))
                 .build());

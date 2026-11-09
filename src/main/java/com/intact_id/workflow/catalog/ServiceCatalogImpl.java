@@ -6,6 +6,7 @@ import com.intact_id.workflow.CatalogService;
 import com.intact_id.workflow.ServiceCatalog;
 import com.intact_id.workflow.ServiceRequirements;
 import com.intact_id.workflow.ServiceStatus;
+import com.intact_id.workflow.SubjectType;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -38,7 +39,7 @@ public class ServiceCatalogImpl implements ServiceCatalog {
     }
 
     @Override
-    public List<CatalogService> available(String subjectType) {
+    public List<CatalogService> available(SubjectType subjectType) {
         return all().values().stream()
                 .filter(s -> s.status() == ServiceStatus.AVAILABLE)
                 .filter(s -> s.supportsSubject(subjectType))
@@ -51,7 +52,7 @@ public class ServiceCatalogImpl implements ServiceCatalog {
     }
 
     @Override
-    public ServiceRequirements requirementsFor(Collection<String> codes, String subjectType, String country,
+    public ServiceRequirements requirementsFor(Collection<String> codes, SubjectType subjectType, String country,
                                                boolean availableOnly) {
         Map<String, CatalogService> catalog = all();
         List<String> problems = new ArrayList<>();

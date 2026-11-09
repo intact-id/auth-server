@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -185,39 +186,46 @@ public class DataInitializer {
         log.info("Created role: {} with {} permissions", roleName, permissions.size());
     }
 
+    /**
+     * Creates the super admin once. Never resets an existing admin's password: that made the default
+     * password valid again after every restart.
+     */
     private void createSuperAdmin() {
-        log.info("Creating/Updating super admin user...");
-
         String username = "admin";
+        if (userRepository.findByUsername(username).isPresent()) {
+            log.info("Super admin already exists; leaving it unchanged");
+            return;
+        }
 
-        User admin = userRepository.findByUsername(username).orElse(new User());
+        String initialPassword = System.getenv("SUPER_ADMIN_INITIAL_PASSWORD");
+        boolean generated = initialPassword == null || initialPassword.isBlank();
+        if (generated) {
+            initialPassword = UUID.randomUUID().toString();
+        }
 
-        // Set/Update fields
+        User admin = new User();
         admin.setUsername(username);
         admin.setEmail("admin@intact-id.com");
-        admin.setPasswordHash(passwordEncoder.encode("Admin@123")); // Reset password to default
+        admin.setPasswordHash(passwordEncoder.encode(initialPassword));
         admin.setFirstName("Super");
         admin.setLastName("Admin");
         admin.setStatus(GlobalStatuses.ACTIVE);
-        admin.unlock(); // Ensure not locked and reset failed attempts
         admin.setEmailVerified(true);
-
-        // Only set these for new users or if needed
-        if (admin.getId() == null) {
-            admin.setMustChangePassword(true);
-            admin.setPasswordChangedAt(LocalDateTime.now());
-        }
-
-        // Assign SUPER_ADMIN role
+        admin.setMustChangePassword(true);
+        admin.setPasswordChangedAt(LocalDateTime.now());
         roleRepository.findByName("SUPER_ADMIN").ifPresent(role -> {
             Set<Role> roles = new HashSet<>();
             roles.add(role);
             admin.setRoles(roles);
         });
-
         userRepository.save(admin);
 
-        log.info("Super admin updated - Username: {}, Password: Admin@123", username);
+        if (generated) {
+            log.warn("Super admin created with a one-time password (set SUPER_ADMIN_INITIAL_PASSWORD to choose it): {}",
+                    initialPassword);
+        } else {
+            log.info("Super admin created from SUPER_ADMIN_INITIAL_PASSWORD");
+        }
     }
 
     private static class PermissionData {
