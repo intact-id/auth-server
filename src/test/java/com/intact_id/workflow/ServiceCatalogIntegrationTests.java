@@ -33,9 +33,9 @@ class ServiceCatalogIntegrationTests {
 
     @Test
     void seededCatalogShowsOnlyAvailableServicesToMerchants() {
-        assertThat(serviceCatalog.available("INDIVIDUAL")).extracting(CatalogService::code)
+        assertThat(serviceCatalog.available(SubjectType.INDIVIDUAL)).extracting(CatalogService::code)
                 .containsExactly("DOCUMENT_CHECK", "DATA_CROSSCHECK", "LIVENESS", "FACE_MATCH");
-        assertThat(serviceCatalog.available("BUSINESS")).isEmpty();
+        assertThat(serviceCatalog.available(SubjectType.BUSINESS)).isEmpty();
 
         CatalogService iprs = serviceCatalog.find("IPRS_LOOKUP").orElseThrow();
         assertThat(iprs.status()).isEqualTo(ServiceStatus.IN_DEVELOPMENT);
@@ -47,7 +47,7 @@ class ServiceCatalogIntegrationTests {
     @Test
     void todaysFullKycFlowEvaluatesFromTheSeededCatalog() {
         ServiceRequirements r = serviceCatalog.requirementsFor(
-                List.of("FACE_MATCH", "DATA_CROSSCHECK", "LIVENESS", "DOCUMENT_CHECK"), "INDIVIDUAL", "KEN", true);
+                List.of("FACE_MATCH", "DATA_CROSSCHECK", "LIVENESS", "DOCUMENT_CHECK"), SubjectType.INDIVIDUAL, "KEN", true);
 
         assertThat(r.problems()).isEmpty();
         assertThat(r.services()).containsExactly("DOCUMENT_CHECK", "DATA_CROSSCHECK", "LIVENESS", "FACE_MATCH");

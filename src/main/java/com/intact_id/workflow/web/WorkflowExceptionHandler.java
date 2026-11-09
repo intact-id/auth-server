@@ -1,6 +1,8 @@
 package com.intact_id.workflow.web;
 
 import com.intact_id.dto.response.ApiResponse;
+import com.intact_id.workflow.WorkflowInvalidException;
+import com.intact_id.workflow.WorkflowProblem;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.intact_id.workflow.web.WorkflowResponses.respond;
@@ -34,6 +37,11 @@ public class WorkflowExceptionHandler {
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(Exception e) {
         return respond(HttpStatus.BAD_REQUEST, "Malformed request", null);
+    }
+
+    @ExceptionHandler(WorkflowInvalidException.class)
+    public ResponseEntity<ApiResponse<List<WorkflowProblem>>> handleInvalidWorkflow(WorkflowInvalidException e) {
+        return respond(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage(), e.getProblems());
     }
 
     @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})

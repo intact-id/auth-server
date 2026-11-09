@@ -5,6 +5,7 @@ import com.intact_id.workflow.CatalogService;
 import com.intact_id.workflow.ServiceCatalog;
 import com.intact_id.workflow.ServiceRequirements;
 import com.intact_id.workflow.ServiceStatus;
+import com.intact_id.workflow.SubjectType;
 import com.intact_id.workflow.catalog.CatalogAdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,8 +31,8 @@ public class ServiceCatalogController {
 
     @GetMapping("/available")
     @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Services a merchant can add to a workflow", description = "subjectType: INDIVIDUAL or BUSINESS")
-    public ResponseEntity<ApiResponse<List<CatalogService>>> available(@RequestParam(required = false) String subjectType) {
+    @Operation(summary = "Services a merchant can add to a workflow")
+    public ResponseEntity<ApiResponse<List<CatalogService>>> available(@RequestParam(required = false) SubjectType subjectType) {
         return respond(HttpStatus.OK, "OK", serviceCatalog.available(subjectType));
     }
 

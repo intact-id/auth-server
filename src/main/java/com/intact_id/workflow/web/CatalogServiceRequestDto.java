@@ -1,5 +1,7 @@
 package com.intact_id.workflow.web;
 
+import com.intact_id.workflow.ServiceCategory;
+import com.intact_id.workflow.SubjectType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -21,10 +23,9 @@ public class CatalogServiceRequestDto {
     @Size(max = 2000)
     private String description;
 
-    @Pattern(regexp = "^[A-Z][A-Z_]{1,49}$", message = "category must be UPPER_SNAKE_CASE, e.g. VERIFICATION")
-    private String category;
+    private ServiceCategory category;
 
-    private List<@Pattern(regexp = "^(INDIVIDUAL|BUSINESS)$", message = "subject type must be INDIVIDUAL or BUSINESS") String> subjectTypes;
+    private List<SubjectType> subjectTypes;
 
     private List<@Pattern(regexp = "^[A-Z]{3}$", message = "countries are ISO 3166 alpha-3 codes") String> countries;
 

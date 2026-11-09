@@ -2,7 +2,9 @@ package com.intact_id.workflow.catalog;
 
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.workflow.CatalogService;
+import com.intact_id.workflow.ServiceCategory;
 import com.intact_id.workflow.ServiceStatus;
+import com.intact_id.workflow.SubjectType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -40,8 +42,9 @@ public class CatalogServiceEntity extends Auditable {
     @Column(name = "description", columnDefinition = "text")
     private String description;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 50)
-    private String category;
+    private ServiceCategory category;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
@@ -50,7 +53,7 @@ public class CatalogServiceEntity extends Auditable {
     @Builder.Default
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "subject_types", columnDefinition = "jsonb", nullable = false)
-    private List<String> subjectTypes = new ArrayList<>();
+    private List<SubjectType> subjectTypes = new ArrayList<>();
 
     @Builder.Default
     @JdbcTypeCode(SqlTypes.JSON)
