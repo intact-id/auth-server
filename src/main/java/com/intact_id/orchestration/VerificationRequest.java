@@ -1,5 +1,6 @@
 package com.intact_id.orchestration;
 
+import com.intact_id.workflow.WorkflowRun;
 import com.intact_id.constant.base.Auditable;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
@@ -14,6 +15,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.math.BigDecimal;
 
@@ -30,6 +32,18 @@ public class VerificationRequest extends Auditable {
 
     @Column(name = "tier", nullable = false, length = 20)
     private String tier; // tier1, tier2, tier3
+
+    // The workflow version this run follows; null = tier-based run
+    @Column(name = "workflow_id")
+    private String workflowId;
+
+    @Column(name = "workflow_version")
+    private Integer workflowVersion;
+
+    // Every node taken and the output it left by, for the audit trail
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "workflow_path", columnDefinition = "jsonb")
+    private List<WorkflowRun.Step> workflowPath;
 
     @Column(name = "verification_type", length = 20)
     private String verificationType; // individual, business

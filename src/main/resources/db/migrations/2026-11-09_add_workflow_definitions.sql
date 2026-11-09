@@ -1,5 +1,5 @@
 -- Workflows merchants build from the service catalog, their published versions, and two starter templates
--- (company_id NULL). Safe to run more than once.
+-- (company_id NULL). Safe to run more than once, before or after Hibernate creates the tables.
 CREATE TABLE IF NOT EXISTS workflow_definition
 (
     id               VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS workflow_version
 );
 
 INSERT INTO workflow_definition (id, created_at, updated_at, company_id, workflow_key, name, description, subject_type,
-                                 draft_graph, draft_updated_at)
+                                 draft_graph, draft_updated_at, latest_version, archived)
 SELECT gen_random_uuid()::text, now(), now(), NULL, 'standard-kyc', 'Standard KYC',
        'ID document, data cross-check, liveness and face match; low match scores go to manual review.', 'INDIVIDUAL',
        '{"nodes": [
@@ -70,11 +70,11 @@ SELECT gen_random_uuid()::text, now(), now(), NULL, 'standard-kyc', 'Standard KY
           {"from": "face", "port": "failed", "to": "rejected"},
           {"from": "score", "port": "branch:0", "to": "review"},
           {"from": "score", "port": "else", "to": "approved"}]}'::jsonb,
-       now()
+       now(), 0, FALSE
 WHERE NOT EXISTS (SELECT 1 FROM workflow_definition WHERE company_id IS NULL AND workflow_key = 'standard-kyc');
 
 INSERT INTO workflow_definition (id, created_at, updated_at, company_id, workflow_key, name, description, subject_type,
-                                 draft_graph, draft_updated_at)
+                                 draft_graph, draft_updated_at, latest_version, archived)
 SELECT gen_random_uuid()::text, now(), now(), NULL, 'id-check', 'ID check only',
        'Capture and read the ID document; nothing else.', 'INDIVIDUAL',
        '{"nodes": [
@@ -86,5 +86,5 @@ SELECT gen_random_uuid()::text, now(), now(), NULL, 'id-check', 'ID check only',
           {"from": "start", "port": "next", "to": "doc"},
           {"from": "doc", "port": "passed", "to": "approved"},
           {"from": "doc", "port": "failed", "to": "rejected"}]}'::jsonb,
-       now()
+       now(), 0, FALSE
 WHERE NOT EXISTS (SELECT 1 FROM workflow_definition WHERE company_id IS NULL AND workflow_key = 'id-check');

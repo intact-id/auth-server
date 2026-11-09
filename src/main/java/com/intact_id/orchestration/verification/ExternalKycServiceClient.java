@@ -54,21 +54,43 @@ public class ExternalKycServiceClient {
             String tier,
             VerificationRequest request,
             List<VerificationDocument> documents) {
+        return performVerification(tier, request, documents, null);
+    }
 
-        log.info("Starting verification for tier={} id={}", tier, request.getId());
+    /**
+     * services: catalog codes the run's workflow uses; only their checks are called (null = all, tier-based).
+     * Face match runs for FACE_MATCH, liveness for LIVENESS, OCR for DOCUMENT_CHECK or DATA_CROSSCHECK.
+     */
+    public CompletableFuture<VerificationResult> performVerification(
+            String tier,
+            VerificationRequest request,
+            List<VerificationDocument> documents,
+            Set<String> services) {
+
+        boolean runFace = services == null || services.contains("FACE_MATCH");
+        boolean runLiveness = services == null || services.contains("LIVENESS");
+        boolean runOcr = services == null || services.contains("DOCUMENT_CHECK") || services.contains("DATA_CROSSCHECK");
+        log.info("Starting verification for tier={} id={} face={} liveness={} ocr={}", tier, request.getId(),
+                runFace, runLiveness, runOcr);
 
         return CompletableFuture.supplyAsync(() -> {
             try {
                 VerificationDocument selfieDoc = documents.stream()
                         .filter(d -> "selfie".equals(d.getDocumentType()))
                         .findFirst()
-                        .orElseThrow(() -> new RuntimeException("Selfie not found"));
+                        .orElse(null);
+                if (selfieDoc == null && (runFace || runLiveness)) {
+                    throw new RuntimeException("Selfie not found");
+                }
 
                 VerificationDocument idDoc = documents.stream()
                         .filter(d -> "id_front".equals(d.getDocumentType())
                                 || "id_card".equals(d.getDocumentType()))
                         .findFirst()
-                        .orElseThrow(() -> new RuntimeException("ID document not found"));
+                        .orElse(null);
+                if (idDoc == null && (runFace || runOcr)) {
+                    throw new RuntimeException("ID document not found");
+                }
 
                 // Active-liveness frames from the widget (liveness_{index}_{label}), in capture order.
                 // Absent for API submissions with a single selfie — those keep the photo check.
@@ -79,10 +101,10 @@ public class ExternalKycServiceClient {
                         .toList();
 
                 // Each service call gets its own MultipartFile instance to avoid shared stream state
-                MultipartFile selfieForFace = createMultipartFile(selfieDoc);
-                MultipartFile selfieForLiveness = createMultipartFile(selfieDoc);
-                MultipartFile idFileForFace = createMultipartFile(idDoc);
-                MultipartFile idFileForOcr = createMultipartFile(idDoc);
+                MultipartFile selfieForFace = runFace ? createMultipartFile(selfieDoc) : null;
+                MultipartFile selfieForLiveness = runLiveness ? createMultipartFile(selfieDoc) : null;
+                MultipartFile idFileForFace = runFace ? createMultipartFile(idDoc) : null;
+                MultipartFile idFileForOcr = runOcr ? createMultipartFile(idDoc) : null;
                 MultipartFile[] livenessFrames = new MultipartFile[livenessDocs.size()];
                 for (int i = 0; i < livenessDocs.size(); i++)
                     livenessFrames[i] = createMultipartFile(livenessDocs.get(i));
@@ -94,13 +116,13 @@ public class ExternalKycServiceClient {
                 CircuitBreaker ocrBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.OCR_SERVICE);
 
                 // Face match — critical, failure propagates
-                CompletableFuture<FaceVerificationResponse> faceFuture = CompletableFuture
-                        .supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> faceScreeningClient.verifyFace(
+                CompletableFuture<FaceVerificationResponse> faceFuture = !runFace ? CompletableFuture.completedFuture(null)
+                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> faceScreeningClient.verifyFace(
                                 faceApiKey, faceApiSecret, selfieForFace, idFileForFace)));
 
                 // Liveness — degrades to manual_review if service is down (or breaker is open)
-                CompletableFuture<LivenessResponse> livenessFuture = CompletableFuture
-                        .supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> livenessFrames.length > 0
+                CompletableFuture<LivenessResponse> livenessFuture = !runLiveness ? CompletableFuture.completedFuture(null)
+                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> livenessFrames.length > 0
                                 ? faceScreeningClient.checkLivenessSequence(faceApiKey, faceApiSecret, livenessFrames, livenessLabels)
                                 : faceScreeningClient.checkLiveness(faceApiKey, faceApiSecret, selfieForLiveness)))
                         .exceptionally(ex -> {
@@ -109,8 +131,8 @@ public class ExternalKycServiceClient {
                         });
 
                 // OCR extraction — degrades to manual_review if service is down (or breaker is open)
-                CompletableFuture<OcrExtractionResponse> ocrFuture = CompletableFuture
-                        .supplyAsync(CircuitBreaker.decorateSupplier(ocrBreaker, () -> ocrScreeningClient.extractDocument(
+                CompletableFuture<OcrExtractionResponse> ocrFuture = !runOcr ? CompletableFuture.completedFuture(null)
+                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(ocrBreaker, () -> ocrScreeningClient.extractDocument(
                                 ocrApiKey, ocrApiSecret, idFileForOcr)))
                         .exceptionally(ex -> {
                             log.warn("OCR service unavailable for {}: {}", request.getId(), ex.getMessage());
@@ -125,6 +147,7 @@ public class ExternalKycServiceClient {
 
                 // --- Face match (critical) ---
                 FaceVerificationResponse faceResponse = faceFuture.join();
+                if (faceResponse != null) {
                 boolean faceManualReview = isManualReview(faceResponse);
                 String faceStatus = faceResponse.isVerified()
                         ? "passed"
@@ -152,10 +175,13 @@ public class ExternalKycServiceClient {
                     overallDecision = "rejected";
                     riskScore = 0.9;
                 }
+                }
 
                 // --- Liveness (null = service was down → manual review) ---
                 LivenessResponse livenessResponse = livenessFuture.join();
-                if (livenessResponse != null) {
+                if (!runLiveness) {
+                    // Not part of this run's workflow
+                } else if (livenessResponse != null) {
                     checks.add(CheckResult.builder()
                             .stepName("liveness_detection")
                             .status(livenessResponse.isPassed() ? "passed" : "failed")
@@ -186,6 +212,7 @@ public class ExternalKycServiceClient {
 
                 // --- OCR validation (null = service was down → OcrValidationService handles it) ---
                 OcrExtractionResponse ocrResponse = ocrFuture.join();
+                if (runOcr) {
                 ValidationOutcome ocrOutcome = ocrValidationService.validate(
                         ocrResponse, request.getCustomerData(), tier);
                 checks.add(ocrOutcome.checkResult());
@@ -197,6 +224,7 @@ public class ExternalKycServiceClient {
                         && "approved".equals(overallDecision)) {
                     overallDecision = "manual_review";
                     riskScore = 0.5;
+                }
                 }
 
                 // Build extracted OCR data map for persistence on the id_front document
@@ -211,7 +239,7 @@ public class ExternalKycServiceClient {
                         .overallDecision(overallDecision)
                         .riskScore(riskScore)
                         .extractedOcrData(extractedOcrData)
-                        .ocrDocumentId(idDoc.getId())
+                        .ocrDocumentId(idDoc != null ? idDoc.getId() : null)
                         .build();
 
             } catch (Exception e) {

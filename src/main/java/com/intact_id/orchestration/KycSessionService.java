@@ -1,5 +1,6 @@
 package com.intact_id.orchestration;
 
+import com.intact_id.workflow.PinnedWorkflow;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.orchestration.model.WidgetChannel;
 import com.intact_id.accounts.Company;
@@ -32,12 +33,13 @@ public class KycSessionService {
     private String issuer;
 
     public String createSessionToken(String companyId, String companyName, ApiKeyEnvironment environment,
-                                     String tier, String externalReference) {
+                                     String tier, String externalReference, PinnedWorkflow workflow) {
         String normalizedReference = externalReference != null && !externalReference.isBlank()
                 ? externalReference.trim()
                 : null;
         WidgetSessionContext context = new WidgetSessionContext(
-                companyId, companyName, environment, tier, normalizedReference, null, null, WidgetChannel.EMBEDDED);
+                companyId, companyName, environment, tier, normalizedReference, null, null, WidgetChannel.EMBEDDED,
+                workflow == null ? null : workflow.workflowId(), workflow == null ? null : workflow.version());
         return issueToken(context, new Date(System.currentTimeMillis() + SESSION_TTL_MS));
     }
 
@@ -52,6 +54,8 @@ public class KycSessionService {
         putIfPresent(claims, "externalReference", context.externalReference());
         putIfPresent(claims, "draftId", context.draftId());
         putIfPresent(claims, "handoffId", context.handoffId());
+        putIfPresent(claims, "workflowId", context.workflowId());
+        if (context.workflowVersion() != null) claims.put("workflowVersion", context.workflowVersion());
         claims.put("jti", UUID.randomUUID().toString());
 
         return Jwts.builder()
@@ -92,7 +96,9 @@ public class KycSessionService {
                 claims.get("externalReference", String.class),
                 claims.get("draftId", String.class),
                 claims.get("handoffId", String.class),
-                channel != null ? WidgetChannel.valueOf(channel) : WidgetChannel.EMBEDDED);
+                channel != null ? WidgetChannel.valueOf(channel) : WidgetChannel.EMBEDDED,
+                claims.get("workflowId", String.class),
+                claims.get("workflowVersion", Integer.class));
     }
 
     /** The name end users know the business by: trading name, falling back to the legal name. */

@@ -13,7 +13,9 @@ public record VerificationOutcome(
         String tier,
         GlobalStatuses status,
         String overallDecision,
-        String failureReason) {
+        String failureReason,
+        // Billing charges this workflow's price; null for tier-based runs
+        String workflowId) {
 
     public static VerificationOutcome of(VerificationRequest request) {
         return new VerificationOutcome(
@@ -23,6 +25,7 @@ public record VerificationOutcome(
                 request.getTier(),
                 request.getStatus(),
                 request.getOverallDecision(),
-                request.getFailureReason());
+                request.getFailureReason(),
+                request.getWorkflowId());
     }
 }

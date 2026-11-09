@@ -24,6 +24,19 @@ public class KycDraftResponseDto {
     private HandoffSummary handoff;
     // "direct": upload via /upload-url then /complete; "proxy": multipart to /documents/{type}
     private String uploadMode;
+    // What the pinned workflow needs from the applicant; absent for tier-based sessions
+    private WorkflowSteps workflow;
+
+    @Data
+    @Builder
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class WorkflowSteps {
+        private String key;
+        private Integer version;
+        private List<String> screens;
+        private List<String> requiredFields;
+        private List<String> captures;
+    }
 
     @Data
     @Builder
