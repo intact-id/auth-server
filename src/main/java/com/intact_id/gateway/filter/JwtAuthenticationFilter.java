@@ -1,0 +1,106 @@
+package com.intact_id.gateway.filter;
+
+import com.intact_id.accounts.User;
+import com.intact_id.accounts.UserRepository;
+import com.intact_id.accounts.JwtService;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserRepository userRepository;
+
+    @Override
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
+
+        final String authHeader = request.getHeader("Authorization");
+        final String jwt;
+        final String username;
+
+        // Check if Authorization header exists and starts with Bearer
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Extract JWT token
+        jwt = authHeader.substring(7);
+
+        try {
+            // Extract username from token
+            username = jwtService.extractUsername(jwt);
+
+            // Always revalidate the JWT — never skip based on existing context state.
+            // Using createEmptyContext() + setContext() is the Spring Security recommended
+            // pattern to avoid stale authentication leaking between requests on reused threads.
+            if (username != null) {
+                // Load user from database
+                User user = userRepository.findByUsername(username).orElse(null);
+
+                // Validate token — and reject anything that isn't a plain access token.
+                // Refresh tokens carry tokenType "refresh" and MFA challenge tokens carry
+                // "mfa_challenge"; neither should ever authenticate an API request.
+                String tokenType = jwtService.extractTokenType(jwt);
+                if (user != null && tokenType == null && jwtService.validateToken(jwt, username)) {
+                    // Create authorities from user roles and permissions
+                    List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
+                            .flatMap(role -> {
+                                // Add role as authority
+                                var roleAuthority = new SimpleGrantedAuthority("ROLE_" + role.getName());
+                                // Add permissions as authorities
+                                var permissionAuthorities = role.getPermissions().stream()
+                                        .map(permission -> new SimpleGrantedAuthority(permission.getName()))
+                                        .collect(Collectors.toList());
+                                permissionAuthorities.add(roleAuthority);
+                                return permissionAuthorities.stream();
+                            })
+                            .collect(Collectors.toList());
+
+                    // Create authentication token
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            user,
+                            null,
+                            authorities);
+
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    // Use a fresh context to prevent any stale auth from a previous request
+                    // on this thread from being visible
+                    SecurityContext context = SecurityContextHolder.createEmptyContext();
+                    context.setAuthentication(authToken);
+                    SecurityContextHolder.setContext(context);
+
+                    log.debug("JWT authentication successful for user: {}", username);
+                }
+            }
+        } catch (Exception e) {
+            log.error("JWT authentication failed", e);
+        }
+
+        filterChain.doFilter(request, response);
+
+    }
+}

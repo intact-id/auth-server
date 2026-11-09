@@ -1,0 +1,143 @@
+# Intact-ID staging stack (laptop). Same services as production, but auth-server runs the
+# :develop image and Watchtower redeploys it whenever develop is pushed.
+# env/*.env are copies of production's files; the few values that must differ are
+# overridden under auth-server.environment below (compose environment beats env_file).
+x-app: &app
+  restart: unless-stopped
+  networks: [app-net]
+  labels:
+    - com.centurylinklabs.watchtower.enable=true
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    env_file: env/postgres.env
+    ports: ["127.0.0.1:5433:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.8.0
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms512m
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks: [app-net]
+
+  # Catches all outgoing email; inbox at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports: ["127.0.0.1:8025:8025"]
+    networks: [app-net]
+
+  auth-server:
+    <<: *app
+    image: frankmwangi8118/intact-auth:develop
+    env_file: env/auth.env
+    environment:
+      # Never touch production data or people from staging
+      KYC_STORAGE_TYPE: ${STAGING_STORAGE_TYPE:-local}
+      KYC_S3_BUCKET: ${STAGING_S3_BUCKET:-intact-kyc-docs-staging}
+      # Staging's own R2 token (scoped to the staging bucket); never production's
+      # Staging bucket is in the default jurisdiction; env/auth.env has production's EU endpoint
+      KYC_S3_ENDPOINT: ${STAGING_S3_ENDPOINT:?set STAGING_S3_ENDPOINT in .env}
+      KYC_S3_ACCESS_KEY: ${STAGING_S3_ACCESS_KEY:-}
+      KYC_S3_SECRET_KEY: ${STAGING_S3_SECRET_KEY:-}
+      JWT_SECRET: ${STAGING_JWT_SECRET:?set STAGING_JWT_SECRET in .env}
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      # Also the From address (spring.mail.username) — blank makes every send fail "Illegal address"
+      MAIL_USERNAME: no-reply@staging.intact-io.com
+      MAIL_PASSWORD: ""
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "false"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "false"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: "false"
+      # Public URL of this laptop (Cloudflare Tunnel / ngrok) for widget + phone handoff
+      KYC_WIDGET_MOBILE_URL: ${STAGING_WIDGET_URL:-http://localhost:5173}/m
+      APP_BASE_URL: ${STAGING_PUBLIC_URL:-http://localhost:8080}
+      CORS_ALLOWED_ORIGINS: ${STAGING_CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
+    ports: ["8080:8080"]
+    volumes:
+      - uploads:/var/data/intact-id/uploads
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  face-service:
+    <<: *app
+    # :develop (id-ingestion develop) — :latest is production's and lacks the liveness/sequence
+    # endpoint the :develop auth-server calls
+    image: frankmwangi8118/intact-id:develop
+    env_file: env/face.env
+    environment:
+      PORT: 9000
+      REDIS_ENABLED: "false"
+    shm_size: 2gb
+
+  ocr-service:
+    <<: *app
+    image: frankmwangi8118/paddleocr-service:develop
+    command: ./scripts/start.sh
+    env_file: env/ocr.env
+    volumes:
+      - paddleocr-cache:/root/.paddleocr
+    shm_size: 2gb
+
+  sactions-service:
+    <<: *app
+    image: frankmwangi8118/sactions-service:develop
+    env_file: env/sactions.env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  billing-service:
+    <<: *app
+    image: frankmwangi8118/api-billing-service:develop
+    env_file: env/billing.env
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_POLL_INTERVAL: "30"
+      WATCHTOWER_CLEANUP: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:
+  kafka-data:
+  paddleocr-cache:
+  uploads:
+
+networks:
+  app-net:
+    name: intact-staging-net
