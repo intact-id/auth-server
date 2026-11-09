@@ -9,8 +9,11 @@ import lombok.Data;
 @Data
 public class KycSessionRequestDto {
 
-    @NotBlank(message = "tier is required (tier1, tier2, tier3)")
+    // Required unless a workflow is given; with a workflow it is kept for reporting only
     private String tier;
+
+    // Workflow key (e.g. full-onboarding): sandbox runs its latest published version, production its live one
+    private String workflow;
 
     @NotNull(message = "environment is required")
     private ApiKeyEnvironment environment;

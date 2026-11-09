@@ -37,7 +37,7 @@ class VerificationBillingEventsTests {
     @Test
     void outcomeIsBilledAfterCommitAndTheStoredEventIsCleared() {
         VerificationOutcome outcome = new VerificationOutcome("ver-test-1", "company-1", "CLIENT-1", "tier1",
-                GlobalStatuses.COMPLETED, "approved", null);
+                GlobalStatuses.COMPLETED, "approved", null, null);
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> publisher.publishEvent(outcome));
 

@@ -1,5 +1,8 @@
 package com.intact_id.orchestration.draft;
 
+import java.util.Optional;
+import com.intact_id.workflow.WorkflowRuntime;
+import com.intact_id.workflow.PinnedWorkflow;
 import com.intact_id.orchestration.config.KycDraftConfig;
 import com.intact_id.orchestration.model.KycDraftStatus;
 import com.intact_id.orchestration.model.KycHandoffStatus;
@@ -64,6 +67,7 @@ public class KycDraftService {
     private static final Pattern LIVENESS_TYPE = Pattern.compile("liveness_([0-7])_(neutral|turn_left|turn_right)");
     private static final Pattern UNSAFE_FILENAME_CHARS = Pattern.compile("[^A-Za-z0-9._-]");
     private static final int RESUME_TOKEN_BYTES = 32;
+    private static final String LIVENESS_SERVICE = "LIVENESS";
     private static final Pattern UPLOAD_ID = Pattern.compile(
             "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final Set<String> DIRECT_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
@@ -76,6 +80,7 @@ public class KycDraftService {
     private final DocumentStorage documentStorage;
     private final KycSessionService kycSessionService;
     private final VerificationService verificationService;
+    private final WorkflowRuntime workflowRuntime;
     private final GeneratorUtils generatorUtils;
     private final KycDraftConfig config;
 
@@ -87,6 +92,8 @@ public class KycDraftService {
         draft.setCompanyId(context.companyId());
         draft.setEnvironment(context.environment());
         draft.setTier(context.tier());
+        draft.setWorkflowId(context.workflowId());
+        draft.setWorkflowVersion(context.workflowVersion());
         draft.setExternalReference(context.externalReference());
         draft.setResumeTokenHash(generatorUtils.hashString(resumeToken));
         draft.setExpiresAt(LocalDateTime.now().plus(config.getTtl()));
@@ -350,7 +357,8 @@ public class KycDraftService {
                     companyRepository.findById(draft.getCompanyId()).orElse(null));
             WidgetSessionContext tokenContext = new WidgetSessionContext(
                     draft.getCompanyId(), companyName, draft.getEnvironment(), draft.getTier(),
-                    draft.getExternalReference(), draft.getId(), handoffId, channel);
+                    draft.getExternalReference(), draft.getId(), handoffId, channel,
+                    draft.getWorkflowId(), draft.getWorkflowVersion());
             response.setDraftToken(kycSessionService.issueToken(
                     tokenContext, Date.from(tokenExpiry.atZone(ZoneId.systemDefault()).toInstant())));
             response.setDraftTokenExpiresInSeconds(Duration.between(now, tokenExpiry).getSeconds());
@@ -385,6 +393,13 @@ public class KycDraftService {
                 .documents(documents)
                 .handoff(handoff)
                 .uploadMode(documentStorage.supportsDirectUpload() ? "direct" : "proxy")
+                .workflow(pinned(draft).map(w -> KycDraftResponseDto.WorkflowSteps.builder()
+                        .key(w.key())
+                        .version(w.version())
+                        .screens(w.requirements().screens())
+                        .requiredFields(w.requirements().requiredFields())
+                        .captures(w.requirements().captures())
+                        .build()).orElse(null))
                 .build();
     }
 
@@ -416,6 +431,8 @@ public class KycDraftService {
         request.setEmail(detail(details, "email"));
         request.setVerificationType("individual");
         request.setExternalReference(draft.getExternalReference());
+        request.setWorkflowId(draft.getWorkflowId());
+        request.setWorkflowVersion(draft.getWorkflowVersion());
 
         TreeMap<Integer, KycDraftDocument> livenessByIndex = new TreeMap<>();
         for (KycDraftDocument document : documentRepository.findByDraftId(draft.getId())) {
@@ -434,8 +451,10 @@ public class KycDraftService {
             }
         }
 
-        // Drafts must carry the active-liveness frames; the single-photo fallback is for API callers only
-        if (livenessByIndex.isEmpty()) {
+        // Drafts must carry the active-liveness frames (the single-photo fallback is for API callers only),
+        // unless the pinned workflow has no liveness step
+        boolean needsLiveness = pinned(draft).map(w -> w.runs(LIVENESS_SERVICE)).orElse(true);
+        if (needsLiveness && livenessByIndex.isEmpty()) {
             throw new ApplicationExceptions.IntactBadRequestException("Complete the liveness check before submitting");
         }
         List<MultipartFile> frames = new ArrayList<>();
@@ -449,6 +468,11 @@ public class KycDraftService {
         request.setLivenessFrames(frames);
         request.setLivenessLabels(String.join(",", labels));
         return request;
+    }
+
+    private Optional<PinnedWorkflow> pinned(KycDraft draft) {
+        return draft.getWorkflowId() == null || draft.getWorkflowVersion() == null ? Optional.empty()
+                : workflowRuntime.find(draft.getWorkflowId(), draft.getWorkflowVersion());
     }
 
     private MultipartFile asMultipartFile(KycDraftDocument document) {

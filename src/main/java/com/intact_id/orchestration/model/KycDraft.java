@@ -31,6 +31,13 @@ public class KycDraft extends Auditable {
     @Column(name = "tier", nullable = false, length = 20)
     private String tier;
 
+    // The workflow version pinned when the session started; null = tier-based run
+    @Column(name = "workflow_id")
+    private String workflowId;
+
+    @Column(name = "workflow_version")
+    private Integer workflowVersion;
+
     @Column(name = "external_reference")
     private String externalReference;
 

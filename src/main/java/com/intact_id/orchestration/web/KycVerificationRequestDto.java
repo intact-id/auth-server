@@ -65,4 +65,14 @@ public class KycVerificationRequestDto {
 
     @Size(max = 255, message = "externalReference must be at most 255 characters")
     private String externalReference;
+
+    // Workflow key for API submissions: sandbox runs its latest published version, production its live one
+    private String workflow;
+
+    // Set internally when a session already pinned the version (widget drafts); not part of the public API
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    private String workflowId;
+
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    private Integer workflowVersion;
 }
