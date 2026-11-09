@@ -383,6 +383,9 @@ public class BillingService {
         metadata.put("tier", outcome.tier());
         metadata.put("overallDecision", outcome.overallDecision());
         metadata.put("verificationId", outcome.verificationId());
+        if (outcome.workflowId() != null) {
+            metadata.put("workflowId", outcome.workflowId());
+        }
 
         String clientIdentifier = outcome.clientIdentifier();
         log.info("Publishing billing event: client={} eventType={} verification={} billingEvent={}",

@@ -1,5 +1,8 @@
 package com.intact_id.orchestration.verification;
 
+import java.util.ArrayList;
+import com.intact_id.workflow.WorkflowRuntime;
+import com.intact_id.workflow.PinnedWorkflow;
 import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.accounts.Company;
@@ -52,6 +55,7 @@ public class VerificationService {
     private final ApplicationEventPublisher eventPublisher;
     private final PlatformTransactionManager transactionManager;
     private final DocumentStorage documentStorage;
+    private final WorkflowRuntime workflowRuntime;
 
     /** Document type prefix for active-liveness frames: liveness_{index}_{label}. */
     public static final String LIVENESS_DOC_PREFIX = "liveness_";
@@ -77,8 +81,13 @@ public class VerificationService {
 
         log.info("Submitting {} verification for company: {}, tier: {}", environment.name(), company.getId(), tier);
 
-        // Validate tier-specific requirements — in-memory, no DB/IO involved
-        tierValidationService.validateTier(tier, request);
+        // A workflow decides which uploads are needed; otherwise the tier does (in-memory, no DB/IO involved)
+        PinnedWorkflow workflow = resolveWorkflow(request, company, environment);
+        if (workflow != null) {
+            validateWorkflowUploads(workflow, request);
+        } else {
+            tierValidationService.validateTier(tier, request);
+        }
         List<String> livenessLabels = parseLivenessLabels(request);
         String externalReference = normalizeExternalReference(request.getExternalReference());
 
@@ -87,6 +96,10 @@ public class VerificationService {
             VerificationRequest verificationRequest = new VerificationRequest();
             verificationRequest.setCompany(company);
             verificationRequest.setTier(tier);
+            if (workflow != null) {
+                verificationRequest.setWorkflowId(workflow.workflowId());
+                verificationRequest.setWorkflowVersion(workflow.version());
+            }
             verificationRequest.setVerificationType(request.getVerificationType());
             // DRAFT until its files are saved, so the scheduler never picks up a request without documents
             verificationRequest.setStatus(GlobalStatuses.DRAFT);
@@ -167,6 +180,36 @@ public class VerificationService {
      * labels (one per frame), or an empty list when the submission has no liveness frames — e.g.
      * API customers that upload a single selfie, who stay on the single-photo liveness check.
      */
+    /** The version a draft pinned, or the one a workflow key resolves to now; null for tier-based runs. */
+    private PinnedWorkflow resolveWorkflow(KycVerificationRequestDto request, Company company, ApiKeyEnvironment environment) {
+        if (request.getWorkflowId() != null && request.getWorkflowVersion() != null) {
+            return workflowRuntime.find(request.getWorkflowId(), request.getWorkflowVersion())
+                    .orElseThrow(() -> new ApplicationExceptions.IntactBadRequestException("The session's workflow no longer exists"));
+        }
+        if (request.getWorkflow() != null && !request.getWorkflow().isBlank()) {
+            return workflowRuntime.pin(company.getId(), request.getWorkflow().trim(), environment == ApiKeyEnvironment.PROD);
+        }
+        return null;
+    }
+
+    /** Only the uploads the workflow's services capture are required. A single selfie still covers liveness. */
+    private static void validateWorkflowUploads(PinnedWorkflow workflow, KycVerificationRequestDto request) {
+        List<String> captures = workflow.requirements().captures();
+        List<String> missing = new ArrayList<>();
+        if (captures.contains("id_front") && isMissing(request.getIdFront())) missing.add("idFront");
+        boolean needsSelfie = captures.contains("selfie") || captures.contains("liveness_frames");
+        if (needsSelfie && isMissing(request.getSelfie())) missing.add("selfie");
+        if (captures.contains("proof_of_address") && isMissing(request.getProofOfAddress())) missing.add("proofOfAddress");
+        if (!missing.isEmpty()) {
+            throw new ApplicationExceptions.IntactBadRequestException(
+                    "Workflow " + workflow.key() + " needs: " + String.join(", ", missing));
+        }
+    }
+
+    private static boolean isMissing(MultipartFile file) {
+        return file == null || file.isEmpty();
+    }
+
     private List<String> parseLivenessLabels(KycVerificationRequestDto request) {
         List<MultipartFile> frames = request.getLivenessFrames() == null ? List.of()
                 : request.getLivenessFrames().stream().filter(f -> f != null && !f.isEmpty()).toList();

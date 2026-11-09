@@ -6,7 +6,8 @@ package com.intact_id.orchestration;
  */
 public interface BalanceCheck {
 
-    HoldDecision check(String clientIdentifier, String verificationId);
+    /** workflowId: the run's workflow, priced per workflow in billing; null = the client's default price. */
+    HoldDecision check(String clientIdentifier, String verificationId, String workflowId);
 
     record HoldDecision(boolean hold, String reason) {
         public static final HoldDecision ALLOW = new HoldDecision(false, null);

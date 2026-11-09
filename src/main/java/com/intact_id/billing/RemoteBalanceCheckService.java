@@ -1,5 +1,6 @@
 package com.intact_id.billing;
 
+import java.util.Map;
 import com.intact_id.orchestration.BalanceCheck;
 import com.intact_id.orchestration.BalanceCheck.HoldDecision;
 import com.intact_id.billing.client.BalanceCheckReason;
@@ -26,12 +27,12 @@ public class RemoteBalanceCheckService implements BalanceCheck {
      * triggers in billing-service releases this exact lock instead of waiting out its TTL.
      */
     @Override
-    public HoldDecision check(String clientIdentifier, String verificationId) {
+    public HoldDecision check(String clientIdentifier, String verificationId, String workflowId) {
         BillingApiResult<BalanceCheckResponse> result;
         try {
             result = billingServiceClient.checkBalance(
                     new BalanceCheckRequest(clientIdentifier, KafkaBillingEventType.KYC_VERIFICATION_CALL.name(),
-                            true, verificationId, 1));
+                            true, verificationId, 1, workflowId == null ? null : Map.of("workflowId", workflowId)));
         } catch (Exception e) {
             log.error("billing-service check-balance call failed for client {} — holding (fail closed): {}",
                     clientIdentifier, e.getMessage(), e);

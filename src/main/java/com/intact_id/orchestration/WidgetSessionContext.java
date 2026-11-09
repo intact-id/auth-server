@@ -15,7 +15,10 @@ public record WidgetSessionContext(
         String externalReference,
         String draftId,
         String handoffId,
-        WidgetChannel channel) {
+        WidgetChannel channel,
+        // The workflow version pinned at session start; null for tier-based sessions
+        String workflowId,
+        Integer workflowVersion) {
 
     public static final String ATTRIBUTE = "widget.context";
 }

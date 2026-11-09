@@ -1,5 +1,11 @@
 package com.intact_id.orchestration.verification;
 
+import java.util.Set;
+import java.util.Optional;
+import com.intact_id.workflow.WorkflowRuntime;
+import com.intact_id.workflow.WorkflowRun;
+import com.intact_id.workflow.WorkflowExecutor;
+import com.intact_id.workflow.PinnedWorkflow;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.orchestration.VerificationDocument;
 import com.intact_id.orchestration.VerificationRequest;
@@ -39,6 +45,7 @@ public class VerificationProcessor {
     private final EmailService emailService;
     private final RateLimitService rateLimitService;
     private final PlatformTransactionManager transactionManager;
+    private final WorkflowRuntime workflowRuntime;
     private final BalanceCheck balanceCheck;
 
     @Value("${app.support-email:support@intact-id.com}")
@@ -61,7 +68,7 @@ public class VerificationProcessor {
         // Wallet balance check — billing implements BalanceCheck by asking billing-service.
         // The local check-and-hold path (BillingService.checkSufficientBalance) is deprecated.
         HoldDecision balanceDecision = balanceCheck.check(
-                request.getCompany().getCompanyIdentifierCode(), request.getId());
+                request.getCompany().getCompanyIdentifierCode(), request.getId(), request.getWorkflowId());
         if (balanceDecision.hold()) {
             request.markAsHeld(balanceDecision.reason());
             verificationRequestRepository.save(request);
@@ -72,10 +79,15 @@ public class VerificationProcessor {
         List<VerificationDocument> documents = verificationDocumentRepository
                 .findByVerificationRequestId(request.getId());
 
+        // A workflow run calls only its services' checks; a tier-based run calls them all
+        Optional<PinnedWorkflow> workflow = request.getWorkflowId() == null || request.getWorkflowVersion() == null
+                ? Optional.empty() : workflowRuntime.find(request.getWorkflowId(), request.getWorkflowVersion());
+        Set<String> services = workflow.map(w -> Set.copyOf(w.services())).orElse(null);
+
         ExternalKycServiceClient.VerificationResult result;
         try {
             result = externalKycServiceClient
-                    .performVerification(request.getTier(), request, documents)
+                    .performVerification(request.getTier(), request, documents, services)
                     .join();
         } catch (Exception e) {
             log.error("External KYC service call failed for: {}", request.getId(), e);
@@ -108,6 +120,10 @@ public class VerificationProcessor {
             markAsFailed(request, failureReason, errorDetails);
             publishStatusChanged(request);
             return;
+        }
+
+        if (request.getWorkflowId() != null) {
+            applyWorkflow(request, workflow, result);
         }
 
         for (ExternalKycServiceClient.CheckResult check : result.getChecks()) {
@@ -191,6 +207,37 @@ public class VerificationProcessor {
     // parsing, "selfie not found", etc.) is terminal. See ExternalServiceFailureClassifier.
     private static boolean isRetryableServiceError(Throwable cause) {
         return ExternalServiceFailureClassifier.isTransient(cause);
+    }
+
+    /** The workflow, not the fixed check bundle, decides: walk the pinned graph and keep the path for audit. */
+    private void applyWorkflow(VerificationRequest request, Optional<PinnedWorkflow> workflow,
+                               ExternalKycServiceClient.VerificationResult result) {
+        if (workflow.isEmpty()) {
+            log.error("Verification {} pins workflow {} v{}, which no longer exists", request.getId(),
+                    request.getWorkflowId(), request.getWorkflowVersion());
+            result.setOverallDecision("manual_review");
+            result.setFailureReason("Workflow version not found");
+            return;
+        }
+        WorkflowRun run = WorkflowExecutor.walk(workflow.get().graph(),
+                WorkflowOutcomes.from(result, Set.copyOf(workflow.get().services())), WorkflowOutcomes.startFacts(request));
+        request.setWorkflowPath(run.path());
+        switch (run.decision()) {
+            case APPROVED -> {
+                result.setOverallDecision("approved");
+                result.setFailureReason(null);
+            }
+            case REJECTED -> {
+                result.setOverallDecision("rejected");
+                result.setFailureReason(run.reason());
+            }
+            case MANUAL_REVIEW -> {
+                result.setOverallDecision("manual_review");
+                result.setFailureReason(run.reason());
+            }
+        }
+        log.info("Verification {} followed workflow {} v{}: {} ({} steps)", request.getId(), workflow.get().key(),
+                workflow.get().version(), run.decision(), run.path().size());
     }
 
     private static boolean shouldReject(String failureReason, String errorDetails, String overallDecision) {
