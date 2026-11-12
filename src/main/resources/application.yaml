@@ -53,6 +53,15 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
+  cloud:
+    openfeign:
+      client:
+        config:
+          screening-service:
+            logger-level: basic
+          billing-service:
+            logger-level: basic
+
 server:
   port: ${SERVER_PORT:8085}
   servlet:
@@ -169,6 +178,9 @@ logging:
   level:
     com.intact_id.checks.FaceScreeningClient: DEBUG
     com.intact_id.checks.OcrScreeningClient: DEBUG
+    # Every call to sactions-service and billing-service: method, URL, status, time (no bodies: they hold PII)
+    com.intact_id.checks.screening.ScreeningServiceClient: DEBUG
+    com.intact_id.billing.client.BillingServiceClient: DEBUG
 
 springdoc:
   swagger-ui:
