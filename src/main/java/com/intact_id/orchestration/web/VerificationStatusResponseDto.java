@@ -1,5 +1,7 @@
 package com.intact_id.orchestration.web;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.intact_id.notifications.WebhookDeliveryView;
 import lombok.Builder;
 import lombok.Data;
 
@@ -16,6 +18,9 @@ public class VerificationStatusResponseDto {
     private String status;
     private String tier;
     private String verificationType;
+    private String environment;
+    private String workflowId;
+    private Integer workflowVersion;
     private String overallDecision;
     private String failureReason;
     private String errorDetails;
@@ -23,8 +28,16 @@ public class VerificationStatusResponseDto {
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
     private Map<String, Object> customerData;
+    private Integer documentCount;
     private List<VerificationStepDto> steps;
     private List<DocumentDto> documents;
+
+    // Staff only (ADMIN / SUPER_ADMIN). Left out of the JSON for merchants and the widget.
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private ReviewDto review;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private List<WebhookDeliveryView> webhookDeliveries;
 
     @Data
     @Builder
@@ -47,5 +60,18 @@ public class VerificationStatusResponseDto {
         private String mimeType;
         private LocalDateTime uploadedAt;
         private Map<String, Object> extractedData;
+    }
+
+    /** The manual review record. Empty fields mean that stage has not happened. */
+    @Data
+    @Builder
+    public static class ReviewDto {
+        private String reason;
+        private LocalDateTime requestedAt;
+        private String assignedTo;
+        private LocalDateTime assignedAt;
+        private String reviewedBy;
+        private LocalDateTime reviewedAt;
+        private String notes;
     }
 }

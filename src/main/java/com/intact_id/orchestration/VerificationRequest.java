@@ -93,6 +93,29 @@ public class VerificationRequest extends Auditable {
     @Column(name = "external_reference")
     private String externalReference; // company-supplied ID, not unique
 
+    // Manual review record. Kept apart from riskScore and failureReason so the automated
+    // evidence survives a reviewer's decision.
+    @Column(name = "review_reason", length = 500)
+    private String reviewReason; // why the checks sent it to a human
+
+    @Column(name = "review_requested_at")
+    private LocalDateTime reviewRequestedAt;
+
+    @Column(name = "review_assigned_to")
+    private String reviewAssignedTo; // reviewer's username
+
+    @Column(name = "review_assigned_at")
+    private LocalDateTime reviewAssignedAt;
+
+    @Column(name = "reviewed_by")
+    private String reviewedBy; // reviewer's username
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
+
+    @Column(name = "review_notes", columnDefinition = "text")
+    private String reviewNotes;
+
     // Helper methods
     public boolean isCompleted() {
         return status == GlobalStatuses.COMPLETED ||
@@ -147,23 +170,36 @@ public class VerificationRequest extends Auditable {
         this.completedAt = LocalDateTime.now();
     }
 
-    public void markAsManualReview(Double riskScore) {
+    public void markAsManualReview(Double riskScore, String reason) {
         this.status = GlobalStatuses.PENDING_APPROVAL;
         this.overallDecision = "manual_review";
         this.riskScore = riskScore;
+        this.reviewReason = reason != null && reason.length() > 500 ? reason.substring(0, 500) : reason;
+        this.reviewRequestedAt = LocalDateTime.now();
     }
 
-    public void resolveManualReview(String decision, String reviewerNotes) {
+    /** Records the reviewer's decision. The automated riskScore and failureReason are left as evidence. */
+    public void resolveManualReview(String decision, String notes, String reviewer) {
         if ("approved".equalsIgnoreCase(decision)) {
             this.status = GlobalStatuses.COMPLETED;
             this.overallDecision = "approved";
-            this.riskScore = 0.1;
         } else {
             this.status = GlobalStatuses.REJECTED;
             this.overallDecision = "rejected";
-            this.riskScore = 0.9;
         }
-        this.failureReason = reviewerNotes;
-        this.completedAt = LocalDateTime.now();
+        this.reviewedBy = reviewer;
+        this.reviewedAt = LocalDateTime.now();
+        this.reviewNotes = notes;
+        this.completedAt = this.reviewedAt;
+    }
+
+    public void assignReviewer(String reviewer) {
+        this.reviewAssignedTo = reviewer;
+        this.reviewAssignedAt = LocalDateTime.now();
+    }
+
+    public void unassignReviewer() {
+        this.reviewAssignedTo = null;
+        this.reviewAssignedAt = null;
     }
 }

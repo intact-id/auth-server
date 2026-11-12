@@ -352,6 +352,9 @@ public class VerificationService {
                 .status(request.getStatus().name())
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
+                .environment(request.getEnvironment() != null ? request.getEnvironment().name() : null)
+                .workflowId(request.getWorkflowId())
+                .workflowVersion(request.getWorkflowVersion())
                 .overallDecision(request.getOverallDecision())
                 .failureReason(request.getFailureReason())
                 .errorDetails(request.getErrorDetails())
@@ -359,6 +362,7 @@ public class VerificationService {
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
                 .customerData(request.getCustomerData())
+                .documentCount(documents.size())
                 .steps(steps.stream().map(this::mapStepToDto).collect(Collectors.toList()))
                 .documents(documents.stream().map(this::mapDocumentToDto).collect(Collectors.toList()))
                 .build();
@@ -369,6 +373,7 @@ public class VerificationService {
             ApiKeyEnvironment environment,
             GlobalStatuses status,
             String tier,
+            String verificationType,
             String externalReference,
             LocalDateTime fromDate,
             LocalDateTime toDate,
@@ -381,8 +386,9 @@ public class VerificationService {
         String environmentName = environment != null ? environment.name() : null;
         String statusName = status != null ? status.name() : null;
         Page<VerificationRequest> requests = verificationRequestRepository.findByFilters(
-                resolvedCompanyId, environmentName, statusName, tier, normalizedReference,
-                fromDate, toDate, normalizedSearch, pageable);
+                resolvedCompanyId, environmentName, statusName, tier, blankToNull(verificationType),
+                normalizedReference, fromDate, toDate, normalizedSearch, pageable);
+        Map<String, Integer> documentCounts = documentCountsFor(requests.getContent());
 
         return requests.map(request -> VerificationStatusResponseDto.builder()
                 .verificationId(request.getId())
@@ -391,14 +397,56 @@ public class VerificationService {
                 .status(request.getStatus().name())
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
+                .environment(request.getEnvironment() != null ? request.getEnvironment().name() : null)
+                .workflowId(request.getWorkflowId())
+                .workflowVersion(request.getWorkflowVersion())
                 .overallDecision(request.getOverallDecision())
                 .riskScore(request.getRiskScore())
                 .failureReason(request.getFailureReason())
                 .errorDetails(request.getErrorDetails())
                 .customerData(request.getCustomerData())
+                .documentCount(documentCounts.getOrDefault(request.getId(), 0))
                 .createdAt(request.getCreatedAt())
                 .completedAt(request.getCompletedAt())
                 .build());
+    }
+
+    private Map<String, Integer> documentCountsFor(List<VerificationRequest> requests) {
+        if (requests.isEmpty()) return Map.of();
+        List<String> ids = requests.stream().map(VerificationRequest::getId).toList();
+        Map<String, Integer> counts = new HashMap<>();
+        for (Object[] row : verificationDocumentRepository.countByVerificationIds(ids)) {
+            counts.put((String) row[0], ((Number) row[1]).intValue());
+        }
+        return counts;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /**
+     * Adds what only Intact staff (ADMIN / SUPER_ADMIN) may see: the manual review record and,
+     * optionally, this verification's webhook deliveries. Callers decide who is staff.
+     */
+    @Transactional(readOnly = true)
+    public VerificationStatusResponseDto withStaffDetails(VerificationStatusResponseDto dto, boolean includeWebhookDeliveries) {
+        VerificationRequest request = verificationRequestRepository.findById(dto.getVerificationId())
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
+                        "Verification not found: " + dto.getVerificationId()));
+        dto.setReview(VerificationStatusResponseDto.ReviewDto.builder()
+                .reason(request.getReviewReason())
+                .requestedAt(request.getReviewRequestedAt())
+                .assignedTo(request.getReviewAssignedTo())
+                .assignedAt(request.getReviewAssignedAt())
+                .reviewedBy(request.getReviewedBy())
+                .reviewedAt(request.getReviewedAt())
+                .notes(request.getReviewNotes())
+                .build());
+        if (includeWebhookDeliveries) {
+            dto.setWebhookDeliveries(webhookService.listDeliveriesForVerification(request.getId()));
+        }
+        return dto;
     }
 
     @Transactional
