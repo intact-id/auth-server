@@ -42,6 +42,7 @@ public class CompanyServiceImpl implements CompanyService {
     private final GeneratorUtils generatorUtils;
     private final com.intact_id.notifications.EmailService emailService;
     private final com.intact_id.accounts.NotificationService notificationService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Company createCompanyFromApplication(CompanyApplication application) {
@@ -60,6 +61,8 @@ public class CompanyServiceImpl implements CompanyService {
         Company savedCompany = companyRepository.save(company);
         log.info("Company created with ID: {}, Customer ID: {}",
                 savedCompany.getId(), savedCompany.getCompanyIdentifierCode());
+        eventPublisher.publishEvent(new com.intact_id.accounts.CompanyCreated(savedCompany.getId(),
+                savedCompany.getCompanyIdentifierCode(), savedCompany.getLegalName(), savedCompany.getCountry()));
 
         // 2. Create Communication
         CompanyCommunicationDetails communication = getCompanyCommunicationDetails(application, savedCompany);

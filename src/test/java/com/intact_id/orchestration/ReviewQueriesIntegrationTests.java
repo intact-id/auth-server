@@ -53,15 +53,15 @@ class ReviewQueriesIntegrationTests {
         verificationRequestRepository.saveAndFlush(done);
 
         List<String> all = ids(verificationRequestRepository.findReviewQueue(
-                GlobalStatuses.PENDING_APPROVAL, null, false, PageRequest.of(0, 50)).getContent());
+                GlobalStatuses.PENDING_APPROVAL, null, null, false, PageRequest.of(0, 50)).getContent());
         assertThat(all).containsSubsequence(older.getId(), newer.getId()).doesNotContain(done.getId());
 
         assertThat(ids(verificationRequestRepository.findReviewQueue(
-                GlobalStatuses.PENDING_APPROVAL, "amina", false, PageRequest.of(0, 50)).getContent()))
+                GlobalStatuses.PENDING_APPROVAL, null, "amina", false, PageRequest.of(0, 50)).getContent()))
                 .contains(newer.getId()).doesNotContain(older.getId());
 
         assertThat(ids(verificationRequestRepository.findReviewQueue(
-                GlobalStatuses.PENDING_APPROVAL, null, true, PageRequest.of(0, 50)).getContent()))
+                GlobalStatuses.PENDING_APPROVAL, null, null, true, PageRequest.of(0, 50)).getContent()))
                 .contains(older.getId()).doesNotContain(newer.getId());
     }
 

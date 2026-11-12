@@ -1,5 +1,7 @@
 package com.intact_id.orchestration.web;
 
+import com.intact_id.accounts.SecurityContextUtil;
+
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.orchestration.verification.ManualReviewService;
 import com.intact_id.orchestration.verification.ManualReviewService.QueueFilter;
@@ -30,6 +32,7 @@ public class ManualReviewController {
             @Parameter(description = "all (default), mine or unassigned") @RequestParam(defaultValue = "all") String assignee,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Super admins only: one company's queue (omit for all)") @RequestParam(required = false) String companyId,
             Authentication authentication) {
 
         QueueFilter filter = switch (assignee.trim().toLowerCase()) {
@@ -40,7 +43,7 @@ public class ManualReviewController {
                     "assignee must be all, mine or unassigned");
         };
         Page<VerificationStatusResponseDto> queue = manualReviewService.getPendingReviewQueue(
-                filter, authentication.getName(), PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
+                reviewScope(companyId), filter, authentication.getName(), PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
 
         return ok("Review queue retrieved", queue);
     }
@@ -56,7 +59,7 @@ public class ManualReviewController {
             Authentication authentication) {
 
         return ok("Review recorded", manualReviewService.resolveReview(
-                verificationId, decision, notes, authentication.getName()));
+                reviewScope(null), verificationId, decision, notes, authentication.getName()));
     }
 
     @PostMapping("/{verificationId}/assign")
@@ -66,7 +69,7 @@ public class ManualReviewController {
             @PathVariable String verificationId,
             Authentication authentication) {
 
-        return ok("Review assigned", manualReviewService.assign(verificationId, authentication.getName()));
+        return ok("Review assigned", manualReviewService.assign(reviewScope(null), verificationId, authentication.getName()));
     }
 
     @DeleteMapping("/{verificationId}/assign")
@@ -76,7 +79,15 @@ public class ManualReviewController {
             @PathVariable String verificationId,
             Authentication authentication) {
 
-        return ok("Review unassigned", manualReviewService.unassign(verificationId, authentication.getName()));
+        return ok("Review unassigned", manualReviewService.unassign(reviewScope(null), verificationId, authentication.getName()));
+    }
+
+    /** Company admins work only their own company's reviews; super admins any (or one with companyId). */
+    private static String reviewScope(String companyId) {
+        if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+            return companyId == null || companyId.isBlank() ? null : companyId;
+        }
+        return SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
     }
 
     private static <T> ResponseEntity<ApiResponse<T>> ok(String message, T data) {
