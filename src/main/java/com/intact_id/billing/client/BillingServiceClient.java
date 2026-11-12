@@ -1,6 +1,5 @@
 package com.intact_id.billing.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,53 +24,58 @@ public interface BillingServiceClient {
     BillingApiResult<WorkflowPricingResult> priceWorkflow(@PathVariable("workflowId") String workflowId,
                                                           @RequestBody WorkflowPricingRequest request);
 
-    // Account management for the dashboard: bodies and results pass through as JSON
+    // Account management for the dashboard
 
     @GetMapping("/v1/client/account")
-    JsonNode account(@RequestParam("clientIdentifier") String clientIdentifier);
+    BillingApiResult<BillingApi.Account> account(@RequestParam("clientIdentifier") String clientIdentifier);
 
     @PostMapping("/v1/client")
-    JsonNode createClient(@RequestBody JsonNode client);
+    BillingApiResult<BillingApi.Client> createClient(@RequestBody BillingApi.ClientCreation client);
 
     @PostMapping("/v1/billing-profile")
-    JsonNode createBillingProfile(@RequestBody JsonNode profile);
+    BillingApiResult<BillingApi.BillingProfile> createBillingProfile(@RequestBody BillingApi.BillingProfileCreation profile);
 
     @PatchMapping("/v1/billing-profile")
-    JsonNode updateBillingProfile(@RequestParam("id") String id, @RequestBody JsonNode changes);
+    BillingApiResult<BillingApi.BillingProfile> updateBillingProfile(@RequestParam("id") String id,
+                                                                     @RequestBody BillingApi.ProfileChanges changes);
 
     @PostMapping("/v1/billing-profile/wallet")
-    JsonNode createWallet(@RequestBody JsonNode wallet);
+    BillingApiResult<BillingApi.Wallet> createWallet(@RequestBody BillingApi.WalletCreation wallet);
 
     @PostMapping("/v1/billing-profile/wallet/credit")
-    JsonNode creditWallet(@RequestParam("billingProfileId") String billingProfileId, @RequestBody JsonNode credit);
+    BillingApiResult<BillingApi.Wallet> creditWallet(@RequestParam("billingProfileId") String billingProfileId,
+                                                     @RequestBody BillingApi.WalletCredit credit);
 
     @GetMapping("/v1/billing-profile/wallet/history")
-    JsonNode walletHistory(@RequestParam("billingProfileId") String billingProfileId);
+    BillingApiResult<List<BillingApi.WalletTransaction>> walletHistory(@RequestParam("billingProfileId") String billingProfileId);
 
     @PostMapping("/v1/billing-profile/per-call-pricing")
-    JsonNode createPerCallPricing(@RequestBody JsonNode pricing);
+    BillingApiResult<BillingApi.PerCallPricing> createPerCallPricing(@RequestBody BillingApi.PerCallPricingCreation pricing);
 
     @PatchMapping("/v1/billing-profile/per-call-pricing")
-    JsonNode updatePerCallPricing(@RequestParam("billingProfileId") String billingProfileId, @RequestBody JsonNode changes);
+    BillingApiResult<BillingApi.PerCallPricing> updatePerCallPricing(@RequestParam("billingProfileId") String billingProfileId,
+                                                                     @RequestBody BillingApi.PerCallChanges changes);
 
     @GetMapping("/v1/service-charges")
-    JsonNode serviceCharges(@RequestParam(value = "billingProfileId", required = false) String billingProfileId);
+    BillingApiResult<List<BillingApi.ServiceCharge>> serviceCharges(
+            @RequestParam(value = "billingProfileId", required = false) String billingProfileId);
 
     @PostMapping("/v1/service-charges")
-    JsonNode createServiceCharge(@RequestBody JsonNode charge);
+    BillingApiResult<BillingApi.ServiceCharge> createServiceCharge(@RequestBody BillingApi.ServiceChargeCreation charge);
 
     @PatchMapping("/v1/service-charges/{id}")
-    JsonNode updateServiceCharge(@PathVariable("id") String id, @RequestBody JsonNode changes);
+    BillingApiResult<BillingApi.ServiceCharge> updateServiceCharge(@PathVariable("id") String id,
+                                                                   @RequestBody BillingApi.ServiceChargeChanges changes);
 
     @GetMapping("/v1/invoice/by-billing-profile")
-    JsonNode invoices(@RequestParam("billingProfileId") String billingProfileId);
+    BillingApiResult<List<BillingApi.Invoice>> invoices(@RequestParam("billingProfileId") String billingProfileId);
 
     @GetMapping("/v1/invoice")
-    JsonNode invoice(@RequestParam("id") String id);
+    BillingApiResult<BillingApi.Invoice> invoice(@RequestParam("id") String id);
 
     @PostMapping("/v1/invoice/mark-paid")
-    JsonNode markInvoicePaid(@RequestParam("id") String id);
+    BillingApiResult<BillingApi.Invoice> markInvoicePaid(@RequestParam("id") String id);
 
     @PostMapping("/v1/invoice/void")
-    JsonNode voidInvoice(@RequestParam("id") String id);
+    BillingApiResult<BillingApi.Invoice> voidInvoice(@RequestParam("id") String id);
 }

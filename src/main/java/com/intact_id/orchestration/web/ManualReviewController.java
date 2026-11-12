@@ -1,8 +1,10 @@
 package com.intact_id.orchestration.web;
 
+import com.intact_id.accounts.SecurityContextUtil;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.orchestration.verification.ManualReviewService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,10 +27,11 @@ public class ManualReviewController {
     @Operation(summary = "List verifications pending manual review")
     public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> getPendingReviewQueue(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Super admins only: one company's queue (omit for all)") @RequestParam(required = false) String companyId) {
 
         Page<VerificationStatusResponseDto> queue = manualReviewService.getPendingReviewQueue(
-                PageRequest.of(page, size));
+                reviewScope(companyId), PageRequest.of(page, size));
 
         return ResponseEntity.ok(ApiResponse.<Page<VerificationStatusResponseDto>>builder()
                 .success(true).responseCode(200).data(queue).build());
@@ -45,9 +48,17 @@ public class ManualReviewController {
 
         String reviewerEmail = authentication.getName();
         VerificationStatusResponseDto result = manualReviewService.resolveReview(
-                verificationId, decision, notes, reviewerEmail);
+                reviewScope(null), verificationId, decision, notes, reviewerEmail);
 
         return ResponseEntity.ok(ApiResponse.<VerificationStatusResponseDto>builder()
                 .success(true).responseCode(200).data(result).build());
+    }
+
+    /** Company admins review only their own company's verifications; super admins any (or one with companyId). */
+    private static String reviewScope(String companyId) {
+        if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+            return companyId == null || companyId.isBlank() ? null : companyId;
+        }
+        return SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
     }
 }

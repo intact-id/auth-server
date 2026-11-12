@@ -27,16 +27,21 @@ public class ManualReviewService {
     private final VerificationWebhooks verificationWebhooks;
     private final ApplicationEventPublisher eventPublisher;
 
-    public Page<VerificationStatusResponseDto> getPendingReviewQueue(Pageable pageable) {
+    /** companyId null = every company's queue (super admins only). */
+    public Page<VerificationStatusResponseDto> getPendingReviewQueue(String companyId, Pageable pageable) {
         return verificationRequestRepository
-                .findByFilters(null, null, GlobalStatuses.PENDING_APPROVAL.name(),
+                .findByFilters(companyId, null, GlobalStatuses.PENDING_APPROVAL.name(),
                         null, null, null, null, null, pageable)
                 .map(r -> verificationService.getVerificationStatus(r.getId(), null, r.getEnvironment()));
     }
 
     @Transactional
-    public VerificationStatusResponseDto resolveReview(String verificationId, String decision, String notes, String reviewerEmail) {
+    /** companyId null = any company (super admins only); otherwise the verification must be that company's. */
+    public VerificationStatusResponseDto resolveReview(String companyId, String verificationId, String decision,
+                                                       String notes, String reviewerEmail) {
         VerificationRequest request = verificationRequestRepository.findById(verificationId)
+                // Another company's verification looks the same as a missing one
+                .filter(r -> companyId == null || (r.getCompany() != null && companyId.equals(r.getCompany().getId())))
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                         "Verification not found: " + verificationId));
 
