@@ -125,6 +125,10 @@ ocr:
 billing-service:
   url: ${BILLING_SERVICE_URL:http://localhost:8086}
 
+# sactions-service: sanctions/PEP screening and customer risk assessment (workflow services SANCTIONS_SCREENING, CRA)
+screening-service:
+  url: ${SCREENING_SERVICE_URL:http://localhost:8087}
+
 app:
   documents:
     base-dir: ${APP_DOCUMENTS_BASE_DIR:${user.dir}/uploads}
