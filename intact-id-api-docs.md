@@ -483,6 +483,62 @@ Authorization: Bearer eyJ...
 
 The new secret is returned **once** in the response. Store it immediately.
 
+### Delivery Log
+
+Every event sent to your endpoint is recorded with its outcome. Test events are not recorded.
+
+```http
+GET /api/companies/{id}/communication/webhook/deliveries?status=FAILED&page=0&size=20
+Authorization: Bearer eyJ...
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Optional. `PENDING`, `DELIVERED`, `FAILED` or `RETRYING` |
+| `page` | integer | Page number (default: 0) |
+| `size` | integer | Page size (default: 20, maximum: 100) |
+
+Returns a page of deliveries, newest first:
+
+```json
+{
+  "content": [
+    {
+      "id": "…",
+      "eventType": "verification.completed",
+      "verificationId": "VRF-20240115-A1B2C3",
+      "webhookUrl": "https://yourapp.com/webhooks/intact",
+      "status": "FAILED",
+      "httpStatusCode": 502,
+      "retryCount": 3,
+      "nextRetryAt": null,
+      "errorMessage": "Bad Gateway",
+      "deliveredAt": null,
+      "createdAt": "2024-01-15T10:31:45"
+    }
+  ],
+  "totalElements": 1,
+  "totalPages": 1,
+  "number": 0,
+  "size": 20
+}
+```
+
+The event payload and your server's response body are not included.
+
+### Delivery Summary
+
+```http
+GET /api/companies/{id}/communication/webhook/deliveries/summary?hours=24
+Authorization: Bearer eyJ...
+```
+
+Counts deliveries created in the last `hours` hours (default 24, maximum 720) by current status:
+
+```json
+{ "since": "2024-01-14T10:31:45", "total": 46, "delivered": 40, "failed": 3, "retrying": 2, "pending": 1 }
+```
+
 ### Webhook Event Payload
 
 ```json

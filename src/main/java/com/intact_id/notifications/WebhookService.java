@@ -11,6 +11,10 @@ import com.intact_id.notifications.webhook.WebhookSigner;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +27,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
@@ -56,6 +61,60 @@ public class WebhookService {
         }
         eventPublisher.publishEvent(new WebhookNotificationEvent(this,
                 new WebhookEventData(companyId, companyName, referenceId, eventType, eventData)));
+    }
+
+    /**
+     * A company's webhook deliveries, newest first. {@code status} is optional; when given it must
+     * be one of PENDING, DELIVERED, FAILED, RETRYING (any case).
+     */
+    @Transactional(readOnly = true)
+    public Page<WebhookDeliveryView> listDeliveries(String companyId, String status, Pageable pageable) {
+        Pageable newestFirst = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<WebhookDelivery> deliveries = (status == null || status.isBlank())
+                ? webhookDeliveryRepository.findByCompanyId(companyId, newestFirst)
+                : webhookDeliveryRepository.findByCompanyIdAndStatus(companyId, parseDeliveryStatus(status), newestFirst);
+        return deliveries.map(WebhookService::toView);
+    }
+
+    /** Delivery counts for a company since the given time, by current delivery status. */
+    @Transactional(readOnly = true)
+    public WebhookDeliverySummary summarizeDeliveries(String companyId, LocalDateTime since) {
+        long delivered = countDeliveries(companyId, WebhookDelivery.DeliveryStatus.DELIVERED, since);
+        long failed = countDeliveries(companyId, WebhookDelivery.DeliveryStatus.FAILED, since);
+        long retrying = countDeliveries(companyId, WebhookDelivery.DeliveryStatus.RETRYING, since);
+        long pending = countDeliveries(companyId, WebhookDelivery.DeliveryStatus.PENDING, since);
+        return new WebhookDeliverySummary(since, delivered + failed + retrying + pending,
+                delivered, failed, retrying, pending);
+    }
+
+    private long countDeliveries(String companyId, WebhookDelivery.DeliveryStatus status, LocalDateTime since) {
+        return webhookDeliveryRepository.countByCompanyIdAndStatusAndCreatedAtAfter(companyId, status, since);
+    }
+
+    private static WebhookDelivery.DeliveryStatus parseDeliveryStatus(String status) {
+        try {
+            return WebhookDelivery.DeliveryStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ApplicationExceptions.InvalidRequestException(
+                    "Unknown delivery status '" + status + "'. Use one of: "
+                            + Arrays.toString(WebhookDelivery.DeliveryStatus.values()));
+        }
+    }
+
+    private static WebhookDeliveryView toView(WebhookDelivery delivery) {
+        return new WebhookDeliveryView(
+                delivery.getId(),
+                delivery.getEventType(),
+                delivery.getVerificationId(),
+                delivery.getWebhookUrl(),
+                delivery.getStatus().name(),
+                delivery.getHttpStatusCode(),
+                delivery.getRetryCount(),
+                delivery.getNextRetryAt(),
+                delivery.getErrorMessage(),
+                delivery.getDeliveredAt(),
+                delivery.getCreatedAt());
     }
 
     /**
