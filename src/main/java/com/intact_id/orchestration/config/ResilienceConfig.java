@@ -23,6 +23,7 @@ public class ResilienceConfig {
 
     public static final String FACE_SERVICE = "face-service";
     public static final String OCR_SERVICE = "ocr-service";
+    public static final String SCREENING_SERVICE = "screening-service";
 
     @Bean
     public CircuitBreakerRegistry circuitBreakerRegistry() {
@@ -42,6 +43,7 @@ public class ResilienceConfig {
         // materializing lazily on first call.
         registry.circuitBreaker(FACE_SERVICE);
         registry.circuitBreaker(OCR_SERVICE);
+        registry.circuitBreaker(SCREENING_SERVICE);
         return registry;
     }
 }

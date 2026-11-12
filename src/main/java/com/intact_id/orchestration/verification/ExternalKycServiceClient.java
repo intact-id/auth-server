@@ -2,6 +2,7 @@ package com.intact_id.orchestration.verification;
 
 import com.intact_id.checks.FaceScreeningClient;
 import com.intact_id.checks.OcrScreeningClient;
+import com.intact_id.checks.RiskScreening;
 import com.intact_id.orchestration.config.ResilienceConfig;
 import com.intact_id.orchestration.VerificationDocument;
 import com.intact_id.orchestration.VerificationRequest;
@@ -37,6 +38,7 @@ public class ExternalKycServiceClient {
     private final VerificationDocumentRepository verificationDocumentRepository;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final VerificationDocumentFiles verificationDocumentFiles;
+    private final RiskScreening riskScreening;
 
     @Value("${face-service.api-key}")
     private String faceApiKey;
@@ -59,7 +61,8 @@ public class ExternalKycServiceClient {
 
     /**
      * services: catalog codes the run's workflow uses; only their checks are called (null = all, tier-based).
-     * Face match runs for FACE_MATCH, liveness for LIVENESS, OCR for DOCUMENT_CHECK or DATA_CROSSCHECK.
+     * Face match runs for FACE_MATCH, liveness for LIVENESS, OCR for DOCUMENT_CHECK or DATA_CROSSCHECK,
+     * sactions-service for SANCTIONS_SCREENING or CRA (workflow runs only).
      */
     public CompletableFuture<VerificationResult> performVerification(
             String tier,
@@ -70,8 +73,10 @@ public class ExternalKycServiceClient {
         boolean runFace = services == null || services.contains("FACE_MATCH");
         boolean runLiveness = services == null || services.contains("LIVENESS");
         boolean runOcr = services == null || services.contains("DOCUMENT_CHECK") || services.contains("DATA_CROSSCHECK");
-        log.info("Starting verification for tier={} id={} face={} liveness={} ocr={}", tier, request.getId(),
-                runFace, runLiveness, runOcr);
+        boolean runScreening = services != null && services.contains("SANCTIONS_SCREENING");
+        boolean runCra = services != null && services.contains("CRA");
+        log.info("Starting verification for tier={} id={} face={} liveness={} ocr={} screening={} cra={}", tier,
+                request.getId(), runFace, runLiveness, runOcr, runScreening, runCra);
 
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -139,7 +144,18 @@ public class ExternalKycServiceClient {
                             return null;
                         });
 
-                CompletableFuture.allOf(faceFuture, livenessFuture, ocrFuture).join();
+                // Screening and risk assessment — degrade to manual_review if sactions-service is down
+                CircuitBreaker screeningBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.SCREENING_SERVICE);
+                CompletableFuture<RiskChecks> riskFuture = !(runScreening || runCra) ? CompletableFuture.completedFuture(null)
+                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(screeningBreaker,
+                                () -> runRiskChecks(request, runScreening, runCra)))
+                        .exceptionally(ex -> {
+                            log.warn("Screening service unavailable for {}: {}", request.getId(), ex.getMessage());
+                            String reason = "screening_service_unavailable";
+                            return new RiskChecks(null, runScreening ? reason : null, null, runCra ? reason : null);
+                        });
+
+                CompletableFuture.allOf(faceFuture, livenessFuture, ocrFuture, riskFuture).join();
 
                 List<CheckResult> checks = new ArrayList<>();
                 String overallDecision = "approved";
@@ -227,6 +243,24 @@ public class ExternalKycServiceClient {
                 }
                 }
 
+                // --- Screening and risk assessment ---
+                RiskChecks riskChecks = riskFuture.join();
+                if (riskChecks != null) {
+                    List<CheckResult> riskResults = new ArrayList<>();
+                    if (runScreening) riskResults.add(screeningCheck(riskChecks));
+                    if (runCra) riskResults.add(assessmentCheck(riskChecks));
+                    for (CheckResult check : riskResults) {
+                        checks.add(check);
+                        if ("failed".equals(check.getStatus()) && !"rejected".equals(overallDecision)) {
+                            overallDecision = "rejected";
+                            riskScore = 0.9;
+                        } else if (!"passed".equals(check.getStatus()) && "approved".equals(overallDecision)) {
+                            overallDecision = "manual_review";
+                            riskScore = 0.5;
+                        }
+                    }
+                }
+
                 // Build extracted OCR data map for persistence on the id_front document
                 Map<String, Object> extractedOcrData = buildExtractedOcrData(ocrResponse);
 
@@ -258,6 +292,127 @@ public class ExternalKycServiceClient {
                 return buildErrorResult(request.getId(), e);
             }
         });
+    }
+
+    /** What sactions-service returned; an error is set instead when that check could not run. */
+    record RiskChecks(RiskScreening.Screening screening, String screeningError,
+                      RiskScreening.Assessment assessment, String assessmentError) {
+    }
+
+    private RiskChecks runRiskChecks(VerificationRequest request, boolean runScreening, boolean runCra) {
+        RiskScreening.Subject subject = screeningSubject(request);
+        RiskScreening.Assessment assessment = null;
+        String assessmentError = null;
+        if (runCra) {
+            try {
+                assessment = riskScreening.assess(request.getCompany().getId(), request.getCompany().getLegalName(),
+                        subject, riskAttributes(request));
+            } catch (feign.FeignException.NotFound e) {
+                assessmentError = "no_active_risk_model";
+            } catch (feign.FeignException.FeignClientException e) {
+                assessmentError = "risk_assessment_rejected_" + e.status();
+            }
+        }
+        RiskScreening.Screening screening = null;
+        String screeningError = null;
+        if (runScreening) {
+            if (assessment != null && assessment.screening() != null) {
+                screening = assessment.screening();
+            } else {
+                try {
+                    screening = riskScreening.screen(subject);
+                } catch (feign.FeignException.FeignClientException e) {
+                    screeningError = "screening_rejected_" + e.status();
+                }
+            }
+        }
+        return new RiskChecks(screening, screeningError, assessment, assessmentError);
+    }
+
+    private static RiskScreening.Subject screeningSubject(VerificationRequest request) {
+        Map<String, Object> c = Optional.ofNullable(request.getCustomerData()).orElse(Map.of());
+        String customerId = request.getExternalReference() != null && !request.getExternalReference().isBlank()
+                ? request.getExternalReference() : request.getId();
+        if ("business".equalsIgnoreCase(request.getVerificationType())) {
+            String jurisdiction = Optional.ofNullable(text(c.get("jurisdiction"))).orElse(text(c.get("countryOfResidence")));
+            return RiskScreening.Subject.business(customerId, text(c.get("companyName")), jurisdiction);
+        }
+        return RiskScreening.Subject.person(customerId, text(c.get("firstName")), text(c.get("lastName")),
+                text(c.get("dateOfBirth")));
+    }
+
+    /** Risk model attributes known at submission; metadata.riskAttributes lets the client add its own. */
+    private static Map<String, Object> riskAttributes(VerificationRequest request) {
+        Map<String, Object> c = Optional.ofNullable(request.getCustomerData()).orElse(Map.of());
+        Map<String, Object> attributes = new HashMap<>();
+        String dob = text(c.get("dateOfBirth"));
+        if (dob != null) {
+            try {
+                attributes.put("age", java.time.Period.between(java.time.LocalDate.parse(dob), java.time.LocalDate.now()).getYears());
+            } catch (java.time.format.DateTimeParseException ignored) {
+                // age stays missing; the risk model decides what that means
+            }
+        }
+        if (text(c.get("countryOfResidence")) != null) attributes.put("country_of_residence", text(c.get("countryOfResidence")));
+        if (text(c.get("nationality")) != null) attributes.put("nationality", text(c.get("nationality")));
+        Object extra = Optional.ofNullable(request.getMetadata()).orElse(Map.of()).get("riskAttributes");
+        if (extra instanceof Map<?, ?> map) map.forEach((k, v) -> attributes.put(String.valueOf(k), v));
+        return attributes;
+    }
+
+    static CheckResult screeningCheck(RiskChecks risk) {
+        RiskScreening.Screening s = risk.screening();
+        if (s == null) {
+            return CheckResult.builder().stepName("sanctions_screening").status("skipped").confidenceScore(0.0)
+                    .result(Map.of("reason", Optional.ofNullable(risk.screeningError()).orElse("screening_unavailable")))
+                    .build();
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("verdict", s.verdict().name());
+        result.put("hits", s.hits());
+        result.put("top_score", s.topScore());
+        result.put("pep", s.pep());
+        result.put("adverse_media", s.adverseMedia());
+        result.put("matches", s.matches().stream().limit(5).map(m -> Map.of(
+                "entity_id", String.valueOf(m.entityId()), "caption", String.valueOf(m.caption()),
+                "score", m.score(), "datasets", m.datasets(), "topics", m.topics())).toList());
+        String status = switch (s.verdict()) {
+            case NO_HIT -> "passed";
+            case POTENTIAL_MATCH -> "review";
+            case CONFIRMED_MATCH -> "failed";
+        };
+        return CheckResult.builder().stepName("sanctions_screening").status(status)
+                .confidenceScore(1.0 - s.topScore()).result(result).build();
+    }
+
+    static CheckResult assessmentCheck(RiskChecks risk) {
+        RiskScreening.Assessment a = risk.assessment();
+        if (a == null) {
+            return CheckResult.builder().stepName("risk_assessment").status("skipped").confidenceScore(0.0)
+                    .result(Map.of("reason", Optional.ofNullable(risk.assessmentError()).orElse("risk_assessment_unavailable")))
+                    .build();
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("assessment_id", a.id());
+        result.put("level", a.level() != null ? a.level().name() : null);
+        result.put("score", a.score() != null ? a.score().doubleValue() : null);
+        result.put("complete", a.complete());
+        result.put("override_applied", a.overrideApplied());
+        result.put("model_version", a.modelVersion());
+        // HIGH risk, an incomplete assessment or an unknown level needs a person unless the workflow routes it
+        boolean review = a.level() == null || a.level() == RiskScreening.RiskLevel.HIGH || !a.complete();
+        return CheckResult.builder().stepName("risk_assessment").status(review ? "review" : "passed")
+                .result(result).build();
+    }
+
+    /** customerData values: strings as-is; LocalDate stored in JSONB comes back as [year, month, day]. */
+    private static String text(Object value) {
+        if (value == null) return null;
+        if (value instanceof List<?> list && list.size() == 3) {
+            return String.format("%04d-%02d-%02d", list.get(0), list.get(1), list.get(2));
+        }
+        String s = String.valueOf(value).strip();
+        return s.isEmpty() ? null : s;
     }
 
     private VerificationResult buildErrorResult(String verificationId, Exception e) {

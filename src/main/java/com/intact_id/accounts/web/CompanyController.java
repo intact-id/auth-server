@@ -7,20 +7,27 @@ import com.intact_id.accounts.CompanyCredentials;
 import com.intact_id.accounts.CompanyCredentialsRepository;
 import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.accounts.CompanyService;
+import com.intact_id.notifications.WebhookDeliverySummary;
+import com.intact_id.notifications.WebhookDeliveryView;
 import com.intact_id.notifications.WebhookService;
 import com.intact_id.accounts.SecurityContextUtil;
 import com.intact_id.util.exception.ApplicationExceptions;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.PageImpl;
+
+import java.time.LocalDateTime;
 
 @Slf4j
 @RestController
@@ -167,6 +174,53 @@ public class CompanyController {
                             .success(false)
                             .build());
         }
+    }
+
+    @GetMapping("/{id}/communication/webhook/deliveries")
+    @Operation(summary = "List webhook deliveries",
+            description = "A company's webhook delivery attempts, newest first. Payloads and receiver responses are not included.")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    public ResponseEntity<ApiResponse<Page<WebhookDeliveryView>>> getWebhookDeliveries(
+            @PathVariable String id,
+            @Parameter(description = "PENDING, DELIVERED, FAILED or RETRYING") @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        try {
+            Page<WebhookDeliveryView> deliveries = webhookService.listDeliveries(resolvedCompanyId, status, pageable);
+            return ResponseEntity.ok(ApiResponse.<Page<WebhookDeliveryView>>builder()
+                    .responseCode(HttpStatus.OK.value())
+                    .responseMessage("Webhook deliveries retrieved successfully")
+                    .success(true)
+                    .data(deliveries)
+                    .build());
+        } catch (ApplicationExceptions.InvalidRequestException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.<Page<WebhookDeliveryView>>builder()
+                    .responseCode(HttpStatus.BAD_REQUEST.value())
+                    .responseMessage(e.getMessage())
+                    .success(false)
+                    .build());
+        }
+    }
+
+    @GetMapping("/{id}/communication/webhook/deliveries/summary")
+    @Operation(summary = "Summarise webhook deliveries",
+            description = "Delivery counts by status for the last `hours` hours (default 24, maximum 720).")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    public ResponseEntity<ApiResponse<WebhookDeliverySummary>> getWebhookDeliverySummary(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "24") int hours) {
+
+        String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
+        LocalDateTime since = LocalDateTime.now().minusHours(Math.min(Math.max(hours, 1), 720));
+        return ResponseEntity.ok(ApiResponse.<WebhookDeliverySummary>builder()
+                .responseCode(HttpStatus.OK.value())
+                .responseMessage("Webhook delivery summary retrieved successfully")
+                .success(true)
+                .data(webhookService.summarizeDeliveries(resolvedCompanyId, since))
+                .build());
     }
 
     @PutMapping("/{id}/communication/webhook")

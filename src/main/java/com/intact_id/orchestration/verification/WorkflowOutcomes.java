@@ -63,6 +63,31 @@ final class WorkflowOutcomes {
                             ? ServiceOutcome.review("The document could not be read reliably", crosscheck)
                             : outcome(check.getStatus(), mismatch, crosscheck));
                 }
+                case "sanctions_screening" -> {
+                    Map<String, Object> facts = new HashMap<>();
+                    putIfPresent(facts, "screening.verdict", r.get("verdict"));
+                    putIfPresent(facts, "screening.hits", r.get("hits"));
+                    putIfPresent(facts, "screening.top_score", r.get("top_score"));
+                    putBoolean(facts, "screening.pep", r.get("pep"));
+                    putBoolean(facts, "screening.adverse_media", r.get("adverse_media"));
+                    outcomes.put("SANCTIONS_SCREENING", "skipped".equals(check.getStatus())
+                            ? ServiceOutcome.review("Screening could not run: " + r.get("reason"), facts)
+                            : "review".equals(check.getStatus())
+                            ? ServiceOutcome.review("Possible sanctions or PEP match", facts)
+                            : outcome(check.getStatus(), "Confirmed sanctions match", facts));
+                }
+                case "risk_assessment" -> {
+                    Map<String, Object> facts = new HashMap<>();
+                    putIfPresent(facts, "risk.level", r.get("level"));
+                    putIfPresent(facts, "risk.score", r.get("score"));
+                    putBoolean(facts, "risk.complete", r.get("complete"));
+                    putBoolean(facts, "risk.override_applied", r.get("override_applied"));
+                    outcomes.put("CRA", "skipped".equals(check.getStatus())
+                            ? ServiceOutcome.review("Risk assessment could not run: " + r.get("reason"), facts)
+                            : Boolean.FALSE.equals(r.get("complete"))
+                            ? ServiceOutcome.review("Risk assessment is missing required information", facts)
+                            : outcome(check.getStatus(), "High risk customer", facts));
+                }
                 default -> { }
             }
         }
