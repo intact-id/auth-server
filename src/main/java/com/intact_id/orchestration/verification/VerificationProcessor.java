@@ -147,7 +147,7 @@ public class VerificationProcessor {
         if (shouldReject(result.getFailureReason(), result.getErrorDetails(), result.getOverallDecision())) {
             request.markAsRejected(result.getFailureReason(), result.getErrorDetails(), result.getRiskScore());
         } else if ("manual_review".equals(result.getOverallDecision())) {
-            request.markAsManualReview(result.getRiskScore());
+            request.markAsManualReview(result.getRiskScore(), reviewReason(result));
             notifyManualReviewRequired(request);
         } else {
             request.markAsCompleted(result.getOverallDecision(), result.getRiskScore());
@@ -238,6 +238,23 @@ public class VerificationProcessor {
         }
         log.info("Verification {} followed workflow {} v{}: {} ({} steps)", request.getId(), workflow.get().key(),
                 workflow.get().version(), run.decision(), run.path().size());
+    }
+
+    /**
+     * Why a verification went to a human. Workflows state their reason; the fixed check bundle
+     * does not, so name the checks that did not pass.
+     */
+    static String reviewReason(ExternalKycServiceClient.VerificationResult result) {
+        if (result.getFailureReason() != null && !result.getFailureReason().isBlank()) {
+            return result.getFailureReason();
+        }
+        List<String> unresolvedChecks = result.getChecks() == null ? List.of() : result.getChecks().stream()
+                .filter(check -> !"passed".equalsIgnoreCase(check.getStatus()))
+                .map(ExternalKycServiceClient.CheckResult::getStepName)
+                .toList();
+        return unresolvedChecks.isEmpty()
+                ? "Automated checks could not decide"
+                : "Checks needing review: " + String.join(", ", unresolvedChecks);
     }
 
     private static boolean shouldReject(String failureReason, String errorDetails, String overallDecision) {

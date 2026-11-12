@@ -15,49 +15,86 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ManualReviewService {
+
+    /** Which part of the review queue to list. */
+    public enum QueueFilter { ALL, MINE, UNASSIGNED }
 
     private final VerificationRequestRepository verificationRequestRepository;
     private final VerificationService verificationService;
     private final VerificationWebhooks verificationWebhooks;
     private final ApplicationEventPublisher eventPublisher;
 
-    public Page<VerificationStatusResponseDto> getPendingReviewQueue(Pageable pageable) {
+    /** Verifications waiting for a human, longest-waiting first, each with its review record. */
+    @Transactional(readOnly = true)
+    public Page<VerificationStatusResponseDto> getPendingReviewQueue(QueueFilter filter, String reviewer, Pageable pageable) {
+        String assignedTo = filter == QueueFilter.MINE ? reviewer : null;
+        boolean unassignedOnly = filter == QueueFilter.UNASSIGNED;
         return verificationRequestRepository
-                .findByFilters(null, null, GlobalStatuses.PENDING_APPROVAL.name(),
-                        null, null, null, null, null, pageable)
-                .map(r -> verificationService.getVerificationStatus(r.getId(), null, r.getEnvironment()));
+                .findReviewQueue(GlobalStatuses.PENDING_APPROVAL, assignedTo, unassignedOnly, pageable)
+                .map(r -> verificationService.withStaffDetails(
+                        verificationService.getVerificationStatus(r.getId(), null, r.getEnvironment()), false));
     }
 
     @Transactional
-    public VerificationStatusResponseDto resolveReview(String verificationId, String decision, String notes, String reviewerEmail) {
-        VerificationRequest request = verificationRequestRepository.findById(verificationId)
-                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
-                        "Verification not found: " + verificationId));
-
-        if (request.getStatus() != GlobalStatuses.PENDING_APPROVAL) {
-            throw new ApplicationExceptions.IntactBadRequestException(
-                    "Verification " + verificationId + " is not pending manual review (status: " + request.getStatus() + ")");
-        }
-
+    public VerificationStatusResponseDto resolveReview(String verificationId, String decision, String notes, String reviewer) {
         if (!"approved".equalsIgnoreCase(decision) && !"rejected".equalsIgnoreCase(decision)) {
-            throw new ApplicationExceptions.IntactBadRequestException(
-                    "Decision must be 'approved' or 'rejected'");
+            throw new ApplicationExceptions.IntactBadRequestException("Decision must be 'approved' or 'rejected'");
         }
+        VerificationRequest request = findPendingReview(verificationId);
 
-        request.resolveManualReview(decision, notes);
+        request.resolveManualReview(decision, blankToNull(notes), reviewer);
         verificationRequestRepository.save(request);
         eventPublisher.publishEvent(VerificationOutcome.of(request));
 
-        log.info("Manual review resolved for {} by {}: decision={}", verificationId, reviewerEmail, decision);
+        log.info("Manual review resolved for {} by {}: decision={}", verificationId, reviewer, decision);
 
         verificationWebhooks.completed(request);
 
-        return verificationService.getVerificationStatus(verificationId, null, request.getEnvironment());
+        return staffView(request);
+    }
+
+    /** Takes the case for the given reviewer, including from another reviewer. */
+    @Transactional
+    public VerificationStatusResponseDto assign(String verificationId, String reviewer) {
+        VerificationRequest request = findPendingReview(verificationId);
+        String previous = request.getReviewAssignedTo();
+        request.assignReviewer(reviewer);
+        verificationRequestRepository.save(request);
+        log.info("Manual review {} assigned to {} (was {})", verificationId, reviewer, previous);
+        return staffView(request);
+    }
+
+    @Transactional
+    public VerificationStatusResponseDto unassign(String verificationId, String reviewer) {
+        VerificationRequest request = findPendingReview(verificationId);
+        String previous = request.getReviewAssignedTo();
+        request.unassignReviewer();
+        verificationRequestRepository.save(request);
+        log.info("Manual review {} unassigned by {} (was {})", verificationId, reviewer, previous);
+        return staffView(request);
+    }
+
+    private VerificationRequest findPendingReview(String verificationId) {
+        VerificationRequest request = verificationRequestRepository.findById(verificationId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
+                        "Verification not found: " + verificationId));
+        if (request.getStatus() != GlobalStatuses.PENDING_APPROVAL) {
+            throw new ApplicationExceptions.InvalidActionException(
+                    "Verification " + verificationId + " is not pending manual review (status: " + request.getStatus() + ")");
+        }
+        return request;
+    }
+
+    private VerificationStatusResponseDto staffView(VerificationRequest request) {
+        return verificationService.withStaffDetails(
+                verificationService.getVerificationStatus(request.getId(), null, request.getEnvironment()), true);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }
