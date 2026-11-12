@@ -28,23 +28,28 @@ public class ManualReviewService {
     private final VerificationWebhooks verificationWebhooks;
     private final ApplicationEventPublisher eventPublisher;
 
-    /** Verifications waiting for a human, longest-waiting first, each with its review record. */
+    /**
+     * Verifications waiting for a human, longest-waiting first, each with its review record.
+     * companyId scopes every method here: null only for super admins, who may act on any company.
+     */
     @Transactional(readOnly = true)
-    public Page<VerificationStatusResponseDto> getPendingReviewQueue(QueueFilter filter, String reviewer, Pageable pageable) {
+    public Page<VerificationStatusResponseDto> getPendingReviewQueue(String companyId, QueueFilter filter, String reviewer,
+                                                                     Pageable pageable) {
         String assignedTo = filter == QueueFilter.MINE ? reviewer : null;
         boolean unassignedOnly = filter == QueueFilter.UNASSIGNED;
         return verificationRequestRepository
-                .findReviewQueue(GlobalStatuses.PENDING_APPROVAL, assignedTo, unassignedOnly, pageable)
+                .findReviewQueue(GlobalStatuses.PENDING_APPROVAL, companyId, assignedTo, unassignedOnly, pageable)
                 .map(r -> verificationService.withStaffDetails(
                         verificationService.getVerificationStatus(r.getId(), null, r.getEnvironment()), false));
     }
 
     @Transactional
-    public VerificationStatusResponseDto resolveReview(String verificationId, String decision, String notes, String reviewer) {
+    public VerificationStatusResponseDto resolveReview(String companyId, String verificationId, String decision, String notes,
+                                                       String reviewer) {
         if (!"approved".equalsIgnoreCase(decision) && !"rejected".equalsIgnoreCase(decision)) {
             throw new ApplicationExceptions.IntactBadRequestException("Decision must be 'approved' or 'rejected'");
         }
-        VerificationRequest request = findPendingReview(verificationId);
+        VerificationRequest request = findPendingReview(companyId, verificationId);
 
         request.resolveManualReview(decision, blankToNull(notes), reviewer);
         verificationRequestRepository.save(request);
@@ -59,8 +64,8 @@ public class ManualReviewService {
 
     /** Takes the case for the given reviewer, including from another reviewer. */
     @Transactional
-    public VerificationStatusResponseDto assign(String verificationId, String reviewer) {
-        VerificationRequest request = findPendingReview(verificationId);
+    public VerificationStatusResponseDto assign(String companyId, String verificationId, String reviewer) {
+        VerificationRequest request = findPendingReview(companyId, verificationId);
         String previous = request.getReviewAssignedTo();
         request.assignReviewer(reviewer);
         verificationRequestRepository.save(request);
@@ -69,8 +74,8 @@ public class ManualReviewService {
     }
 
     @Transactional
-    public VerificationStatusResponseDto unassign(String verificationId, String reviewer) {
-        VerificationRequest request = findPendingReview(verificationId);
+    public VerificationStatusResponseDto unassign(String companyId, String verificationId, String reviewer) {
+        VerificationRequest request = findPendingReview(companyId, verificationId);
         String previous = request.getReviewAssignedTo();
         request.unassignReviewer();
         verificationRequestRepository.save(request);
@@ -78,8 +83,10 @@ public class ManualReviewService {
         return staffView(request);
     }
 
-    private VerificationRequest findPendingReview(String verificationId) {
+    private VerificationRequest findPendingReview(String companyId, String verificationId) {
         VerificationRequest request = verificationRequestRepository.findById(verificationId)
+                // Another company's verification answers the same as a missing one
+                .filter(r -> companyId == null || (r.getCompany() != null && companyId.equals(r.getCompany().getId())))
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
                         "Verification not found: " + verificationId));
         if (request.getStatus() != GlobalStatuses.PENDING_APPROVAL) {

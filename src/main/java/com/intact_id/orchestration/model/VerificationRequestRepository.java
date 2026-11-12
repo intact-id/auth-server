@@ -76,13 +76,16 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
         /**
          * Verifications waiting for a human, longest-waiting first. assignedTo narrows to one
          * reviewer; unassignedOnly to cases nobody has picked up. Both null/false: the whole queue.
+         * companyId null: every company's queue (super admins).
          */
         @Query("SELECT v FROM VerificationRequest v WHERE v.status = :status " +
+                        "AND (:companyId IS NULL OR v.company.id = :companyId) " +
                         "AND (:assignedTo IS NULL OR v.reviewAssignedTo = :assignedTo) " +
                         "AND (:unassignedOnly = false OR v.reviewAssignedTo IS NULL) " +
                         "ORDER BY COALESCE(v.reviewRequestedAt, v.createdAt) ASC")
         Page<VerificationRequest> findReviewQueue(
                         @Param("status") GlobalStatuses status,
+                        @Param("companyId") String companyId,
                         @Param("assignedTo") String assignedTo,
                         @Param("unassignedOnly") boolean unassignedOnly,
                         Pageable pageable);
