@@ -33,6 +33,10 @@ public interface WebhookDeliveryRepository extends JpaRepository<WebhookDelivery
      */
     Page<WebhookDelivery> findByCompanyId(String companyId, Pageable pageable);
 
+    Page<WebhookDelivery> findByCompanyIdAndStatus(String companyId, WebhookDelivery.DeliveryStatus status, Pageable pageable);
+
+    long countByCompanyIdAndStatusAndCreatedAtAfter(String companyId, WebhookDelivery.DeliveryStatus status, LocalDateTime after);
+
     /**
      * Find deliveries by verification ID
      */
