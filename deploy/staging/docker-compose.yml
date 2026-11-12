@@ -74,6 +74,7 @@ services:
       KYC_WIDGET_MOBILE_URL: ${STAGING_WIDGET_URL:-http://localhost:5173}/m
       APP_BASE_URL: ${STAGING_PUBLIC_URL:-http://localhost:8080}
       CORS_ALLOWED_ORIGINS: ${STAGING_CORS_ORIGINS:-http://localhost:5173,http://localhost:5174}
+      SCREENING_SERVICE_URL: http://sactions-service:8080
     ports: ["8080:8080"]
     volumes:
       - uploads:/var/data/intact-id/uploads
