@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -75,6 +76,14 @@ public class WebhookService {
                 ? webhookDeliveryRepository.findByCompanyId(companyId, newestFirst)
                 : webhookDeliveryRepository.findByCompanyIdAndStatus(companyId, parseDeliveryStatus(status), newestFirst);
         return deliveries.map(WebhookService::toView);
+    }
+
+    /** Every delivery attempt for one verification, newest first. */
+    @Transactional(readOnly = true)
+    public List<WebhookDeliveryView> listDeliveriesForVerification(String verificationId) {
+        return webhookDeliveryRepository.findByVerificationIdOrderByCreatedAtDesc(verificationId).stream()
+                .map(WebhookService::toView)
+                .toList();
     }
 
     /** Delivery counts for a company since the given time, by current delivery status. */

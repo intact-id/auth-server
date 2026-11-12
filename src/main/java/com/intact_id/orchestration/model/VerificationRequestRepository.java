@@ -31,6 +31,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         "AND (:environment IS NULL OR v.environment = :environment) " +
                         "AND (:status IS NULL OR v.status = :status) " +
                         "AND (:tier IS NULL OR v.tier = :tier) " +
+                        "AND (:verificationType IS NULL OR LOWER(v.verification_type) = LOWER(:verificationType)) " +
                         "AND (:externalReference IS NULL OR v.external_reference = :externalReference) " +
                         "AND (CAST(:fromDate AS timestamp) IS NULL OR v.created_at >= :fromDate) " +
                         "AND (CAST(:toDate AS timestamp) IS NULL OR v.created_at <= :toDate) " +
@@ -47,6 +48,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                                         "AND (:environment IS NULL OR v.environment = :environment) " +
                                         "AND (:status IS NULL OR v.status = :status) " +
                                         "AND (:tier IS NULL OR v.tier = :tier) " +
+                                        "AND (:verificationType IS NULL OR LOWER(v.verification_type) = LOWER(:verificationType)) " +
                                         "AND (:externalReference IS NULL OR v.external_reference = :externalReference) " +
                                         "AND (CAST(:fromDate AS timestamp) IS NULL OR v.created_at >= :fromDate) " +
                                         "AND (CAST(:toDate AS timestamp) IS NULL OR v.created_at <= :toDate) " +
@@ -62,6 +64,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         @Param("environment") String environment,
                         @Param("status") String status,
                         @Param("tier") String tier,
+                        @Param("verificationType") String verificationType,
                         @Param("externalReference") String externalReference,
                         @Param("fromDate") LocalDateTime fromDate,
                         @Param("toDate") LocalDateTime toDate,
@@ -69,6 +72,20 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         Pageable pageable);
 
         long countByCompanyIdAndCreatedAtAfter(String companyId, LocalDateTime after);
+
+        /**
+         * Verifications waiting for a human, longest-waiting first. assignedTo narrows to one
+         * reviewer; unassignedOnly to cases nobody has picked up. Both null/false: the whole queue.
+         */
+        @Query("SELECT v FROM VerificationRequest v WHERE v.status = :status " +
+                        "AND (:assignedTo IS NULL OR v.reviewAssignedTo = :assignedTo) " +
+                        "AND (:unassignedOnly = false OR v.reviewAssignedTo IS NULL) " +
+                        "ORDER BY COALESCE(v.reviewRequestedAt, v.createdAt) ASC")
+        Page<VerificationRequest> findReviewQueue(
+                        @Param("status") GlobalStatuses status,
+                        @Param("assignedTo") String assignedTo,
+                        @Param("unassignedOnly") boolean unassignedOnly,
+                        Pageable pageable);
 
         long countByCompanyIdAndEnvironmentAndStatusNotAndCreatedAtAfter(
                 String companyId,
