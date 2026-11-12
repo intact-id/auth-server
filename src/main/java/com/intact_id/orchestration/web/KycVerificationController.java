@@ -228,6 +228,14 @@ public class KycVerificationController {
                         VerificationStatusResponseDto response = verificationService.getVerificationStatus(
                                         verificationId, companyId, ApiKeyEnvironment.PROD);
 
+                        // Intact staff also see the review record and webhook deliveries; merchants do not.
+
+                        if (SecurityContextUtil.isAdminAuthenticated()) {
+
+                                response = verificationService.withStaffDetails(response, true);
+
+                        }
+
                         return ResponseEntity.ok(
                                         ApiResponse.<VerificationStatusResponseDto>builder()
                                                         .responseCode(HttpStatus.OK.value())
@@ -252,6 +260,7 @@ public class KycVerificationController {
         public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerifications(
                         @Parameter(description = "Filter by status") @RequestParam(required = false) GlobalStatuses status,
                         @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
+                        @Parameter(description = "individual (KYC) or business (KYB)") @RequestParam(required = false) String verificationType,
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
                         @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
@@ -273,7 +282,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, externalReference, fromDate, toDate, search, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, verificationType, externalReference, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()
@@ -343,6 +352,14 @@ public class KycVerificationController {
                         VerificationStatusResponseDto response = verificationService.getVerificationStatus(
                                         verificationId, companyId, ApiKeyEnvironment.PROD);
 
+                        // Intact staff also see the review record and webhook deliveries; merchants do not.
+
+                        if (SecurityContextUtil.isAdminAuthenticated()) {
+
+                                response = verificationService.withStaffDetails(response, true);
+
+                        }
+
                         return ResponseEntity.ok(
                                         ApiResponse.<VerificationStatusResponseDto>builder()
                                                         .responseCode(HttpStatus.OK.value())
@@ -367,6 +384,7 @@ public class KycVerificationController {
         public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerificationsProd(
                         @Parameter(description = "Filter by status") @RequestParam(required = false) GlobalStatuses status,
                         @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
+                        @Parameter(description = "individual (KYC) or business (KYB)") @RequestParam(required = false) String verificationType,
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
                         @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
@@ -388,7 +406,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, externalReference, fromDate, toDate, search, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.PROD, status, tier, verificationType, externalReference, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()
@@ -414,6 +432,14 @@ public class KycVerificationController {
                         VerificationStatusResponseDto response = verificationService.getVerificationStatus(
                                         verificationId, companyId, ApiKeyEnvironment.DEV);
 
+                        // Intact staff also see the review record and webhook deliveries; merchants do not.
+
+                        if (SecurityContextUtil.isAdminAuthenticated()) {
+
+                                response = verificationService.withStaffDetails(response, true);
+
+                        }
+
                         return ResponseEntity.ok(
                                         ApiResponse.<VerificationStatusResponseDto>builder()
                                                         .responseCode(HttpStatus.OK.value())
@@ -438,6 +464,7 @@ public class KycVerificationController {
         public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerificationsDev(
                         @Parameter(description = "Filter by status") @RequestParam(required = false) GlobalStatuses status,
                         @Parameter(description = "Filter by tier") @RequestParam(required = false) String tier,
+                        @Parameter(description = "individual (KYC) or business (KYB)") @RequestParam(required = false) String verificationType,
                         @Parameter(description = "Filter from date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
                         @Parameter(description = "Filter to date") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
                         @Parameter(description = "Search by verification/customer/company fields") @RequestParam(required = false) String search,
@@ -459,7 +486,7 @@ public class KycVerificationController {
                 Pageable pageable = PageRequest.of(page, size);
 
                 Page<VerificationStatusResponseDto> verifications = verificationService.listVerifications(
-                                resolvedCompanyId, ApiKeyEnvironment.DEV, status, tier, externalReference, fromDate, toDate, search, pageable);
+                                resolvedCompanyId, ApiKeyEnvironment.DEV, status, tier, verificationType, externalReference, fromDate, toDate, search, pageable);
 
                 return ResponseEntity.ok(
                                 ApiResponse.<Page<VerificationStatusResponseDto>>builder()

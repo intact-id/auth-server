@@ -424,11 +424,16 @@ Authorization: Bearer eyJ...
 |-------|------|-------------|
 | `status` | string | Filter by status |
 | `tier` | string | Filter by tier |
+| `verificationType` | string | `individual` or `business` (case-insensitive) |
 | `fromDate` | string | ISO 8601 start date |
 | `toDate` | string | ISO 8601 end date |
 | `search` | string | Search by name, email, ID number |
 | `page` | integer | Page number (default: 0) |
 | `size` | integer | Page size (default: 20) |
+
+Each verification in the list and in the single-verification response also carries
+`environment` (`PROD` or `DEV`), `workflowId` and `workflowVersion` (the workflow it ran
+through, if any) and `documentCount`.
 
 ---
 

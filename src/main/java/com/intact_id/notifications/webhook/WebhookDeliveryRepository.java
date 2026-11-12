@@ -42,6 +42,8 @@ public interface WebhookDeliveryRepository extends JpaRepository<WebhookDelivery
      */
     List<WebhookDelivery> findByVerificationId(String verificationId);
 
+    List<WebhookDelivery> findByVerificationIdOrderByCreatedAtDesc(String verificationId);
+
     /**
      * Count delivery attempts for a verification
      */
