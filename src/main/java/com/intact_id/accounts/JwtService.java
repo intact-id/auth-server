@@ -1,6 +1,5 @@
 package com.intact_id.accounts;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -90,16 +89,15 @@ public class JwtService {
 
     /**
      * Generate a short-lived, minimal-claim access token for company (client-credentials)
-     * API auth. Deliberately opaque: only the company id, environment, scope, jti, iat, and
+     * API auth. Deliberately opaque: only the company id, scope, jti, iat, and
      * exp are included — no company name/email, no internal user data, nothing a decoded
      * token shouldn't leak. Subject is a fixed constant (never a resolvable username) so
      * JwtAuthenticationFilter's username lookup safely no-ops on this token type.
      */
-    public String generateCompanyAccessToken(String companyId, ApiKeyEnvironment environment) {
+    public String generateCompanyAccessToken(String companyId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("tokenType", COMPANY_ACCESS_TOKEN_TYPE);
         claims.put("cid", companyId);
-        claims.put("env", environment.name());
         claims.put("scope", COMPANY_ACCESS_SCOPE);
         claims.put("jti", UUID.randomUUID().toString());
 
@@ -120,10 +118,6 @@ public class JwtService {
 
     public String extractCompanyId(String token) {
         return extractClaim(token, claims -> claims.get("cid", String.class));
-    }
-
-    public String extractCompanyTokenEnvironment(String token) {
-        return extractClaim(token, claims -> claims.get("env", String.class));
     }
 
     public String extractScope(String token) {

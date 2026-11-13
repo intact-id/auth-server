@@ -26,14 +26,14 @@ public class ApiKeyController {
     private final ApiKeyService apiKeyService;
 
     @PostMapping("/generate")
-    @Operation(summary = "Generate or regenerate API key for company")
+    @Operation(summary = "Generate or regenerate the company's API key", description = "Replaces the previous key. A key works only on the server that issued it.")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ApiKeyGenerationResponseDto>> generateApiKey(
             @RequestParam(required = false) String companyId) {
 
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
-            var response = apiKeyService.generateProdApiKey(resolvedCompanyId);
+            var response = apiKeyService.generateApiKey(resolvedCompanyId);
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<ApiKeyGenerationResponseDto>builder()
                             .responseCode(HttpStatus.CREATED.value())
@@ -51,57 +51,6 @@ public class ApiKeyController {
         }
     }
 
-    @PostMapping("/generate/dev")
-    @Operation(summary = "Generate or regenerate DEV API key for company (Admin only)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ApiKeyGenerationResponseDto>> generateDevApiKey(
-            @RequestParam(required = false) String companyId) {
-
-        try {
-            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
-            var response = apiKeyService.generateDevApiKey(resolvedCompanyId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    ApiResponse.<ApiKeyGenerationResponseDto>builder()
-                            .responseCode(HttpStatus.CREATED.value())
-                            .responseMessage("DEV API Key generated successfully")
-                            .success(true)
-                            .data(response)
-                            .build());
-        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                    ApiResponse.<ApiKeyGenerationResponseDto>builder()
-                            .responseCode(HttpStatus.NOT_FOUND.value())
-                            .responseMessage(e.getMessage())
-                            .success(false)
-                            .build());
-        }
-    }
-
-    @PostMapping("/generate/prod")
-    @Operation(summary = "Generate or regenerate PROlsD API key for company (Admin only)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ApiKeyGenerationResponseDto>> generateProdApiKey(
-            @RequestParam(required = false) String companyId) {
-
-        try {
-            String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
-            var response = apiKeyService.generateProdApiKey(resolvedCompanyId);
-            return ResponseEntity.status(HttpStatus.CREATED).body(
-                    ApiResponse.<ApiKeyGenerationResponseDto>builder()
-                            .responseCode(HttpStatus.CREATED.value())
-                            .responseMessage("PROD API Key generated successfully")
-                            .success(true)
-                            .data(response)
-                            .build());
-        } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                    ApiResponse.<ApiKeyGenerationResponseDto>builder()
-                            .responseCode(HttpStatus.NOT_FOUND.value())
-                            .responseMessage(e.getMessage())
-                            .success(false)
-                            .build());
-        }
-    }
     @DeleteMapping("/{keyId}")
     @Operation(summary = "Revoke API key")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")

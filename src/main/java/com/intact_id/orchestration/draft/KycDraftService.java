@@ -90,7 +90,6 @@ public class KycDraftService {
 
         KycDraft draft = new KycDraft();
         draft.setCompanyId(context.companyId());
-        draft.setEnvironment(context.environment());
         draft.setTier(context.tier());
         draft.setWorkflowId(context.workflowId());
         draft.setWorkflowVersion(context.workflowVersion());
@@ -111,7 +110,6 @@ public class KycDraftService {
         KycDraft draft = draftRepository.findByResumeTokenHash(generatorUtils.hashString(resumeToken.trim()))
                 .filter(d -> !d.isExpired())
                 .filter(d -> d.getCompanyId().equals(context.companyId())
-                        && d.getEnvironment() == context.environment()
                         && d.getTier().equalsIgnoreCase(context.tier())
                         && Objects.equals(d.getExternalReference(), context.externalReference()))
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
@@ -284,7 +282,7 @@ public class KycDraftService {
             KycVerificationRequestDto request = buildVerificationRequest(draft);
             Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
             result = verificationService.submitVerification(
-                    draft.getTier(), request, company, draft.getEnvironment());
+                    draft.getTier(), request, company);
         } catch (RuntimeException e) {
             draftRepository.transitionStatus(draftId, KycDraftStatus.SUBMITTING, KycDraftStatus.IN_PROGRESS,
                     LocalDateTime.now());
@@ -356,7 +354,7 @@ public class KycDraftService {
             String companyName = KycSessionService.displayName(
                     companyRepository.findById(draft.getCompanyId()).orElse(null));
             WidgetSessionContext tokenContext = new WidgetSessionContext(
-                    draft.getCompanyId(), companyName, draft.getEnvironment(), draft.getTier(),
+                    draft.getCompanyId(), companyName, draft.getTier(),
                     draft.getExternalReference(), draft.getId(), handoffId, channel,
                     draft.getWorkflowId(), draft.getWorkflowVersion());
             response.setDraftToken(kycSessionService.issueToken(
@@ -386,7 +384,6 @@ public class KycDraftService {
                 .draftId(draft.getId())
                 .status(draft.getStatus().name())
                 .tier(draft.getTier())
-                .environment(draft.getEnvironment().name())
                 .expiresAt(draft.getExpiresAt())
                 .verificationId(draft.getVerificationId())
                 .details(maskDetails(draft.getDetails()))

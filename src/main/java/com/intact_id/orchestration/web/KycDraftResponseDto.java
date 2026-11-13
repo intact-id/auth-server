@@ -15,7 +15,6 @@ public class KycDraftResponseDto {
     private String draftId;
     private String status;
     private String tier;
-    private String environment;
     private LocalDateTime expiresAt;
     private String verificationId;
     // Masked values only; raw PII and document content are never returned

@@ -1,6 +1,5 @@
 package com.intact_id.orchestration.events;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
@@ -8,11 +7,9 @@ import org.springframework.context.ApplicationEvent;
 public class RateLimitConsumedEvent extends ApplicationEvent {
 
     private final String companyId;
-    private final ApiKeyEnvironment environment;
 
-    public RateLimitConsumedEvent(Object source, String companyId, ApiKeyEnvironment environment) {
+    public RateLimitConsumedEvent(Object source, String companyId) {
         super(source);
         this.companyId = companyId;
-        this.environment = environment;
     }
 }

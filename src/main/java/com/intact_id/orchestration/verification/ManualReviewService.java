@@ -40,7 +40,7 @@ public class ManualReviewService {
         return verificationRequestRepository
                 .findReviewQueue(GlobalStatuses.PENDING_APPROVAL, companyId, assignedTo, unassignedOnly, pageable)
                 .map(r -> verificationService.withStaffDetails(
-                        verificationService.getVerificationStatus(r.getId(), null, r.getEnvironment()), false));
+                        verificationService.getVerificationStatus(r.getId(), null), false));
     }
 
     @Transactional
@@ -98,7 +98,7 @@ public class ManualReviewService {
 
     private VerificationStatusResponseDto staffView(VerificationRequest request) {
         return verificationService.withStaffDetails(
-                verificationService.getVerificationStatus(request.getId(), null, request.getEnvironment()), true);
+                verificationService.getVerificationStatus(request.getId(), null), true);
     }
 
     private static String blankToNull(String value) {

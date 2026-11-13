@@ -1,6 +1,5 @@
 package com.intact_id.gateway.filter;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.accounts.CompanyCredentials;
 import com.intact_id.accounts.CompanyAuthentication;
 import com.intact_id.accounts.CredentialsValidator;
@@ -92,9 +91,8 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
             // Get company from credentials
             String apiKey = request.getHeader("X-API-Key");
-            ApiKeyEnvironment environment = credentialsValidator.resolveEnvironment(request);
             CompanyCredentials credentials = companyCredentialService
-                    .getByApiKeyCompanyCredentialsWithStatusActive(apiKey, environment);
+                    .getByApiKeyCompanyCredentialsWithStatusActive(apiKey);
 
             // Set company in security context
             CompanyAuthentication authentication = new CompanyAuthentication(credentials.getCompany());
@@ -117,7 +115,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 success = false;
                 throw e;
             } finally {
-                companyCredentialService.recordUsageAsync(credentials.getId(), environment, success);
+                companyCredentialService.recordUsageAsync(credentials.getId(), success);
             }
 
         } catch (ApplicationExceptions.IntactUnauthorizedException e) {

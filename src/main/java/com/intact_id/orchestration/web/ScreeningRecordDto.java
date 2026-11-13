@@ -13,7 +13,6 @@ import java.util.List;
 public record ScreeningRecordDto(
         String id,
         String verificationId,
-        String environment,
         String companyId,
         String companyName,
         String subjectName,

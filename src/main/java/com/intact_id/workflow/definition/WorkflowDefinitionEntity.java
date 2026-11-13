@@ -54,11 +54,11 @@ public class WorkflowDefinitionEntity extends Auditable {
     @Column(name = "draft_updated_at")
     private LocalDateTime draftUpdatedAt;
 
-    // 0 = never published; versions run in sandbox once published
+    // 0 = never published
     @Column(name = "latest_version", nullable = false)
     private int latestVersion;
 
-    // The version live sessions use; null until a version is promoted
+    // The version sessions and API calls run: the latest published, unless an older one was put back
     @Column(name = "live_version")
     private Integer liveVersion;
 

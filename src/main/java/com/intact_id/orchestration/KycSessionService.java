@@ -1,7 +1,6 @@
 package com.intact_id.orchestration;
 
 import com.intact_id.workflow.PinnedWorkflow;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.orchestration.model.WidgetChannel;
 import com.intact_id.accounts.Company;
 import io.jsonwebtoken.Claims;
@@ -32,13 +31,13 @@ public class KycSessionService {
     @Value("${jwt.issuer}")
     private String issuer;
 
-    public String createSessionToken(String companyId, String companyName, ApiKeyEnvironment environment,
+    public String createSessionToken(String companyId, String companyName,
                                      String tier, String externalReference, PinnedWorkflow workflow) {
         String normalizedReference = externalReference != null && !externalReference.isBlank()
                 ? externalReference.trim()
                 : null;
         WidgetSessionContext context = new WidgetSessionContext(
-                companyId, companyName, environment, tier, normalizedReference, null, null, WidgetChannel.EMBEDDED,
+                companyId, companyName, tier, normalizedReference, null, null, WidgetChannel.EMBEDDED,
                 workflow == null ? null : workflow.workflowId(), workflow == null ? null : workflow.version());
         return issueToken(context, new Date(System.currentTimeMillis() + SESSION_TTL_MS));
     }
@@ -47,7 +46,6 @@ public class KycSessionService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("tokenType", TOKEN_TYPE);
         claims.put("companyId", context.companyId());
-        claims.put("environment", context.environment().name());
         claims.put("tier", context.tier());
         claims.put("channel", context.channel().name());
         putIfPresent(claims, "companyName", context.companyName());
@@ -91,7 +89,6 @@ public class KycSessionService {
         return new WidgetSessionContext(
                 claims.get("companyId", String.class),
                 claims.get("companyName", String.class),
-                ApiKeyEnvironment.valueOf(claims.get("environment", String.class)),
                 claims.get("tier", String.class),
                 claims.get("externalReference", String.class),
                 claims.get("draftId", String.class),

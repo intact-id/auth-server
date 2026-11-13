@@ -20,33 +20,21 @@ public class WorkflowRuntimeImpl implements WorkflowRuntime {
     private final ServiceCatalog catalog;
 
     @Override
-    public PinnedWorkflow pin(String companyId, String workflowKey, boolean live) {
+    public PinnedWorkflow pin(String companyId, String workflowKey) {
         WorkflowDefinitionEntity definition = definitions.findByCompanyIdAndKeyAndArchivedFalse(companyId, workflowKey)
                 .orElseThrow(() -> new ApplicationExceptions.IntactBadRequestException("Unknown workflow: " + workflowKey));
-        Integer number = live ? definition.getLiveVersion()
-                : (definition.getLatestVersion() > 0 ? definition.getLatestVersion() : null);
-        if (number == null) {
-            throw new ApplicationExceptions.IntactBadRequestException(live
-                    ? "Workflow " + workflowKey + " has no live version; promote one first"
-                    : "Workflow " + workflowKey + " has not been published yet");
+        if (definition.getLiveVersion() == null) {
+            throw new ApplicationExceptions.IntactBadRequestException("Workflow " + workflowKey + " has not been published yet");
         }
-        return find(definition.getId(), number)
+        return find(definition.getId(), definition.getLiveVersion())
                 .orElseThrow(() -> new ApplicationExceptions.IntactBadRequestException("Workflow version not found"));
     }
 
     @Override
-    public Optional<PinnedWorkflow> pinDefault(String companyId, boolean live) {
+    public Optional<PinnedWorkflow> pinDefault(String companyId) {
         return definitions.findByCompanyIdAndDefaultWorkflowTrueAndArchivedFalse(companyId)
-                .flatMap(definition -> {
-                    Integer number = live ? definition.getLiveVersion()
-                            : (definition.getLatestVersion() > 0 ? definition.getLatestVersion() : null);
-                    if (number == null) {
-                        log.warn("Default workflow {} of company {} has no {} version; using the tier checks",
-                                definition.getKey(), companyId, live ? "live" : "published");
-                        return Optional.empty();
-                    }
-                    return find(definition.getId(), number);
-                });
+                .filter(definition -> definition.getLiveVersion() != null)
+                .flatMap(definition -> find(definition.getId(), definition.getLiveVersion()));
     }
 
     @Override

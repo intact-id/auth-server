@@ -1,7 +1,6 @@
 package com.intact_id.accounts.credentials;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.accounts.Company;
 import com.intact_id.accounts.CompanyCredentials;
 import com.intact_id.accounts.web.CompanyAccessTokenResponseDto;
@@ -49,14 +48,13 @@ public class CompanyAccessTokenService {
             throw new ApplicationExceptions.IntactUnauthorizedException("Invalid API credentials");
         }
 
-        ApiKeyEnvironment environment = credentialsValidator.resolveEnvironment(request);
         CompanyCredentials credentials = companyCredentialService
-                .getByApiKeyCompanyCredentialsWithStatusActive(apiKey, environment);
+                .getByApiKeyCompanyCredentialsWithStatusActive(apiKey);
         Company company = credentials.getCompany();
 
-        String accessToken = jwtService.generateCompanyAccessToken(company.getId(), environment);
+        String accessToken = jwtService.generateCompanyAccessToken(company.getId());
 
-        log.info("Issued company access token for company={} env={}", company.getId(), environment);
+        log.info("Issued company access token for company={}", company.getId());
 
         return CompanyAccessTokenResponseDto.builder()
                 .accessToken(accessToken)

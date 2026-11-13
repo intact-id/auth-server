@@ -65,7 +65,6 @@ public class KycWidgetAuthFilter extends OncePerRequestFilter {
         // Attach session metadata so the controller can read them
         request.setAttribute(WidgetSessionContext.ATTRIBUTE, context);
         request.setAttribute("widget.companyId", context.companyId());
-        request.setAttribute("widget.environment", context.environment());
         request.setAttribute("widget.tier", context.tier());
         request.setAttribute("widget.externalReference", context.externalReference());
 

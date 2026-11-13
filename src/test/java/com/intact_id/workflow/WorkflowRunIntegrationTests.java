@@ -5,7 +5,6 @@ import com.intact_id.accounts.CompanyRepository;
 import com.intact_id.checks.FaceScreeningClient;
 import com.intact_id.checks.OcrExtractionResponse;
 import com.intact_id.checks.OcrScreeningClient;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.orchestration.BalanceCheck;
 import com.intact_id.orchestration.VerificationRequest;
@@ -117,7 +116,7 @@ class WorkflowRunIntegrationTests {
         dto.setIdFront(new MockMultipartFile("idFront", "id.jpg", "image/jpeg", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3}));
 
         // No selfie: the workflow has no face or liveness step
-        String id = verificationService.submitVerification("workflow", dto, company, ApiKeyEnvironment.DEV).getVerificationId();
+        String id = verificationService.submitVerification("workflow", dto, company).getVerificationId();
         processor.process(requests.findByIdWithCompany(id).orElseThrow());
         return requests.findByIdWithCompany(id).orElseThrow();
     }

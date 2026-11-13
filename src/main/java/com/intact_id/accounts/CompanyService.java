@@ -28,9 +28,9 @@ public interface CompanyService {
 
     Company activateCompany(String companyId, String adminId);
 
-    void suspendCredentials(String companyId, String environment);
+    void suspendCredentials(String companyId);
 
-    void activateCredentials(String companyId, String environment);
+    void activateCredentials(String companyId);
 
     Company updateCompany(String companyId, CompanyUpdateRequestDto request);
 

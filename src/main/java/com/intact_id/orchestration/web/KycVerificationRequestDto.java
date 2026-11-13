@@ -66,7 +66,7 @@ public class KycVerificationRequestDto {
     @Size(max = 255, message = "externalReference must be at most 255 characters")
     private String externalReference;
 
-    // Workflow key for API submissions: sandbox runs its latest published version, production its live one
+    // Workflow key for API submissions; without it the company's default workflow runs, else the tier checks
     private String workflow;
 
     // Set internally when a session already pinned the version (widget drafts); not part of the public API

@@ -2,7 +2,6 @@ package com.intact_id.orchestration.web;
 
 import com.intact_id.accounts.Company;
 import com.intact_id.dto.response.ApiResponse;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.orchestration.KycSessionService;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.workflow.PinnedWorkflow;
@@ -45,14 +44,12 @@ public class KycSessionController {
             @Valid @RequestBody KycSessionRequestDto request) {
 
         Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
-        log.info("Creating widget session for company={} tier={} env={}",
-                company.getId(), request.getTier(), request.getEnvironment());
+        log.info("Creating widget session for company={} tier={}", company.getId(), request.getTier());
 
-        boolean live = request.getEnvironment() == ApiKeyEnvironment.PROD;
         // The named workflow, else the company's default workflow, else the tier checks
         PinnedWorkflow workflow = request.getWorkflow() == null || request.getWorkflow().isBlank()
-                ? workflowRuntime.pinDefault(company.getId(), live).orElse(null)
-                : workflowRuntime.pin(company.getId(), request.getWorkflow().trim(), live);
+                ? workflowRuntime.pinDefault(company.getId()).orElse(null)
+                : workflowRuntime.pin(company.getId(), request.getWorkflow().trim());
         String tier = request.getTier();
         if (workflow == null && (tier == null || tier.isBlank())) {
             throw new ApplicationExceptions.IntactBadRequestException("tier is required (tier1, tier2, tier3) unless a workflow is given");
@@ -61,7 +58,7 @@ public class KycSessionController {
             tier = WORKFLOW_TIER;
         }
         String token = kycSessionService.createSessionToken(
-                company.getId(), KycSessionService.displayName(company), request.getEnvironment(),
+                company.getId(), KycSessionService.displayName(company),
                 tier, request.getExternalReference(), workflow);
 
         KycSessionResponseDto response = KycSessionResponseDto.builder()
@@ -70,7 +67,6 @@ public class KycSessionController {
                 .tier(tier)
                 .workflow(workflow == null ? null : workflow.key())
                 .workflowVersion(workflow == null ? null : workflow.version())
-                .environment(request.getEnvironment().name())
                 .externalReference(request.getExternalReference())
                 .build();
 

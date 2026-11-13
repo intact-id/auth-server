@@ -35,12 +35,11 @@ public class ScreeningRecordsController {
     public ResponseEntity<ApiResponse<Page<ScreeningRecordDto>>> results(
             @Parameter(description = "NO_HIT, POTENTIAL_MATCH, CONFIRMED_MATCH or SKIPPED") @RequestParam(required = false) String verdict,
             @Parameter(description = "Name, company or verification ID") @RequestParam(required = false) String search,
-            @Parameter(description = "PROD or DEV") @RequestParam(required = false) String environment,
             @Parameter(description = "Super admins only: one company") @RequestParam(required = false) String companyId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        Page<ScreeningRecordDto> results = screeningRecords.list(company(companyId), upper(environment), upper(verdict), search,
+        Page<ScreeningRecordDto> results = screeningRecords.list(company(companyId), upper(verdict), search,
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
         return ok("Screening results retrieved", results);
     }
@@ -49,12 +48,11 @@ public class ScreeningRecordsController {
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
     @Operation(summary = "Count screening results", description = "Per verdict over the last `days` days (default 30, max 365).")
     public ResponseEntity<ApiResponse<ScreeningSummaryDto>> summary(
-            @RequestParam(required = false) String environment,
             @RequestParam(required = false) String companyId,
             @RequestParam(defaultValue = "30") int days) {
 
         LocalDateTime since = LocalDateTime.now().minusDays(Math.min(Math.max(days, 1), 365));
-        return ok("Screening summary retrieved", screeningRecords.summary(company(companyId), upper(environment), since));
+        return ok("Screening summary retrieved", screeningRecords.summary(company(companyId), since));
     }
 
     /** Super admins: the named company, or all when none is named. Everyone else: their own company. */

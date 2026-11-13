@@ -2,7 +2,6 @@ package com.intact_id.orchestration;
 
 import com.intact_id.workflow.WorkflowRun;
 import com.intact_id.constant.base.Auditable;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.accounts.Company;
 import com.intact_id.util.converter.PgJsonbToMapConverter;
@@ -52,9 +51,6 @@ public class VerificationRequest extends Auditable {
     @Column(name = "status", nullable = false)
     private GlobalStatuses status = GlobalStatuses.SUBMITTED;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "environment", nullable = false, length = 10)
-    private ApiKeyEnvironment environment = ApiKeyEnvironment.PROD;
 
     @Column(name = "customer_data", columnDefinition = "jsonb")
     @Convert(converter = PgJsonbToMapConverter.class)

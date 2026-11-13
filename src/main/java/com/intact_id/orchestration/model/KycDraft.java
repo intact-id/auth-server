@@ -1,7 +1,6 @@
 package com.intact_id.orchestration.model;
 
 import com.intact_id.constant.base.Auditable;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.util.converter.PgJsonbToMapConverter;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -23,10 +22,6 @@ public class KycDraft extends Auditable {
 
     @Column(name = "company_id", nullable = false)
     private String companyId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "environment", nullable = false, length = 10)
-    private ApiKeyEnvironment environment;
 
     @Column(name = "tier", nullable = false, length = 20)
     private String tier;

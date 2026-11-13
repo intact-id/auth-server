@@ -1,6 +1,5 @@
 package com.intact_id.orchestration;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.orchestration.model.WidgetChannel;
 
 /**
@@ -10,7 +9,6 @@ public record WidgetSessionContext(
         String companyId,
         // Shown on the widget's first screen ("Acme Pay verification")
         String companyName,
-        ApiKeyEnvironment environment,
         String tier,
         String externalReference,
         String draftId,

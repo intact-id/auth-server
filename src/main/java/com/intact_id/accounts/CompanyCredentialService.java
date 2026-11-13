@@ -1,10 +1,8 @@
 package com.intact_id.accounts;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
 
 /**
  * @Author frank
@@ -14,18 +12,12 @@ import java.util.Map;
 
 @Service
 public interface CompanyCredentialService {
-    CompanyCredentials getByApiKeyCompanyCredentials(String apiKey, ApiKeyEnvironment environment);
-    CompanyCredentials getByApiKeyCompanyCredentialsWithStatusActive(String apiKey, ApiKeyEnvironment environment);
-    void updateStatus(String apiKey, ApiKeyEnvironment environment, GlobalStatuses globalStatus);
-    void recordUsageAsync(String credentialsId, ApiKeyEnvironment environment, boolean success);
 
-    /**
-     * Generate PROD (live) API key + secret for a company on demand.
-     * Returns the plaintext credentials — shown only once; the caller must
-     * surface them to the user immediately as they are never stored in plaintext.
-     *
-     * @param companyId the company's UUID
-     * @return map with keys "apiKey" and "apiSecret"
-     */
-    Map<String, String> generateProdCredentials(String companyId);
+    CompanyCredentials getByApiKeyCompanyCredentials(String apiKey);
+
+    CompanyCredentials getByApiKeyCompanyCredentialsWithStatusActive(String apiKey);
+
+    void updateStatus(String apiKey, GlobalStatuses globalStatus);
+
+    void recordUsageAsync(String credentialsId, boolean success);
 }
