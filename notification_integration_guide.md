@@ -115,24 +115,33 @@ Best regards,
 Intact ID Team
 ```
 
-## Frontend Usage
-The dashboard Notifications page allows admins to:
-- View all notifications
-- Create custom notifications (with email)
-- Mark notifications as read
-- Delete notifications
-- Filter by company
+## Inbox (the bell)
+Every signed-in person has an inbox:
+- Company users (`ADMIN`, `COMPANY`) see their own company's notifications.
+- Super admins see the **staff inbox**: notifications with no company. The system adds them through
+  `NotificationService.notifyStaff(title, message, type, link)` when a company applies, when an application
+  passes the first review, when a verification goes to manual review, and when a service goes down or comes back.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/notifications/inbox?page&size` | The caller's inbox, newest first |
+| `GET /api/notifications/inbox/unread-count` | Unread count for the bell |
+| `PUT /api/notifications/inbox/read` | Marks the whole inbox read; returns how many changed |
+| `PUT /api/notifications/{id}/read` | Marks one read (only within the caller's inbox, except super admins) |
+| `GET /api/notifications` | Super admins: what was sent to companies. Company admins: their company's |
+
+`notifyStaff` saves in its own transaction and never throws, so a failed notification never undoes the work
+that triggered it.
 
 ## Database Schema
-Notifications are stored in the `notification_tbl` table with:
+Notifications are stored in the `notifications` table:
 - `id` - Notification ID
-- `company_id` - Reference to company
-- `title` - Notification title
-- `message` - Notification message
-- `type` - Notification type (INFO, SUCCESS, WARNING, ERROR)
-- `status` - Read status (UNREAD, READ)
-- `created_at` - Creation timestamp
-- `read_at` - Read timestamp (nullable)
+- `company_id` - The company it is for; null = Intact staff inbox
+- `title`, `message` - What it says
+- `link` - Console page it is about (e.g. `/dashboard/applications`), nullable
+- `type` - INFO, SUCCESS, WARNING, ERROR
+- `status` - UNREAD, READ
+- `created_at`, `read_at`
 
 ## Best Practices
 

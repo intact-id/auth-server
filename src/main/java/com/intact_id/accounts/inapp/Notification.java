@@ -21,9 +21,14 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // The company it is for; null = for Intact staff (super admins)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id")
     private Company company;
+
+    // Console page it is about, e.g. /dashboard/applications; null when there is none
+    @Column(name = "link")
+    private String link;
 
     @Column(nullable = false)
     private String title;

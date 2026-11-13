@@ -1,7 +1,8 @@
 spring:
   jpa:
     hibernate:
-      ddl-auto: update
+      # Flyway owns the schema (db/migration); Hibernate only checks the entities match it
+      ddl-auto: validate
     show-sql: false
 
 kyc:
