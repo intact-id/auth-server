@@ -71,35 +71,16 @@ public class GeneratorUtils {
     }
 
     /**
-     * Generate DEV API key — issued automatically on company approval.
-     * Format: ak_dev_xxxxxxxxxxxxxxxxxxxxxxxx (32 chars after prefix)
-     */
-    public String generateDevApiKey() {
-        return "ak_dev_" + generateSecureRandomString(32);
-    }
-
-    /**
-     * Generate DEV API secret — issued automatically on company approval.
-     * Format: as_dev_xxxxxxxxxxxxxxxxxxxxxxxx
-     */
-    public String generateDevApiSecret() {
-        return "as_dev_" + generateSecureRandomString(32);
-    }
-
-    /**
-     * Generate PROD (live) API key — generated on demand by the company.
-     * Format: ak_live_xxxxxxxxxxxxxxxxxxxxxxxx (32 chars after prefix)
+     * API key. Keys work only on the server (develop or production) that issued them.
+     * Format: ak_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (32 chars after prefix)
      */
     public String generateApiKey() {
-        return "ak_live_" + generateSecureRandomString(32);
+        return "ak_" + generateSecureRandomString(32);
     }
 
-    /**
-     * Generate PROD (live) API secret — generated on demand by the company.
-     * Format: as_live_xxxxxxxxxxxxxxxxxxxxxxxx
-     */
+    /** API secret. Format: as_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx */
     public String generateApiSecret() {
-        return "as_live_" + generateSecureRandomString(32);
+        return "as_" + generateSecureRandomString(32);
     }
 
     /**

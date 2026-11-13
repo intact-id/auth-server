@@ -4,13 +4,8 @@ import lombok.Data;
 
 @Data
 public class RateLimitsRequestDto {
-    private EnvLimits dev;
-    private EnvLimits prod;
-
-    @Data
-    public static class EnvLimits {
-        private Integer perHour;
-        private Integer perDay;
-        private Integer perMonth;
-    }
+    // null = leave as is; a negative value removes the limit
+    private Integer perHour;
+    private Integer perDay;
+    private Integer perMonth;
 }

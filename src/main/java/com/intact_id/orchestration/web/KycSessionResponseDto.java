@@ -11,6 +11,5 @@ public class KycSessionResponseDto {
     private String tier;
     private String workflow;
     private Integer workflowVersion;
-    private String environment;
     private String externalReference;
 }

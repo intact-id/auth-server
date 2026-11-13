@@ -94,9 +94,9 @@ public class CompanyServiceImpl implements CompanyService {
     }
 
     private CompanyCredentials createCredentials(Company company, String email) {
-        // On approval issue DEV credentials only — PROD keys are generated on demand
-        String apiKey = generatorUtils.generateDevApiKey();
-        String apiSecret = generatorUtils.generateDevApiSecret();
+        // On approval issue the company's key pair; it works only on this server
+        String apiKey = generatorUtils.generateApiKey();
+        String apiSecret = generatorUtils.generateApiSecret();
 
         // Hash them for storage
         String apiKeyHash = generatorUtils.hashString(apiKey);
@@ -126,20 +126,14 @@ public class CompanyServiceImpl implements CompanyService {
         return credentials;
     }
 
-    private CompanyCredentials getCompanyCredentials(Company company, String devApiKeyHash, String devApiSecretHash) {
+    private CompanyCredentials getCompanyCredentials(Company company, String apiKeyHash, String apiSecretHash) {
         CompanyCredentials credentials = new CompanyCredentials();
         credentials.setCompany(company);
-        // DEV keys — issued on approval
-        credentials.setDevApiKeyHash(devApiKeyHash);
-        credentials.setDevApiSecretHash(devApiSecretHash);
-        credentials.setDevStatus(GlobalStatuses.ACTIVE);
-        credentials.setDevRateLimitPerHour(100);
-        credentials.setDevRateLimitPerDay(1000);
-        credentials.setDevTotalRequests(0L);
-        credentials.setDevTotalSuccessfulRequests(0L);
-        credentials.setDevTotalFailedRequests(0L);
-        // PROD keys are null — generated on demand
-        credentials.setProdStatus(GlobalStatuses.ACTIVE); // ready to activate once keys generated
+        credentials.setApiKeyHash(apiKeyHash);
+        credentials.setApiSecretHash(apiSecretHash);
+        credentials.setStatus(GlobalStatuses.ACTIVE);
+        credentials.setRateLimitPerHour(100);
+        credentials.setRateLimitPerDay(1000);
         return credentials;
     }
 
@@ -259,46 +253,26 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     @Transactional
-    public void suspendCredentials(String companyId, String environment) {
+    public void suspendCredentials(String companyId) {
         String resolvedCompanyId = resolveCompanyIdForAction(companyId);
         CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                         "Credentials not found for company"));
-        if ("dev".equalsIgnoreCase(environment)) {
-            credentials.setDevStatus(GlobalStatuses.SUSPENDED);
-        } else if ("prod".equalsIgnoreCase(environment)) {
-            credentials.setProdStatus(GlobalStatuses.SUSPENDED);
-            credentials.setStatus(GlobalStatuses.SUSPENDED);
-        } else {
-            // suspend all
-            credentials.setDevStatus(GlobalStatuses.SUSPENDED);
-            credentials.setProdStatus(GlobalStatuses.SUSPENDED);
-            credentials.setStatus(GlobalStatuses.SUSPENDED);
-        }
+        credentials.setStatus(GlobalStatuses.SUSPENDED);
         credentialsRepository.save(credentials);
-        log.info("Credentials ({}) suspended for company: {}", environment, resolvedCompanyId);
+        log.info("Credentials suspendd for company: {}", resolvedCompanyId);
     }
 
     @Override
     @Transactional
-    public void activateCredentials(String companyId, String environment) {
+    public void activateCredentials(String companyId) {
         String resolvedCompanyId = resolveCompanyIdForAction(companyId);
         CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                         "Credentials not found for company"));
-        if ("dev".equalsIgnoreCase(environment)) {
-            credentials.setDevStatus(GlobalStatuses.ACTIVE);
-        } else if ("prod".equalsIgnoreCase(environment)) {
-            credentials.setProdStatus(GlobalStatuses.ACTIVE);
-            credentials.setStatus(GlobalStatuses.ACTIVE);
-        } else {
-            // activate all
-            credentials.setDevStatus(GlobalStatuses.ACTIVE);
-            credentials.setProdStatus(GlobalStatuses.ACTIVE);
-            credentials.setStatus(GlobalStatuses.ACTIVE);
-        }
+        credentials.setStatus(GlobalStatuses.ACTIVE);
         credentialsRepository.save(credentials);
-        log.info("Credentials ({}) activated for company: {}", environment, resolvedCompanyId);
+        log.info("Credentials activated for company: {}", resolvedCompanyId);
     }
 
     @Override

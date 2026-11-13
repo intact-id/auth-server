@@ -16,8 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * This endpoint concentrates the expensive credential-validation path (DB lookup + secure
  * hash comparison) that used to run on every /verify call, which also makes it the
  * brute-force target now. There's no existing generic per-key/IP rate limiter in the repo to
- * reuse (RateLimitService is specific to counting VerificationRequest rows per company/
- * environment) — this follows the same "window + limit" shape but is Caffeine-backed so a
+ * reuse (RateLimitService is specific to counting VerificationRequest rows per company) — this follows the same "window + limit" shape but is Caffeine-backed so a
  * flood of bad attempts costs no DB reads/writes.
  */
 @Slf4j

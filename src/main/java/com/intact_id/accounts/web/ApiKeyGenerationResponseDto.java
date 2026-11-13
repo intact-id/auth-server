@@ -12,5 +12,4 @@ public class ApiKeyGenerationResponseDto {
     private String apiSecret;
     private LocalDateTime expiresAt;
     private String status;
-    private String environment;
 }

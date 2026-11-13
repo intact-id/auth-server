@@ -28,7 +28,6 @@ public class VerificationStats {
 
     private static final String FILTERS = """
             WHERE (CAST(:companyId AS text) IS NULL OR v.company_id = :companyId)
-              AND (CAST(:environment AS text) IS NULL OR v.environment = :environment)
               AND v.created_at >= :from AND v.created_at < :to
             """;
 
@@ -46,16 +45,16 @@ public class VerificationStats {
 
     private final NamedParameterJdbcTemplate jdbc;
 
-    /** companyId and environment null mean all. */
+    /** companyId null means all companies. */
     @Transactional(readOnly = true)
-    public VerificationStatsDto verifications(String companyId, String environment, int days) {
+    public VerificationStatsDto verifications(String companyId, int days) {
         LocalDateTime to = LocalDateTime.now();
         LocalDateTime from = to.minusDays(days);
-        MapSqlParameterSource params = params(companyId, environment, from, to);
+        MapSqlParameterSource params = params(companyId, from, to);
 
         VerificationStatsDto.Counts current = jdbc.queryForObject(COUNTS, params, VerificationStats::counts);
         VerificationStatsDto.Counts previous = jdbc.queryForObject(COUNTS,
-                params(companyId, environment, from.minusDays(days), from), VerificationStats::counts);
+                params(companyId, from.minusDays(days), from), VerificationStats::counts);
 
         Map<LocalDate, VerificationStatsDto.Day> byDate = jdbc.query("""
                 SELECT CAST(v.created_at AS date) AS day,
@@ -104,12 +103,12 @@ public class VerificationStats {
         return new VerificationStatsDto(from, to, current, previous, daily, byType, byCountry, checks);
     }
 
-    /** companyId and environment null mean all. */
+    /** companyId null means all companies. */
     @Transactional(readOnly = true)
-    public TurnaroundStatsDto turnaround(String companyId, String environment, int days) {
+    public TurnaroundStatsDto turnaround(String companyId, int days) {
         LocalDateTime to = LocalDateTime.now();
         LocalDateTime from = to.minusDays(days);
-        MapSqlParameterSource params = params(companyId, environment, from, to);
+        MapSqlParameterSource params = params(companyId, from, to);
 
         // The automated checks end when their last step was written
         TurnaroundStatsDto summary = jdbc.queryForObject("""
@@ -164,10 +163,9 @@ public class VerificationStats {
                 summary.reviewedAverageSeconds(), summary.stages(), checks, daily);
     }
 
-    private static MapSqlParameterSource params(String companyId, String environment, LocalDateTime from, LocalDateTime to) {
+    private static MapSqlParameterSource params(String companyId, LocalDateTime from, LocalDateTime to) {
         return new MapSqlParameterSource()
                 .addValue("companyId", companyId)
-                .addValue("environment", environment)
                 .addValue("from", from)
                 .addValue("to", to);
     }

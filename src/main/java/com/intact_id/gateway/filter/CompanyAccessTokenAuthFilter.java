@@ -1,7 +1,6 @@
 package com.intact_id.gateway.filter;
 
 import com.github.benmanes.caffeine.cache.Cache;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.accounts.Company;
 import com.intact_id.accounts.CompanyRepository;
 import com.intact_id.accounts.CompanyAuthentication;
@@ -83,17 +82,6 @@ public class CompanyAccessTokenAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        String path = request.getRequestURI();
-        ApiKeyEnvironment tokenEnv = ApiKeyEnvironment.valueOf(jwtService.extractCompanyTokenEnvironment(token));
-        if (path.contains("/api/v1/kyc/dev/") && tokenEnv != ApiKeyEnvironment.DEV) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token was not issued for the DEV environment");
-            return;
-        }
-        if (path.startsWith("/api/v1/kyc/verify") && tokenEnv != ApiKeyEnvironment.PROD) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token was not issued for the PROD environment");
-            return;
-        }
-
         String companyId = jwtService.extractCompanyId(token);
         Company company = companyAccessTokenCompanyCache.get(companyId,
                 id -> companyRepository.findById(id).orElse(null));
@@ -106,7 +94,7 @@ public class CompanyAccessTokenAuthFilter extends OncePerRequestFilter {
         CompanyAuthentication authentication = new CompanyAuthentication(company);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        log.debug("Authenticated company {} via access token for path: {}", company.getId(), path);
+        log.debug("Authenticated company {} via access token for path: {}", company.getId(), request.getRequestURI());
 
         filterChain.doFilter(request, response);
     }

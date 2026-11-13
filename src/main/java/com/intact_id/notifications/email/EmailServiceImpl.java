@@ -131,16 +131,15 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public boolean sendCompanyCredentialsRegeneratedEmail(String companyEmail, String companyName,
-            String apiKey, String apiSecret, String environment) {
+            String apiKey, String apiSecret) {
         Map<String, Object> variables = commonVars();
         variables.put("companyName", companyName);
         variables.put("apiKey", apiKey);
         variables.put("apiSecret", apiSecret);
-        variables.put("environment", environment);
 
         EmailDTO emailDTO = EmailDTO.builder()
                 .to(companyEmail)
-                .subject("Your " + environment + " API Credentials Have Been Regenerated")
+                .subject("Your API Credentials Have Been Regenerated")
                 .templateName("company-credentials-regenerated")
                 .variables(variables)
                 .build();

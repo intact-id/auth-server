@@ -42,11 +42,10 @@ public interface EmailService {
      * @param companyName  Company name
      * @param apiKey       Regenerated API key
      * @param apiSecret    Regenerated API secret
-     * @param environment  Credential environment (DEV/PROD)
      * @return true if sent successfully
      */
     boolean sendCompanyCredentialsRegeneratedEmail(String companyEmail, String companyName,
-            String apiKey, String apiSecret, String environment);
+            String apiKey, String apiSecret);
 
     /**
      * Send company rejection email

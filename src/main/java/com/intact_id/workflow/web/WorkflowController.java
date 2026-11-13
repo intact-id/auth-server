@@ -39,7 +39,7 @@ import static com.intact_id.workflow.web.WorkflowResponses.respond;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/workflows")
 @PreAuthorize("isAuthenticated()")
-@Tag(name = "Workflows", description = "Build, validate, publish (sandbox) and promote (live) verification workflows.")
+@Tag(name = "Workflows", description = "Build, validate and publish verification workflows. Publishing makes a version live.")
 public class WorkflowController {
 
     private final WorkflowDefinitionService service;
@@ -99,7 +99,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/{id}/publish")
-    @Operation(summary = "Publish the draft as a new version", description = "Sandbox uses it at once; prices it in billing. 422 lists problems.")
+    @Operation(summary = "Publish the draft as a new version", description = "It goes live at once and is priced in billing. 422 lists problems.")
     public ResponseEntity<ApiResponse<VersionSummary>> publish(@PathVariable String id,
                                                               @RequestParam(required = false) String companyId,
                                                               @RequestParam(defaultValue = "false") boolean template,
@@ -127,7 +127,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/{id}/promote")
-    @Operation(summary = "Make a published version live")
+    @Operation(summary = "Put an earlier version back in use", description = "A rollback; billing is re-priced for that version.")
     public ResponseEntity<ApiResponse<VersionSummary>> promote(@PathVariable String id,
                                                               @RequestParam(required = false) String companyId,
                                                               @Valid @RequestBody PromoteRequest request) {

@@ -1,6 +1,5 @@
 package com.intact_id.accounts.credentials;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.accounts.Company;
 import com.intact_id.notifications.CompanyCommunicationDetails;
@@ -36,71 +35,62 @@ public class ApiKeyServiceImpl implements ApiKeyService {
     private final EmailService emailService;
     private final NotificationService notificationService;
 
+    /** Creates the company's key pair, replacing any previous one. Works only on this server. */
     @Override
     @Transactional
     public ApiKeyGenerationResponseDto generateApiKey(String companyId) {
-        return generateApiKeyForEnv(companyId, ApiKeyEnvironment.PROD);
-    }
+        String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
+        log.info("Generating API key for company: {}", resolvedCompanyId);
 
-    @Override
-    @Transactional
-    public ApiKeyGenerationResponseDto generateDevApiKey(String companyId) {
-        return generateApiKeyForEnv(companyId, ApiKeyEnvironment.DEV);
-    }
+        Company company = companyRepository.findById(resolvedCompanyId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException("Company not found"));
+        CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
+                .orElse(new CompanyCredentials());
+        if (credentials.getCompany() == null) {
+            credentials.setCompany(company);
+        }
 
-    @Override
-    @Transactional
-    public ApiKeyGenerationResponseDto generateProdApiKey(String companyId) {
-        return generateApiKeyForEnv(companyId, ApiKeyEnvironment.PROD);
+        String rawApiKey = generatorUtils.generateApiKey();
+        String rawApiSecret = generatorUtils.generateApiSecret();
+        credentials.setApiKeyHash(generatorUtils.hashString(rawApiKey));
+        credentials.setApiSecretHash(generatorUtils.hashString(rawApiSecret));
+        credentials.setStatus(GlobalStatuses.ACTIVE);
+        credentials.setExpiresAt(LocalDateTime.now().plusYears(1));
+        credentialsRepository.save(credentials);
+
+        ApiKeyGenerationResponseDto response = ApiKeyGenerationResponseDto.builder()
+                .apiKey(rawApiKey)
+                .apiSecret(rawApiSecret)
+                .expiresAt(credentials.getExpiresAt())
+                .status(credentials.getStatus().name())
+                .build();
+        notifyCompanyOfRegeneratedCredentials(company, response);
+        return response;
     }
 
     @Override
     @Transactional
     public void revokeApiKey(String companyId, String apiKeyId) {
-        // Note: Currently CompanyCredentials is 1:1 with Company, so apiKeyId is
-        // redundant but kept for future extensibility
-        // or we can treat companyId as the identifier.
-        // For now, we just revoke the credentials for the company.
-
+        // Credentials are 1:1 with the company; apiKeyId is kept for the URL shape
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
         log.info("Revoking API key for company: {}", resolvedCompanyId);
-
         CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException("Credentials not found"));
-
         credentials.revoke();
-        credentials.setDevStatus(GlobalStatuses.REVOKED);
-        credentials.setProdStatus(GlobalStatuses.REVOKED);
         credentialsRepository.save(credentials);
     }
 
     @Override
     public List<ApiKeyGenerationResponseDto> getApiKeys(String companyId) {
-        // Since it's 1:1, we return a list with single item or empty
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
         return credentialsRepository.findByCompanyId(resolvedCompanyId)
-                .map(creds -> {
-                    List<ApiKeyGenerationResponseDto> responses = new java.util.ArrayList<>();
-                    if (creds.getApiKeyHash(ApiKeyEnvironment.PROD) != null) {
-                        responses.add(ApiKeyGenerationResponseDto.builder()
-                                .apiKey("****************")
-                                .apiSecret("****************")
-                                .expiresAt(creds.getExpiresAt(ApiKeyEnvironment.PROD))
-                                .status((creds.getProdStatus() != null ? creds.getProdStatus() : creds.getStatus()).name())
-                                .environment(ApiKeyEnvironment.PROD.name())
-                                .build());
-                    }
-                    if (creds.getApiKeyHash(ApiKeyEnvironment.DEV) != null) {
-                        responses.add(ApiKeyGenerationResponseDto.builder()
-                                .apiKey("****************")
-                                .apiSecret("****************")
-                                .expiresAt(creds.getExpiresAt(ApiKeyEnvironment.DEV))
-                                .status((creds.getDevStatus() != null ? creds.getDevStatus() : creds.getStatus()).name())
-                                .environment(ApiKeyEnvironment.DEV.name())
-                                .build());
-                    }
-                    return responses;
-                })
+                .filter(creds -> creds.getApiKeyHash() != null)
+                .map(creds -> List.of(ApiKeyGenerationResponseDto.builder()
+                        .apiKey("****************")
+                        .apiSecret("****************")
+                        .expiresAt(creds.getExpiresAt())
+                        .status(creds.getStatus().name())
+                        .build()))
                 .orElse(Collections.emptyList());
     }
 
@@ -109,83 +99,17 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
         CompanyCredentials creds = credentialsRepository.findByCompanyId(resolvedCompanyId)
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException("Credentials not found"));
-
         return ApiKeyUsageResponseDto.builder()
                 .companyId(creds.getCompany().getId())
                 .companyName(creds.getCompany().getLegalName())
-                .devTotalRequests(creds.getDevTotalRequests())
-                .devTotalSuccessfulRequests(creds.getDevTotalSuccessfulRequests())
-                .devTotalFailedRequests(creds.getDevTotalFailedRequests())
-                .devLastUsedAt(creds.getDevLastUsedAt())
-                .devRateLimitPerHour(creds.getRateLimitPerHour(ApiKeyEnvironment.DEV))
-                .devRateLimitPerDay(creds.getRateLimitPerDay(ApiKeyEnvironment.DEV))
-                .devRateLimitPerMonth(creds.getRateLimitPerMonth(ApiKeyEnvironment.DEV))
-                .prodTotalRequests(creds.getProdTotalRequests())
-                .prodTotalSuccessfulRequests(creds.getProdTotalSuccessfulRequests())
-                .prodTotalFailedRequests(creds.getProdTotalFailedRequests())
-                .prodLastUsedAt(creds.getProdLastUsedAt())
-                .prodRateLimitPerHour(creds.getRateLimitPerHour(ApiKeyEnvironment.PROD))
-                .prodRateLimitPerDay(creds.getRateLimitPerDay(ApiKeyEnvironment.PROD))
-                .prodRateLimitPerMonth(creds.getRateLimitPerMonth(ApiKeyEnvironment.PROD))
+                .totalRequests(creds.getTotalRequests())
+                .totalSuccessfulRequests(creds.getTotalSuccessfulRequests())
+                .totalFailedRequests(creds.getTotalFailedRequests())
+                .lastUsedAt(creds.getLastUsedAt())
+                .rateLimitPerHour(creds.getRateLimitPerHour())
+                .rateLimitPerDay(creds.getRateLimitPerDay())
+                .rateLimitPerMonth(creds.getRateLimitPerMonth())
                 .build();
-    }
-
-    private ApiKeyGenerationResponseDto generateApiKeyForEnv(String companyId, ApiKeyEnvironment environment) {
-        String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
-        log.info("Generating {} API key for company: {}", environment.name(), resolvedCompanyId);
-
-        assert resolvedCompanyId != null;
-        Company company = companyRepository.findById(resolvedCompanyId)
-                .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException("Company not found"));
-
-        CompanyCredentials credentials = credentialsRepository.findByCompanyId(resolvedCompanyId)
-                .orElse(new CompanyCredentials());
-
-        if (credentials.getCompany() == null) {
-            credentials.setCompany(company);
-        }
-
-        String rawApiKey;
-        String rawApiSecret;
-        if (environment == ApiKeyEnvironment.DEV) {
-            rawApiKey    = generatorUtils.generateDevApiKey();
-            rawApiSecret = generatorUtils.generateDevApiSecret();
-        } else {
-            rawApiKey    = generatorUtils.generateApiKey();
-            rawApiSecret = generatorUtils.generateApiSecret();
-        }
-
-        if (environment == ApiKeyEnvironment.DEV) {
-            credentials.setDevApiKeyHash(generatorUtils.hashString(rawApiKey));
-            credentials.setDevApiSecretHash(generatorUtils.hashString(rawApiSecret));
-            credentials.setDevStatus(GlobalStatuses.ACTIVE);
-            credentials.setDevExpiresAt(LocalDateTime.now().plusYears(1));
-        } else {
-            credentials.setProdApiKeyHash(generatorUtils.hashString(rawApiKey));
-            credentials.setProdApiSecretHash(generatorUtils.hashString(rawApiSecret));
-            credentials.setProdStatus(GlobalStatuses.ACTIVE);
-            credentials.setProdExpiresAt(LocalDateTime.now().plusYears(1));
-
-            // Legacy fields for backward compatibility
-            credentials.setApiKeyHash(credentials.getProdApiKeyHash());
-            credentials.setApiSecretHash(credentials.getProdApiSecretHash());
-            credentials.setStatus(credentials.getProdStatus());
-            credentials.setExpiresAt(credentials.getProdExpiresAt());
-        }
-
-        credentialsRepository.save(credentials);
-
-        ApiKeyGenerationResponseDto response = ApiKeyGenerationResponseDto.builder()
-                .apiKey(rawApiKey)
-                .apiSecret(rawApiSecret)
-                .expiresAt(credentials.getExpiresAt(environment))
-                .status((environment == ApiKeyEnvironment.DEV ? credentials.getDevStatus() : credentials.getProdStatus()).name())
-                .environment(environment.name())
-                .build();
-
-        notifyCompanyOfRegeneratedCredentials(company, response);
-
-        return response;
     }
 
     private void notifyCompanyOfRegeneratedCredentials(Company company, ApiKeyGenerationResponseDto response) {
@@ -195,27 +119,15 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                             "Communication details not found for company"));
 
             boolean emailSent = emailService.sendCompanyCredentialsRegeneratedEmail(
-                    communication.getEmail(),
-                    company.getLegalName(),
-                    response.getApiKey(),
-                    response.getApiSecret(),
-                    response.getEnvironment());
-
+                    communication.getEmail(), company.getLegalName(), response.getApiKey(), response.getApiSecret());
             if (!emailSent) {
-                log.warn("Failed to send regenerated {} API credentials email to company {}",
-                        response.getEnvironment(), company.getId());
+                log.warn("Failed to send regenerated API credentials email to company {}", company.getId());
                 return;
             }
-
-            notificationService.persistNotification(
-                    company.getId(),
-                    response.getEnvironment() + " API Credentials Regenerated",
-                    "Your " + response.getEnvironment()
-                            + " API credentials were regenerated and sent to your registered company email.",
-                    "INFO");
+            notificationService.persistNotification(company.getId(), "API Credentials Regenerated",
+                    "Your API credentials were regenerated and sent to your registered company email.", "INFO");
         } catch (Exception e) {
-            log.error("Failed to notify company {} about regenerated {} API credentials",
-                    company.getId(), response.getEnvironment(), e);
+            log.error("Failed to notify company {} about regenerated API credentials", company.getId(), e);
         }
     }
 }

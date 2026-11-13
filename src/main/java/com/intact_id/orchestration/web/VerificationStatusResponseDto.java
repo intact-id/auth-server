@@ -18,7 +18,6 @@ public class VerificationStatusResponseDto {
     private String status;
     private String tier;
     private String verificationType;
-    private String environment;
     private String workflowId;
     private Integer workflowVersion;
     private String overallDecision;
