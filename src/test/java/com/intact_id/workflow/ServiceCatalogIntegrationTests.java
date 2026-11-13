@@ -20,7 +20,7 @@ class ServiceCatalogIntegrationTests {
         assertThat(serviceCatalog.available(SubjectType.INDIVIDUAL)).extracting(CatalogService::code)
                 .containsExactly("DOCUMENT_CHECK", "DATA_CROSSCHECK", "LIVENESS", "FACE_MATCH", "SANCTIONS_SCREENING", "CRA");
         assertThat(serviceCatalog.available(SubjectType.BUSINESS)).extracting(CatalogService::code)
-                .containsExactly("SANCTIONS_SCREENING", "CRA");
+                .containsExactly("SANCTIONS_SCREENING", "BUSINESS_REGISTRY", "OWNER_VERIFICATION", "CRA");
 
         CatalogService iprs = serviceCatalog.find("IPRS_LOOKUP").orElseThrow();
         assertThat(iprs.status()).isEqualTo(ServiceStatus.IN_DEVELOPMENT);

@@ -156,6 +156,10 @@ app:
   dashboard-url: ${DASHBOARD_URL:https://dashboard.intact-id.com}
   docs-url: ${DOCS_URL:https://docs.intact-id.com}
 
+kyb:
+  # Where a director's or owner's invite link points; the widget reads ?token= and starts their verification
+  invite-url: ${KYB_INVITE_URL:https://widget.intact-io.com/invite}
+
 kyc:
   storage:
     type: ${KYC_STORAGE_TYPE:local}

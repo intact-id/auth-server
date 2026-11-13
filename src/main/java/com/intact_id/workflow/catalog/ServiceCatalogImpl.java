@@ -91,7 +91,7 @@ public class ServiceCatalogImpl implements ServiceCatalog {
         Set<String> captures = new LinkedHashSet<>();
         Set<String> screens = new LinkedHashSet<>();
         ordered.forEach(s -> {
-            fields.addAll(s.requiredFields());
+            fields.addAll(requiredFields(s, subjectType));
             captures.addAll(s.captures());
         });
         // Fields are collected on one details screen before any capture
@@ -106,6 +106,16 @@ public class ServiceCatalogImpl implements ServiceCatalog {
         return new ServiceRequirements(
                 ordered.stream().map(CatalogService::code).toList(),
                 List.copyOf(fields), List.copyOf(captures), List.copyOf(screens), List.copyOf(problems));
+    }
+
+    /** A service that serves both people and businesses can list what it needs from a business in ui.businessRequiredFields. */
+    @SuppressWarnings("unchecked")
+    private static List<String> requiredFields(CatalogService service, SubjectType subjectType) {
+        if (subjectType == SubjectType.BUSINESS && service.ui() != null
+                && service.ui().get("businessRequiredFields") instanceof List<?> businessFields) {
+            return (List<String>) businessFields;
+        }
+        return service.requiredFields();
     }
 
     /** Clears the cache after a catalog change on this instance. */

@@ -369,7 +369,8 @@ public class ExternalKycServiceClient {
         String customerId = request.getExternalReference() != null && !request.getExternalReference().isBlank()
                 ? request.getExternalReference() : request.getId();
         if ("business".equalsIgnoreCase(request.getVerificationType())) {
-            String jurisdiction = Optional.ofNullable(text(c.get("jurisdiction"))).orElse(text(c.get("countryOfResidence")));
+            String jurisdiction = Optional.ofNullable(text(c.get("jurisdiction"))).or(() -> Optional.ofNullable(text(c.get("country"))))
+                    .orElse(text(c.get("countryOfResidence")));
             return RiskScreening.Subject.business(customerId, text(c.get("companyName")), jurisdiction);
         }
         return RiskScreening.Subject.person(customerId, text(c.get("firstName")), text(c.get("lastName")),

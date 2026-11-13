@@ -33,6 +33,10 @@ public class VerificationStep extends Auditable {
     @Column(name = "status", nullable = false)
     private GlobalStatuses status = GlobalStatuses.PENDING;
 
+    // What the check reported (passed, failed, review, skipped), so a run that waited can resume from it
+    @Column(name = "check_status", length = 20)
+    private String checkStatus;
+
     @Column(name = "result", columnDefinition = "jsonb")
     @Convert(converter = PgJsonbToMapConverter.class)
     @JdbcTypeCode(SqlTypes.JSON)
