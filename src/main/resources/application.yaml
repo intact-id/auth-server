@@ -61,6 +61,8 @@ spring:
             logger-level: basic
           billing-service:
             logger-level: basic
+          billing-accounts:
+            logger-level: basic
 
 server:
   port: ${SERVER_PORT:8085}
