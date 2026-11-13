@@ -437,6 +437,38 @@ through, if any) and `documentCount`.
 
 ---
 
+## Screening Results
+
+Every verification that runs sanctions and PEP screening keeps its result. List your company's:
+
+```http
+GET /api/v1/screening/results?verdict=POTENTIAL_MATCH&environment=PROD&search=amina&page=0&size=20
+Authorization: Bearer eyJ...
+```
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `verdict` | string | `NO_HIT`, `POTENTIAL_MATCH`, `CONFIRMED_MATCH`, or `SKIPPED` (screening could not run) |
+| `environment` | string | `PROD` or `DEV` |
+| `search` | string | Applicant name, company or verification ID |
+| `page`, `size` | integer | Paging (size up to 100), newest first |
+
+Each result carries `verificationId`, `subjectName`, `verdict`, `hits`, `topScore`, `pep`, `adverseMedia`,
+up to five `matches` (`entity_id`, `caption`, `score`, `datasets`, `topics`), `verificationStatus`,
+`overallDecision` and `checkedAt`.
+
+Counts per verdict over the last `days` days (default 30):
+
+```http
+GET /api/v1/screening/results/summary?days=30
+```
+
+```json
+{ "since": "...", "total": 120, "noHit": 104, "potentialMatch": 12, "confirmedMatch": 1, "skipped": 3, "pep": 9, "adverseMedia": 4 }
+```
+
+---
+
 ## Webhooks
 
 Webhooks deliver real-time verification results to your server. Configure a webhook URL in your dashboard or per-request via the `webhookUrl` field.
