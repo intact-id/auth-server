@@ -1,6 +1,5 @@
 package com.intact_id.accounts;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,15 +23,10 @@ public class CredentialsValidator {
 
     public boolean validateCredentials(HttpServletRequest httpServletRequest) {
         try {
-            ApiKeyEnvironment environment = resolveEnvironment(httpServletRequest);
             var headers = getCredentials(httpServletRequest);
             var companyCredentials = companyCredentialService
-                    .getByApiKeyCompanyCredentialsWithStatusActive(headers.apiKey, environment);
-
-            return compareAndValidate(
-                    companyCredentials.getApiKeyHash(environment),
-                    companyCredentials.getApiSecretHash(environment),
-                    headers);
+                    .getByApiKeyCompanyCredentialsWithStatusActive(headers.apiKey);
+            return compareAndValidate(companyCredentials.getApiKeyHash(), companyCredentials.getApiSecretHash(), headers);
 
         } catch (ApplicationExceptions.IntactUnauthorizedException e) {
             throw new ApplicationExceptions.IntactUnauthorizedException(e.getMessage());
@@ -58,25 +52,6 @@ public class CredentialsValidator {
         } else
             throw new ApplicationExceptions.IntactUnauthorizedException("no credentials provided");
     }
-
-    public ApiKeyEnvironment resolveEnvironment(HttpServletRequest httpServletRequest) {
-        // Resolve from the API key prefix first — most reliable signal
-        String apiKey = httpServletRequest.getHeader("X-API-Key");
-        if (apiKey != null && apiKey.startsWith("ak_dev_")) {
-            return ApiKeyEnvironment.DEV;
-        }
-
-        // Fall back to path-based resolution
-        String path = httpServletRequest.getRequestURI();
-        if (path != null && path.contains("/api/v1/kyc/dev")) {
-            return ApiKeyEnvironment.DEV;
-        }
-        if (path != null && path.contains("/api/v1/kyc/prod")) {
-            return ApiKeyEnvironment.PROD;
-        }
-        return ApiKeyEnvironment.PROD;
-    }
-
 
     @Builder
     private record Credentials(String apiKey, String apiSecret) {

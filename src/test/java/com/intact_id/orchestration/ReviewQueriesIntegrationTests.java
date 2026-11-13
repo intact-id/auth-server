@@ -2,7 +2,6 @@ package com.intact_id.orchestration;
 
 import com.intact_id.accounts.Company;
 import com.intact_id.accounts.CompanyRepository;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.orchestration.model.VerificationDocumentRepository;
 import com.intact_id.orchestration.model.VerificationRequestRepository;
@@ -70,7 +69,7 @@ class ReviewQueriesIntegrationTests {
         VerificationRequest individual = verificationRequestRepository.saveAndFlush(verification("individual"));
         VerificationRequest business = verificationRequestRepository.saveAndFlush(verification("business"));
 
-        List<String> found = ids(verificationRequestRepository.findByFilters(company.getId(), null, null, null,
+        List<String> found = ids(verificationRequestRepository.findByFilters(company.getId(), null, null,
                 "BUSINESS", null, null, null, null, PageRequest.of(0, 50)).getContent());
 
         assertThat(found).containsExactly(business.getId()).doesNotContain(individual.getId());
@@ -102,7 +101,6 @@ class ReviewQueriesIntegrationTests {
         request.setCompany(company);
         request.setTier("tier1");
         request.setVerificationType(type);
-        request.setEnvironment(ApiKeyEnvironment.PROD);
         return request;
     }
 

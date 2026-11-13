@@ -357,15 +357,14 @@ public class CompanyController {
     }
 
     @PostMapping("/{id}/credentials/suspend")
-    @Operation(summary = "Suspend company credentials (Admin). environment: 'prod', 'dev', or omit for both.")
+    @Operation(summary = "Suspend company credentials (Admin)")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> suspendCredentials(
-            @PathVariable String id,
-            @RequestParam(required = false) String environment) {
+            @PathVariable String id) {
 
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
-            companyService.suspendCredentials(resolvedCompanyId, environment);
+            companyService.suspendCredentials(resolvedCompanyId);
 
             return ResponseEntity.ok(
                     ApiResponse.<String>builder()
@@ -384,15 +383,14 @@ public class CompanyController {
     }
 
     @PostMapping("/{id}/credentials/activate")
-    @Operation(summary = "Activate company credentials (Admin). environment: 'prod', 'dev', or omit for both.")
+    @Operation(summary = "Activate company credentials (Admin)")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<String>> activateCredentials(
-            @PathVariable String id,
-            @RequestParam(required = false) String environment) {
+            @PathVariable String id) {
 
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
-            companyService.activateCredentials(resolvedCompanyId, environment);
+            companyService.activateCredentials(resolvedCompanyId);
 
             return ResponseEntity.ok(
                     ApiResponse.<String>builder()
@@ -543,18 +541,9 @@ public class CompanyController {
                 .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                         "No credentials found for company: " + companyId));
 
-        if (request.getDev() != null) {
-            RateLimitsRequestDto.EnvLimits dev = request.getDev();
-            if (dev.getPerHour() != null) creds.setDevRateLimitPerHour(dev.getPerHour() < 0 ? null : dev.getPerHour());
-            if (dev.getPerDay() != null) creds.setDevRateLimitPerDay(dev.getPerDay() < 0 ? null : dev.getPerDay());
-            if (dev.getPerMonth() != null) creds.setDevRateLimitPerMonth(dev.getPerMonth() < 0 ? null : dev.getPerMonth());
-        }
-        if (request.getProd() != null) {
-            RateLimitsRequestDto.EnvLimits prod = request.getProd();
-            if (prod.getPerHour() != null) creds.setProdRateLimitPerHour(prod.getPerHour() < 0 ? null : prod.getPerHour());
-            if (prod.getPerDay() != null) creds.setProdRateLimitPerDay(prod.getPerDay() < 0 ? null : prod.getPerDay());
-            if (prod.getPerMonth() != null) creds.setProdRateLimitPerMonth(prod.getPerMonth() < 0 ? null : prod.getPerMonth());
-        }
+        if (request.getPerHour() != null) creds.setRateLimitPerHour(request.getPerHour() < 0 ? null : request.getPerHour());
+        if (request.getPerDay() != null) creds.setRateLimitPerDay(request.getPerDay() < 0 ? null : request.getPerDay());
+        if (request.getPerMonth() != null) creds.setRateLimitPerMonth(request.getPerMonth() < 0 ? null : request.getPerMonth());
 
         companyCredentialsRepository.save(creds);
         log.info("Rate limits updated for company {} by {}", companyId, SecurityContextUtil.getAuthenticatedUser().getEmail());
@@ -593,22 +582,12 @@ public class CompanyController {
         return RateLimitsResponseDto.builder()
                 .companyId(company.getId())
                 .companyName(company.getLegalName())
-                .dev(RateLimitsResponseDto.EnvLimits.builder()
-                        .perHour(creds != null ? creds.getDevRateLimitPerHour() : null)
-                        .perDay(creds != null ? creds.getDevRateLimitPerDay() : null)
-                        .perMonth(creds != null ? creds.getDevRateLimitPerMonth() : null)
-                        .totalRequests(creds != null ? creds.getDevTotalRequests() : 0L)
-                        .totalSuccessful(creds != null ? creds.getDevTotalSuccessfulRequests() : 0L)
-                        .totalFailed(creds != null ? creds.getDevTotalFailedRequests() : 0L)
-                        .build())
-                .prod(RateLimitsResponseDto.EnvLimits.builder()
-                        .perHour(creds != null ? creds.getProdRateLimitPerHour() : null)
-                        .perDay(creds != null ? creds.getProdRateLimitPerDay() : null)
-                        .perMonth(creds != null ? creds.getProdRateLimitPerMonth() : null)
-                        .totalRequests(creds != null ? creds.getProdTotalRequests() : 0L)
-                        .totalSuccessful(creds != null ? creds.getProdTotalSuccessfulRequests() : 0L)
-                        .totalFailed(creds != null ? creds.getProdTotalFailedRequests() : 0L)
-                        .build())
+                .perHour(creds != null ? creds.getRateLimitPerHour() : null)
+                .perDay(creds != null ? creds.getRateLimitPerDay() : null)
+                .perMonth(creds != null ? creds.getRateLimitPerMonth() : null)
+                .totalRequests(creds != null ? creds.getTotalRequests() : 0L)
+                .totalSuccessful(creds != null ? creds.getTotalSuccessfulRequests() : 0L)
+                .totalFailed(creds != null ? creds.getTotalFailedRequests() : 0L)
                 .build();
     }
 

@@ -41,7 +41,6 @@ public class ScreeningRecords {
             LEFT JOIN company_tbl c ON c.id = v.company_id
             WHERE s.step_name = 'sanctions_screening'
               AND (CAST(:companyId AS text) IS NULL OR v.company_id = :companyId)
-              AND (CAST(:environment AS text) IS NULL OR v.environment = :environment)
               AND (CAST(:since AS timestamp) IS NULL OR COALESCE(s.executed_at, s.created_at) >= :since)
             """;
 
@@ -60,11 +59,11 @@ public class ScreeningRecords {
 
     /** Newest first. companyId null means every company (super admins only; the caller decides). */
     @Transactional(readOnly = true)
-    public Page<ScreeningRecordDto> list(String companyId, String environment, String verdict, String search, Pageable pageable) {
+    public Page<ScreeningRecordDto> list(String companyId, String verdict, String search, Pageable pageable) {
         if (verdict != null && !VERDICTS.contains(verdict)) {
             throw new ApplicationExceptions.IntactBadRequestException("verdict must be one of " + VERDICTS);
         }
-        MapSqlParameterSource params = filters(companyId, environment, null)
+        MapSqlParameterSource params = filters(companyId, null)
                 .addValue("verdict", verdict)
                 .addValue("search", search == null || search.isBlank() ? null : "%" + search.trim().toLowerCase() + "%")
                 .addValue("limit", pageable.getPageSize())
@@ -74,7 +73,7 @@ public class ScreeningRecords {
         List<ScreeningRecordDto> rows = jdbc.query("""
                 SELECT s.id, s.verification_id, s.status AS step_status, s.result::text AS result,
                        COALESCE(s.executed_at, s.created_at) AS checked_at,
-                       v.environment, v.verification_type, v.status AS verification_status, v.overall_decision,
+                       v.verification_type, v.status AS verification_status, v.overall_decision,
                        v.customer_data::text AS customer_data, v.company_id, c.legal_name AS company_name
                 """ + FROM_AND_FILTERS + VERDICT_FILTER + """
                 ORDER BY COALESCE(s.executed_at, s.created_at) DESC
@@ -85,7 +84,7 @@ public class ScreeningRecords {
 
     /** Counts per verdict, plus PEP and adverse-media hits, since the given time. */
     @Transactional(readOnly = true)
-    public ScreeningSummaryDto summary(String companyId, String environment, LocalDateTime since) {
+    public ScreeningSummaryDto summary(String companyId, LocalDateTime since) {
         return jdbc.queryForObject("""
                 SELECT COUNT(*) AS total,
                        COUNT(*) FILTER (WHERE s.result->>'verdict' = 'NO_HIT') AS no_hit,
@@ -94,15 +93,14 @@ public class ScreeningRecords {
                        COUNT(*) FILTER (WHERE s.result->>'verdict' IS NULL) AS skipped,
                        COUNT(*) FILTER (WHERE s.result->>'pep' = 'true') AS pep,
                        COUNT(*) FILTER (WHERE s.result->>'adverse_media' = 'true') AS adverse_media
-                """ + FROM_AND_FILTERS, filters(companyId, environment, since), (rs, i) -> new ScreeningSummaryDto(
+                """ + FROM_AND_FILTERS, filters(companyId, since), (rs, i) -> new ScreeningSummaryDto(
                 since, rs.getLong("total"), rs.getLong("no_hit"), rs.getLong("potential_match"),
                 rs.getLong("confirmed_match"), rs.getLong("skipped"), rs.getLong("pep"), rs.getLong("adverse_media")));
     }
 
-    private static MapSqlParameterSource filters(String companyId, String environment, LocalDateTime since) {
+    private static MapSqlParameterSource filters(String companyId, LocalDateTime since) {
         return new MapSqlParameterSource()
                 .addValue("companyId", companyId)
-                .addValue("environment", environment)
                 .addValue("since", since == null ? null : Timestamp.valueOf(since));
     }
 
@@ -114,7 +112,6 @@ public class ScreeningRecords {
         return new ScreeningRecordDto(
                 rs.getString("id"),
                 rs.getString("verification_id"),
-                rs.getString("environment"),
                 rs.getString("company_id"),
                 rs.getString("company_name"),
                 subjectName(customer),

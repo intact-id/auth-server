@@ -14,12 +14,10 @@ import java.util.Optional;
 
 public interface VerificationRequestRepository extends JpaRepository<VerificationRequest, String> {
 
-        Optional<VerificationRequest> findByIdAndCompanyIdAndEnvironment(String id, String companyId, com.intact_id.constant.enums.ApiKeyEnvironment environment);
+        Optional<VerificationRequest> findByIdAndCompanyId(String id, String companyId);
 
-        Optional<VerificationRequest> findByIdAndEnvironment(String id, com.intact_id.constant.enums.ApiKeyEnvironment environment);
-
-        Optional<VerificationRequest> findFirstByCompanyIdAndEnvironmentAndExternalReferenceOrderByCreatedAtDesc(
-                String companyId, com.intact_id.constant.enums.ApiKeyEnvironment environment, String externalReference);
+        Optional<VerificationRequest> findFirstByCompanyIdAndExternalReferenceOrderByCreatedAtDesc(
+                String companyId, String externalReference);
 
         Page<VerificationRequest> findByCompanyId(String companyId, Pageable pageable);
 
@@ -28,7 +26,6 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
         @Query(value = "SELECT v.* FROM verification_requests v " +
                         "LEFT JOIN company_tbl c ON c.id = v.company_id " +
                         "WHERE (:companyId IS NULL OR v.company_id = :companyId) " +
-                        "AND (:environment IS NULL OR v.environment = :environment) " +
                         "AND (:status IS NULL OR v.status = :status) " +
                         "AND (:tier IS NULL OR v.tier = :tier) " +
                         "AND (:verificationType IS NULL OR LOWER(v.verification_type) = LOWER(:verificationType)) " +
@@ -45,8 +42,7 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         countQuery = "SELECT COUNT(*) FROM verification_requests v " +
                                         "LEFT JOIN company_tbl c ON c.id = v.company_id " +
                                         "WHERE (:companyId IS NULL OR v.company_id = :companyId) " +
-                                        "AND (:environment IS NULL OR v.environment = :environment) " +
-                                        "AND (:status IS NULL OR v.status = :status) " +
+                                                        "AND (:status IS NULL OR v.status = :status) " +
                                         "AND (:tier IS NULL OR v.tier = :tier) " +
                                         "AND (:verificationType IS NULL OR LOWER(v.verification_type) = LOWER(:verificationType)) " +
                                         "AND (:externalReference IS NULL OR v.external_reference = :externalReference) " +
@@ -61,7 +57,6 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         nativeQuery = true)
         Page<VerificationRequest> findByFilters(
                         @Param("companyId") String companyId,
-                        @Param("environment") String environment,
                         @Param("status") String status,
                         @Param("tier") String tier,
                         @Param("verificationType") String verificationType,
@@ -90,9 +85,8 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                         @Param("unassignedOnly") boolean unassignedOnly,
                         Pageable pageable);
 
-        long countByCompanyIdAndEnvironmentAndStatusNotAndCreatedAtAfter(
+        long countByCompanyIdAndStatusNotAndCreatedAtAfter(
                 String companyId,
-                com.intact_id.constant.enums.ApiKeyEnvironment environment,
                 GlobalStatuses excludedStatus,
                 LocalDateTime after);
 

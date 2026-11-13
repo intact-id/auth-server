@@ -37,10 +37,9 @@ public class VerificationStatsController {
     @Operation(summary = "Verification counts", description = "Totals, the previous period's totals, a daily series and "
             + "breakdowns by type, country and check, for verifications submitted in the last `days` days (default 30, max 365).")
     public ResponseEntity<ApiResponse<VerificationStatsDto>> verifications(
-            @Parameter(description = "PROD or DEV") @RequestParam(required = false) String environment,
             @Parameter(description = "Super admins only: one company") @RequestParam(required = false) String companyId,
             @RequestParam(defaultValue = "30") int days) {
-        return ok("Verification stats retrieved", stats.verifications(company(companyId), upper(environment), clampDays(days)));
+        return ok("Verification stats retrieved", stats.verifications(company(companyId), clampDays(days)));
     }
 
     @GetMapping("/stats/turnaround")
@@ -48,10 +47,9 @@ public class VerificationStatsController {
     @Operation(summary = "Turnaround times", description = "Super admins only. Average, median and 90th-percentile time "
             + "from submission to decision, the average per stage and per check, and a daily series.")
     public ResponseEntity<ApiResponse<TurnaroundStatsDto>> turnaround(
-            @Parameter(description = "PROD or DEV") @RequestParam(required = false) String environment,
             @Parameter(description = "One company; all when omitted") @RequestParam(required = false) String companyId,
             @RequestParam(defaultValue = "30") int days) {
-        return ok("Turnaround stats retrieved", stats.turnaround(company(companyId), upper(environment), clampDays(days)));
+        return ok("Turnaround stats retrieved", stats.turnaround(company(companyId), clampDays(days)));
     }
 
     @GetMapping("/kyc/verifications/{verificationId}/timeline")

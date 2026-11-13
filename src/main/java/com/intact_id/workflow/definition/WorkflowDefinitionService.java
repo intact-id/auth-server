@@ -122,7 +122,7 @@ public class WorkflowDefinitionService {
     }
 
     /**
-     * Publishes the draft as the next version (sandbox uses it at once) and prices it in billing. When the draft
+     * Publishes the draft as the next version, which goes live at once, and prices it in billing. When the draft
      * is the same as the latest version, nothing is created and that version is returned.
      */
     @Transactional
@@ -153,25 +153,38 @@ public class WorkflowDefinitionService {
                 .notes(notes)
                 .publishedBy(publishedBy)
                 .publishedAt(LocalDateTime.now())
+                .promotedAt(definition.isTemplate() ? null : LocalDateTime.now())
                 .build());
         definition.setLatestVersion(number);
+        // One environment per server: what is published is live
+        if (!definition.isTemplate()) {
+            definition.setLiveVersion(number);
+        }
         definitions.save(definition);
         log.info("Workflow {} v{} published by {} ({} {})", definition.getKey(), number, publishedBy,
                 version.getPrice(), version.getCurrency());
         return new PublishResult(versionSummary(version, definition), true);
     }
 
-    /** Makes a published version the one live sessions use. */
+    /**
+     * Puts an earlier version back in use (a rollback). Billing is re-priced for that version's services, since
+     * billing keeps one price per workflow.
+     */
     @Transactional
     public VersionSummary promote(String companyId, String id, int number, String promotedBy) {
         WorkflowDefinitionEntity definition = editable(companyId, id);
         WorkflowVersionEntity version = versions.findByDefinitionIdAndNumber(id, number)
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Version " + number + " not found"));
+        if (!definition.isTemplate()) {
+            PriceQuote price = pricing.price(definition.getId(), clientIdentifier(definition.getCompanyId()), version.getServices());
+            version.setPrice(price.total());
+            version.setCurrency(price.currency());
+        }
         version.setPromotedAt(LocalDateTime.now());
         versions.save(version);
         definition.setLiveVersion(number);
         definitions.save(definition);
-        log.info("Workflow {} v{} promoted to live by {}", definition.getKey(), number, promotedBy);
+        log.info("Workflow {} v{} put back in use by {}", definition.getKey(), number, promotedBy);
         return versionSummary(version, definition);
     }
 

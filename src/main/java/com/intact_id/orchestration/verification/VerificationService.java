@@ -3,7 +3,6 @@ package com.intact_id.orchestration.verification;
 import java.util.ArrayList;
 import com.intact_id.workflow.WorkflowRuntime;
 import com.intact_id.workflow.PinnedWorkflow;
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.accounts.Company;
 import com.intact_id.orchestration.VerificationDocument;
@@ -76,13 +75,12 @@ public class VerificationService {
     public KycVerificationResponseDto submitVerification(
             String tier,
             KycVerificationRequestDto request,
-            Company company,
-            ApiKeyEnvironment environment) {
+            Company company) {
 
-        log.info("Submitting {} verification for company: {}, tier: {}", environment.name(), company.getId(), tier);
+        log.info("Submitting verification for company: {}, tier: {}", company.getId(), tier);
 
         // A workflow decides which uploads are needed; otherwise the tier does (in-memory, no DB/IO involved)
-        PinnedWorkflow workflow = resolveWorkflow(request, company, environment);
+        PinnedWorkflow workflow = resolveWorkflow(request, company);
         if (workflow != null) {
             validateWorkflowUploads(workflow, request);
         } else {
@@ -104,7 +102,6 @@ public class VerificationService {
             // DRAFT until its files are saved, so the scheduler never picks up a request without documents
             verificationRequest.setStatus(GlobalStatuses.DRAFT);
             verificationRequest.setWebhookUrl(request.getWebhookUrl());
-            verificationRequest.setEnvironment(environment);
             verificationRequest.setExternalReference(externalReference);
 
             // Store customer data
@@ -181,17 +178,16 @@ public class VerificationService {
      * API customers that upload a single selfie, who stay on the single-photo liveness check.
      */
     /** The version a draft pinned, the one a workflow key resolves to now, or the default; null for tier-based runs. */
-    private PinnedWorkflow resolveWorkflow(KycVerificationRequestDto request, Company company, ApiKeyEnvironment environment) {
+    private PinnedWorkflow resolveWorkflow(KycVerificationRequestDto request, Company company) {
         if (request.getWorkflowId() != null && request.getWorkflowVersion() != null) {
             return workflowRuntime.find(request.getWorkflowId(), request.getWorkflowVersion())
                     .orElseThrow(() -> new ApplicationExceptions.IntactBadRequestException("The session's workflow no longer exists"));
         }
-        boolean live = environment == ApiKeyEnvironment.PROD;
         if (request.getWorkflow() != null && !request.getWorkflow().isBlank()) {
-            return workflowRuntime.pin(company.getId(), request.getWorkflow().trim(), live);
+            return workflowRuntime.pin(company.getId(), request.getWorkflow().trim());
         }
         // No workflow named: the company's default workflow, else the tier checks
-        return workflowRuntime.pinDefault(company.getId(), live).orElse(null);
+        return workflowRuntime.pinDefault(company.getId()).orElse(null);
     }
 
     /** Only the uploads the workflow's services capture are required. A single selfie still covers liveness. */
@@ -296,21 +292,20 @@ public class VerificationService {
 
     public VerificationStatusResponseDto getVerificationStatus(
             String verificationId,
-            String companyId,
-            ApiKeyEnvironment environment) {
+            String companyId) {
         VerificationRequest request;
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
 
         if (resolvedCompanyId != null) {
             // Company-specific access (API key authentication)
             request = verificationRequestRepository
-                    .findByIdAndCompanyIdAndEnvironment(verificationId, resolvedCompanyId, environment)
+                    .findByIdAndCompanyId(verificationId, resolvedCompanyId)
                     .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                             "Verification not found: " + verificationId));
         } else {
             // Admin access (JWT authentication) - can view any verification
             request = verificationRequestRepository
-                    .findByIdAndEnvironment(verificationId, environment)
+                    .findById(verificationId)
                     .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                             "Verification not found: " + verificationId));
         }
@@ -320,8 +315,7 @@ public class VerificationService {
 
     public VerificationStatusResponseDto getLatestByExternalReference(
             String externalReference,
-            String companyId,
-            ApiKeyEnvironment environment) {
+            String companyId) {
         String normalizedReference = normalizeExternalReference(externalReference);
         if (normalizedReference == null) {
             throw new ApplicationExceptions.IntactBadRequestException("externalReference is required");
@@ -332,8 +326,7 @@ public class VerificationService {
         }
 
         VerificationRequest request = verificationRequestRepository
-                .findFirstByCompanyIdAndEnvironmentAndExternalReferenceOrderByCreatedAtDesc(
-                        resolvedCompanyId, environment, normalizedReference)
+                .findFirstByCompanyIdAndExternalReferenceOrderByCreatedAtDesc(resolvedCompanyId, normalizedReference)
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException(
                         "No verification found for externalReference: " + normalizedReference));
 
@@ -354,7 +347,6 @@ public class VerificationService {
                 .status(request.getStatus().name())
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
-                .environment(request.getEnvironment() != null ? request.getEnvironment().name() : null)
                 .workflowId(request.getWorkflowId())
                 .workflowVersion(request.getWorkflowVersion())
                 .overallDecision(request.getOverallDecision())
@@ -372,7 +364,6 @@ public class VerificationService {
 
     public Page<VerificationStatusResponseDto> listVerifications(
             String companyId,
-            ApiKeyEnvironment environment,
             GlobalStatuses status,
             String tier,
             String verificationType,
@@ -385,10 +376,9 @@ public class VerificationService {
         String resolvedCompanyId = TenantContext.resolveCompanyIdIfAuthenticated(companyId);
         String normalizedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
         String normalizedReference = normalizeExternalReference(externalReference);
-        String environmentName = environment != null ? environment.name() : null;
         String statusName = status != null ? status.name() : null;
         Page<VerificationRequest> requests = verificationRequestRepository.findByFilters(
-                resolvedCompanyId, environmentName, statusName, tier, blankToNull(verificationType),
+                resolvedCompanyId, statusName, tier, blankToNull(verificationType),
                 normalizedReference, fromDate, toDate, normalizedSearch, pageable);
         Map<String, Integer> documentCounts = documentCountsFor(requests.getContent());
 
@@ -399,7 +389,6 @@ public class VerificationService {
                 .status(request.getStatus().name())
                 .tier(request.getTier())
                 .verificationType(request.getVerificationType())
-                .environment(request.getEnvironment() != null ? request.getEnvironment().name() : null)
                 .workflowId(request.getWorkflowId())
                 .workflowVersion(request.getWorkflowVersion())
                 .overallDecision(request.getOverallDecision())

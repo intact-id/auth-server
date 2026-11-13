@@ -1,6 +1,5 @@
 package com.intact_id.orchestration.web;
 
-import com.intact_id.constant.enums.ApiKeyEnvironment;
 import com.intact_id.orchestration.model.WidgetChannel;
 import com.intact_id.accounts.Company;
 import com.intact_id.dto.response.ApiResponse;
@@ -36,7 +35,7 @@ public class KycWidgetController {
     @PostMapping(value = "/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('COMPANY')")
     @Operation(summary = "Submit KYC verification from widget",
-               description = "Authenticated via X-Session-Token. Tier and environment are derived from the session token.")
+               description = "Authenticated via X-Session-Token. The tier and workflow come from the session token.")
     public ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerification(
             @RequestParam String firstName,
             @RequestParam String lastName,
@@ -68,7 +67,6 @@ public class KycWidgetController {
 
         try {
             Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
-            ApiKeyEnvironment environment = (ApiKeyEnvironment) httpRequest.getAttribute("widget.environment");
             String tier = (String) httpRequest.getAttribute("widget.tier");
 
             KycVerificationRequestDto dto = new KycVerificationRequestDto();
@@ -90,7 +88,7 @@ public class KycWidgetController {
             dto.setLivenessFrames(livenessFrames);
             dto.setLivenessLabels(livenessLabels);
 
-            KycVerificationResponseDto result = verificationService.submitVerification(tier, dto, company, environment);
+            KycVerificationResponseDto result = verificationService.submitVerification(tier, dto, company);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(
                     ApiResponse.<KycVerificationResponseDto>builder()
@@ -127,10 +125,8 @@ public class KycWidgetController {
 
         try {
             Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
-            ApiKeyEnvironment environment = (ApiKeyEnvironment) httpRequest.getAttribute("widget.environment");
-
             VerificationStatusResponseDto status = verificationService.getVerificationStatus(
-                    verificationId, company.getId(), environment);
+                    verificationId, company.getId());
 
             return ResponseEntity.ok(ApiResponse.<VerificationStatusResponseDto>builder()
                     .responseCode(200)

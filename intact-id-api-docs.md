@@ -1,7 +1,7 @@
 # Intact ID — Partner Integration API Reference
 
 > **Base URL (Production):** `https://api.intact-id.com`
-> **Base URL (Sandbox):** `https://sandbox.intact-id.com`
+> **Base URL (Test server):** `https://sandbox.intact-id.com`
 > **API Version:** `v1`
 > **Docs:** `https://docs.intact-id.com`
 
@@ -30,10 +30,10 @@
 
 1. **Register your company** at `https://dashboard.intact-id.com` or via the [registration API](#company-registration).
 2. **Wait for approval** — our team reviews applications within 1–2 business days.
-3. **Get your API keys** from the dashboard (separate keys for sandbox and production).
-4. **Submit a test verification** using the sandbox environment.
+3. **Get your API keys** from the test server's dashboard and build your integration against it.
+4. **Submit a test verification** to the test server.
 5. **Configure webhooks** to receive real-time status updates.
-6. **Go live** — swap your sandbox key for the production key.
+6. **Go live** — get your production keys from the production dashboard and switch your base URL.
 
 ### Base Request
 
@@ -42,8 +42,8 @@ All API requests must be made over HTTPS. HTTP requests will be rejected.
 ```http
 POST /api/v1/kyc/verify/TIER_1
 Host: api.intact-id.com
-X-API-Key: ik_live_xxxxxxxxxxxx
-X-API-Secret: sk_live_xxxxxxxxxxxx
+X-API-Key: ak_xxxxxxxxxxxx
+X-API-Secret: as_xxxxxxxxxxxx
 Content-Type: multipart/form-data
 ```
 
@@ -59,15 +59,15 @@ Used for all KYC verification requests.
 
 | Header | Description |
 |--------|-------------|
-| `X-API-Key` | Your API key (`ik_live_...` or `ik_dev_...`) |
-| `X-API-Secret` | Your API secret (`sk_live_...` or `sk_dev_...`) |
+| `X-API-Key` | Your API key (`ak_...`) |
+| `X-API-Secret` | Your API secret (`as_...`) |
 
-API keys are **environment-scoped** — a live key cannot be used to hit sandbox endpoints and vice versa.
+API keys belong to the server that issued them: test-server keys don't work in production, and production keys don't work on the test server.
 
 ```http
 POST /api/v1/kyc/verify/TIER_1
-X-API-Key: ik_live_abc123
-X-API-Secret: sk_live_xyz789
+X-API-Key: ak_abc123
+X-API-Secret: as_xyz789
 ```
 
 ### JWT Bearer Token
@@ -129,15 +129,16 @@ Used exclusively with the [Iframe Widget](#iframe-widget). Your backend obtains 
 
 ## Environments
 
-| Environment | Purpose | Key Prefix |
-|-------------|---------|------------|
-| **Sandbox (DEV)** | Testing and integration | `ik_dev_` / `sk_dev_` |
-| **Production (PROD)** | Live verifications | `ik_live_` / `sk_live_` |
+The test server and production are separate servers, each with its own data. Everything else is the
+same: the same endpoints, the same requests and responses.
 
-Sandbox verifications do not count toward billing. Use realistic test data in sandbox — the system runs real OCR and face-matching against your uploads.
+| Server | Purpose | Base URL |
+|--------|---------|----------|
+| **Test server** | Building and testing your integration | `https://sandbox.intact-id.com` |
+| **Production** | Real customers | `https://api.intact-id.com` |
 
-**Sandbox endpoint prefix:** `/api/v1/kyc/dev/verify/{tier}`
-**Production endpoint prefix:** `/api/v1/kyc/verify/{tier}`
+Keys, companies, workflows and verifications on one server don't exist on the other. Older paths with
+`/dev/` or `/prod/` (e.g. `/api/v1/kyc/dev/verify/{tier}`) still work and behave exactly like the plain ones.
 
 ---
 
@@ -264,21 +265,10 @@ GET /api/public/applications/APP-20240115-001/status
 
 ### Submit a Verification
 
-#### Production
-
 ```http
 POST /api/v1/kyc/verify/{tier}
-X-API-Key: ik_live_xxxxxxxxxxxx
-X-API-Secret: sk_live_xxxxxxxxxxxx
-Content-Type: multipart/form-data
-```
-
-#### Sandbox
-
-```http
-POST /api/v1/kyc/dev/verify/{tier}
-X-API-Key: ik_dev_xxxxxxxxxxxx
-X-API-Secret: sk_dev_xxxxxxxxxxxx
+X-API-Key: ak_xxxxxxxxxxxx
+X-API-Secret: as_xxxxxxxxxxxx
 Content-Type: multipart/form-data
 ```
 
@@ -311,8 +301,8 @@ Content-Type: multipart/form-data
 
 ```bash
 curl -X POST https://api.intact-id.com/api/v1/kyc/verify/TIER_1 \
-  -H "X-API-Key: ik_live_xxxxxxxxxxxx" \
-  -H "X-API-Secret: sk_live_xxxxxxxxxxxx" \
+  -H "X-API-Key: ak_xxxxxxxxxxxx" \
+  -H "X-API-Secret: as_xxxxxxxxxxxx" \
   -F "firstName=Jane" \
   -F "lastName=Doe" \
   -F "dateOfBirth=1990-05-15" \
@@ -333,9 +323,8 @@ curl -X POST https://api.intact-id.com/api/v1/kyc/verify/TIER_1 \
 Send `workflow=<key>` to run one of your workflows instead of the tier's fixed checks. The workflow's key is
 shown on the console's Workflows page.
 
-- **Production** (`/verify/{tier}`) runs the workflow's **live** version; it fails with
-  `Workflow … has no live version` until you make one live.
-- **Sandbox** (`/dev/verify/{tier}`) runs the **latest published** version, so you can test before going live.
+- It runs the workflow's live version: the one last published (or an earlier one put back). It fails with
+  `Workflow … has not been published yet` until you publish it.
 - Only the uploads the workflow needs are required. A screening-only workflow needs no files at all.
 - Only the checks the applicant reaches are run: if the document check rejects, later checks are skipped.
 - `{tier}` is still part of the URL but is ignored when a workflow runs.
@@ -457,7 +446,7 @@ Authorization: Bearer eyJ...
 | `size` | integer | Page size (default: 20) |
 
 Each verification in the list and in the single-verification response also carries
-`environment` (`PROD` or `DEV`), `workflowId` and `workflowVersion` (the workflow it ran
+`workflowId` and `workflowVersion` (the workflow it ran
 through, if any) and `documentCount`.
 
 ---
@@ -467,14 +456,13 @@ through, if any) and `documentCount`.
 Every verification that runs sanctions and PEP screening keeps its result. List your company's:
 
 ```http
-GET /api/v1/screening/results?verdict=POTENTIAL_MATCH&environment=PROD&search=amina&page=0&size=20
+GET /api/v1/screening/results?verdict=POTENTIAL_MATCH&search=amina&page=0&size=20
 Authorization: Bearer eyJ...
 ```
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `verdict` | string | `NO_HIT`, `POTENTIAL_MATCH`, `CONFIRMED_MATCH`, or `SKIPPED` (screening could not run) |
-| `environment` | string | `PROD` or `DEV` |
 | `search` | string | Applicant name, company or verification ID |
 | `page`, `size` | integer | Paging (size up to 100), newest first |
 
@@ -500,7 +488,7 @@ Counts for verifications submitted in the last `days` days (default 30, max 365)
 period before, a daily series, and breakdowns by type, country (`countryOfResidence`, else `nationality`) and check:
 
 ```http
-GET /api/v1/stats/verifications?days=30&environment=PROD
+GET /api/v1/stats/verifications?days=30
 Authorization: Bearer eyJ...
 ```
 
@@ -511,7 +499,7 @@ Authorization: Bearer eyJ...
 ### Turnaround time (super admins)
 
 ```http
-GET /api/v1/stats/turnaround?days=30&environment=PROD&companyId=...
+GET /api/v1/stats/turnaround?days=30&companyId=...
 GET /api/v1/kyc/verifications/{verificationId}/timeline
 ```
 
@@ -777,13 +765,12 @@ Your **backend** calls this endpoint with your API key. Never expose your API ke
 
 ```http
 POST /api/v1/kyc/sessions
-X-API-Key: ik_live_xxxxxxxxxxxx
-X-API-Secret: sk_live_xxxxxxxxxxxx
+X-API-Key: ak_xxxxxxxxxxxx
+X-API-Secret: as_xxxxxxxxxxxx
 Content-Type: application/json
 
 {
-  "tier": "TIER_1",
-  "environment": "PROD"
+  "tier": "TIER_1"
 }
 ```
 
@@ -795,8 +782,7 @@ Content-Type: application/json
   "data": {
     "sessionToken": "eyJ...",
     "expiresInSeconds": 900,
-    "tier": "TIER_1",
-    "environment": "PROD"
+    "tier": "TIER_1"
   }
 }
 ```
@@ -860,22 +846,22 @@ window.addEventListener('message', (event) => {
 ### Widget Session Token Limits
 
 - Tokens expire after **15 minutes**
-- Each token is scoped to one company, one tier, and one environment
+- Each token is scoped to one company and one tier (or workflow)
 - Tokens are single-use by design — generate a new token per session
 
 ---
 
 ## Rate Limits
 
-Rate limits are enforced per company, per environment. Exceeding a limit returns HTTP `429`.
+Rate limits are enforced per company. Exceeding a limit returns HTTP `429`.
 
 ### Default Limits
 
-| Window | Sandbox (DEV) | Production (PROD) |
-|--------|--------------|------------------|
-| Per hour | Configurable | Configurable |
-| Per day | Configurable | Configurable |
-| Per month | Configurable | Configurable |
+| Window | Limit |
+|--------|-------|
+| Per hour | Configurable |
+| Per day | Configurable |
+| Per month | Configurable |
 
 Contact support to request limit increases.
 
@@ -905,22 +891,15 @@ Authorization: Bearer eyJ...
   "responseCode": 200,
   "success": true,
   "data": {
-    "dev": {
-      "totalRequests": 142,
-      "totalSuccessful": 138,
-      "totalFailed": 4,
-      "limitPerHour": 100,
-      "limitPerDay": 500,
-      "limitPerMonth": 5000
-    },
-    "prod": {
-      "totalRequests": 2891,
-      "totalSuccessful": 2876,
-      "totalFailed": 15,
-      "limitPerHour": 500,
-      "limitPerDay": 5000,
-      "limitPerMonth": 50000
-    }
+    "companyId": "…",
+    "companyName": "Kestrel Capital Limited",
+    "totalRequests": 2891,
+    "totalSuccessfulRequests": 2876,
+    "totalFailedRequests": 15,
+    "lastUsedAt": "2026-11-13T09:10:00",
+    "rateLimitPerHour": 500,
+    "rateLimitPerDay": 5000,
+    "rateLimitPerMonth": 50000
   }
 }
 ```
