@@ -84,6 +84,10 @@ public class VerificationRequest extends Auditable {
     @Column(name = "error_details", columnDefinition = "text")
     private String errorDetails; // Detailed error message
 
+    // When the checks last started running; the gap from created_at is time spent queued or held
+    @Column(name = "processing_started_at")
+    private LocalDateTime processingStartedAt;
+
     @Column(name = "billing_amount", precision = 19, scale = 4)
     private BigDecimal billingAmount;
 
@@ -125,6 +129,7 @@ public class VerificationRequest extends Auditable {
 
     public void markAsProcessing() {
         this.status = GlobalStatuses.PROCESSING;
+        this.processingStartedAt = LocalDateTime.now();
     }
 
     public void markAsHeld(String reason) {
