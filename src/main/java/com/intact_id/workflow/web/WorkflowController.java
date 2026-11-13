@@ -7,6 +7,7 @@ import com.intact_id.dto.response.ApiResponse;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.workflow.WorkflowPricing.PriceQuote;
 import com.intact_id.workflow.definition.WorkflowDefinitionService;
+import com.intact_id.workflow.web.WorkflowDtos.PublishResult;
 import com.intact_id.workflow.web.WorkflowDtos.CreateWorkflowRequest;
 import com.intact_id.workflow.web.WorkflowDtos.PromoteRequest;
 import com.intact_id.workflow.web.WorkflowDtos.PublishRequest;
@@ -104,8 +105,25 @@ public class WorkflowController {
                                                               @RequestParam(defaultValue = "false") boolean template,
                                                               @Valid @RequestBody(required = false) PublishRequest request) {
         String notes = request == null ? null : request.notes();
-        return respond(HttpStatus.CREATED, "Version published",
-                service.publish(owner(companyId, template), id, notes, actor()));
+        PublishResult result = service.publish(owner(companyId, template), id, notes, actor());
+        return result.created()
+                ? respond(HttpStatus.CREATED, "Version published", result.version())
+                : respond(HttpStatus.OK, "Nothing changed since v" + result.version().number() + "; no new version", result.version());
+    }
+
+    @PutMapping("/{id}/default")
+    @Operation(summary = "Make this the company's default workflow",
+            description = "Sessions and API calls that name no workflow run it instead of the tier checks. Needs a live version.")
+    public ResponseEntity<ApiResponse<WorkflowDetail>> makeDefault(@PathVariable String id,
+                                                                  @RequestParam(required = false) String companyId) {
+        return respond(HttpStatus.OK, "Default workflow set", service.makeDefault(SecurityContextUtil.resolveCompanyId(companyId), id));
+    }
+
+    @DeleteMapping("/{id}/default")
+    @Operation(summary = "Stop using this as the default", description = "Calls that name no workflow go back to the tier checks.")
+    public ResponseEntity<ApiResponse<WorkflowDetail>> clearDefault(@PathVariable String id,
+                                                                   @RequestParam(required = false) String companyId) {
+        return respond(HttpStatus.OK, "Default workflow cleared", service.clearDefault(SecurityContextUtil.resolveCompanyId(companyId), id));
     }
 
     @PostMapping("/{id}/promote")

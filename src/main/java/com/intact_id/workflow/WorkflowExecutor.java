@@ -28,6 +28,28 @@ public final class WorkflowExecutor {
     }
 
     public static WorkflowRun walk(WorkflowGraph graph, Map<String, ServiceOutcome> outcomes, Map<String, Object> startFacts) {
+        return follow(graph, outcomes, startFacts, false).run();
+    }
+
+    /**
+     * The next service the path reaches that has no result yet, or empty when the path reaches an end
+     * (or a safety stop) with the results it has. Running services one at a time with this means checks
+     * the applicant never reaches are never called.
+     */
+    public static Optional<String> nextService(WorkflowGraph graph, Map<String, ServiceOutcome> outcomes,
+                                               Map<String, Object> startFacts) {
+        return Optional.ofNullable(follow(graph, outcomes, startFacts, true).waitingFor());
+    }
+
+    /** Where following the graph ended: a finished run, or the service it is waiting for. */
+    private record Followed(WorkflowRun run, String waitingFor) {
+        static Followed done(WorkflowRun run) {
+            return new Followed(run, null);
+        }
+    }
+
+    private static Followed follow(WorkflowGraph graph, Map<String, ServiceOutcome> outcomes, Map<String, Object> startFacts,
+                                   boolean stopAtMissingResult) {
         Map<String, Node> nodes = new HashMap<>();
         graph.nodes().forEach(n -> nodes.put(n.id(), n));
         Map<String, Map<String, String>> out = new HashMap<>();
@@ -42,7 +64,7 @@ public final class WorkflowExecutor {
 
         Optional<Node> start = graph.nodes().stream().filter(n -> n.type() == NodeType.START).findFirst();
         if (start.isEmpty()) {
-            return new WorkflowRun(Decision.MANUAL_REVIEW, "Workflow has no Start node", path);
+            return Followed.done(new WorkflowRun(Decision.MANUAL_REVIEW, "Workflow has no Start node", path));
         }
         Node node = start.get();
         for (int guard = 0; guard <= nodes.size(); guard++) {
@@ -50,25 +72,26 @@ public final class WorkflowExecutor {
             switch (node.type()) {
                 case END -> {
                     path.add(new Step(node.id(), node.type(), null, null));
-                    return node.outcome() == EndOutcome.APPROVED
+                    return Followed.done(node.outcome() == EndOutcome.APPROVED
                             ? new WorkflowRun(Decision.APPROVED, null, path)
-                            : new WorkflowRun(Decision.REJECTED, failure != null ? failure : node.label(), path);
+                            : new WorkflowRun(Decision.REJECTED, failure != null ? failure : node.label(), path));
                 }
                 case MANUAL_REVIEW -> {
                     path.add(new Step(node.id(), node.type(), null, null));
-                    return new WorkflowRun(Decision.MANUAL_REVIEW, failure != null ? failure : node.label(), path);
+                    return Followed.done(new WorkflowRun(Decision.MANUAL_REVIEW, failure != null ? failure : node.label(), path));
                 }
                 case START -> {
                     path.add(new Step(node.id(), node.type(), null, PORT_NEXT));
                     String next = ports.get(PORT_NEXT);
-                    if (next == null) return stop(path, "Start is not connected");
+                    if (next == null) return Followed.done(stop(path, "Start is not connected"));
                     node = nodes.get(next);
                 }
                 case SERVICE -> {
                     ServiceOutcome outcome = outcomes.get(node.service());
                     if (outcome == null) {
+                        if (stopAtMissingResult) return new Followed(null, node.service());
                         path.add(new Step(node.id(), node.type(), node.service(), null));
-                        return stop(path, node.service() + " produced no result");
+                        return Followed.done(stop(path, node.service() + " produced no result"));
                     }
                     String port = switch (outcome.status()) {
                         case PASSED -> PORT_PASSED;
@@ -79,11 +102,11 @@ public final class WorkflowExecutor {
                     String next = ports.get(port);
                     if (next == null) {
                         // Unconnected failed/review outputs mean: reject / send to a reviewer
-                        return switch (outcome.status()) {
+                        return Followed.done(switch (outcome.status()) {
                             case FAILED -> new WorkflowRun(Decision.REJECTED, reasonOf(node, outcome), path);
                             case REVIEW -> new WorkflowRun(Decision.MANUAL_REVIEW, reasonOf(node, outcome), path);
                             case PASSED -> stop(path, node.service() + " passed but nothing follows it");
-                        };
+                        });
                     }
                     if (outcome.status() != ServiceOutcome.Status.PASSED) {
                         failure = reasonOf(node, outcome);
@@ -101,13 +124,13 @@ public final class WorkflowExecutor {
                     }
                     path.add(new Step(node.id(), node.type(), null, port));
                     String next = ports.get(port);
-                    if (next == null) return stop(path, "Condition " + node.id() + " has no " + port + " connection");
+                    if (next == null) return Followed.done(stop(path, "Condition " + node.id() + " has no " + port + " connection"));
                     node = nodes.get(next);
                 }
             }
-            if (node == null) return stop(path, "A connection points to a missing step");
+            if (node == null) return Followed.done(stop(path, "A connection points to a missing step"));
         }
-        return stop(path, "The workflow loops");
+        return Followed.done(stop(path, "The workflow loops"));
     }
 
     private static WorkflowRun stop(List<Step> path, String reason) {

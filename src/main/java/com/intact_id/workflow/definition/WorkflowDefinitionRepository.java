@@ -20,4 +20,6 @@ public interface WorkflowDefinitionRepository extends JpaRepository<WorkflowDefi
     boolean existsByCompanyIdIsNullAndKey(String key);
 
     Optional<WorkflowDefinitionEntity> findByCompanyIdAndKeyAndArchivedFalse(String companyId, String key);
+
+    Optional<WorkflowDefinitionEntity> findByCompanyIdAndDefaultWorkflowTrueAndArchivedFalse(String companyId);
 }

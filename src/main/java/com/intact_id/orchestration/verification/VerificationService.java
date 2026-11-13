@@ -180,16 +180,18 @@ public class VerificationService {
      * labels (one per frame), or an empty list when the submission has no liveness frames — e.g.
      * API customers that upload a single selfie, who stay on the single-photo liveness check.
      */
-    /** The version a draft pinned, or the one a workflow key resolves to now; null for tier-based runs. */
+    /** The version a draft pinned, the one a workflow key resolves to now, or the default; null for tier-based runs. */
     private PinnedWorkflow resolveWorkflow(KycVerificationRequestDto request, Company company, ApiKeyEnvironment environment) {
         if (request.getWorkflowId() != null && request.getWorkflowVersion() != null) {
             return workflowRuntime.find(request.getWorkflowId(), request.getWorkflowVersion())
                     .orElseThrow(() -> new ApplicationExceptions.IntactBadRequestException("The session's workflow no longer exists"));
         }
+        boolean live = environment == ApiKeyEnvironment.PROD;
         if (request.getWorkflow() != null && !request.getWorkflow().isBlank()) {
-            return workflowRuntime.pin(company.getId(), request.getWorkflow().trim(), environment == ApiKeyEnvironment.PROD);
+            return workflowRuntime.pin(company.getId(), request.getWorkflow().trim(), live);
         }
-        return null;
+        // No workflow named: the company's default workflow, else the tier checks
+        return workflowRuntime.pinDefault(company.getId(), live).orElse(null);
     }
 
     /** Only the uploads the workflow's services capture are required. A single selfie still covers liveness. */

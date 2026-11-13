@@ -298,8 +298,9 @@ Content-Type: multipart/form-data
 | `phone` | string | ✅ | Phone number with country code |
 | `email` | string | ✅ | Applicant email — used for result notifications |
 | `verificationType` | string | ✅ | `individual` or `business` |
-| `selfie` | file | ✅ | Selfie photo (JPEG/PNG, max 10 MB) |
-| `idFront` | file | ✅ | Front of ID document (JPEG/PNG, max 10 MB) |
+| `workflow` | string | ❌ | Workflow key to run (see [Workflows](#workflows-over-the-api)). Without it, your default workflow runs if you set one, else the tier checks |
+| `selfie` | file | ✅* | Selfie photo (JPEG/PNG, max 10 MB). *With a workflow: only if it has a selfie or liveness step |
+| `idFront` | file | ✅* | Front of ID document (JPEG/PNG, max 10 MB). *With a workflow: only if it has a document step |
 | `idBack` | file | ⚠️ | Back of ID (required for national ID) |
 | `proofOfAddress` | file | ❌ | Utility bill or bank statement (optional) |
 | `webhookUrl` | string | ❌ | Override company webhook URL for this request |
@@ -325,6 +326,30 @@ curl -X POST https://api.intact-id.com/api/v1/kyc/verify/TIER_1 \
   -F "selfie=@/path/to/selfie.jpg" \
   -F "idFront=@/path/to/id_front.jpg" \
   -F "idBack=@/path/to/id_back.jpg"
+```
+
+### Workflows over the API
+
+Send `workflow=<key>` to run one of your workflows instead of the tier's fixed checks. The workflow's key is
+shown on the console's Workflows page.
+
+- **Production** (`/verify/{tier}`) runs the workflow's **live** version; it fails with
+  `Workflow … has no live version` until you make one live.
+- **Sandbox** (`/dev/verify/{tier}`) runs the **latest published** version, so you can test before going live.
+- Only the uploads the workflow needs are required. A screening-only workflow needs no files at all.
+- Only the checks the applicant reaches are run: if the document check rejects, later checks are skipped.
+- `{tier}` is still part of the URL but is ignored when a workflow runs.
+
+**Default workflow:** mark one workflow as the default in the console. Every session and API call that names
+no workflow then runs it instead of the tier checks. Remove the default to go back to the tier checks.
+
+```bash
+curl -X POST https://api.intact-id.com/api/v1/kyc/verify/TIER_1 \
+  -H "Authorization: Bearer <access token>" \
+  -F "workflow=onboarding-basic" \
+  -F "firstName=Jane" -F "lastName=Doe" -F "dateOfBirth=1990-05-15" -F "idNumber=12345678" \
+  -F "nationality=KE" \
+  -F "selfie=@/path/to/selfie.jpg" -F "idFront=@/path/to/id_front.jpg"
 ```
 
 ### Submit Response
