@@ -21,6 +21,8 @@ import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.orchestration.model.VerificationStepRepository;
 import com.intact_id.notifications.EmailService;
 import com.intact_id.accounts.NotificationService;
+import com.intact_id.checks.BusinessRegistry;
+import com.intact_id.orchestration.kyb.KybParties;
 import com.intact_id.orchestration.events.VerificationStatusChangedData;
 import com.intact_id.orchestration.events.VerificationStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.HashSet;
@@ -53,15 +56,19 @@ public class VerificationProcessor {
     private final WorkflowRuntime workflowRuntime;
     private final BalanceCheck balanceCheck;
     private final NotificationService notificationService;
+    private final BusinessRegistry businessRegistry;
+    private final KybParties kybParties;
 
     @Value("${app.support-email:support@intact-id.com}")
     private String supportEmail;
 
     public void process(VerificationRequest request) {
         log.info("Processing verification: {}", request.getId());
+        // A business that waited for its directors and owners already passed the rate limit and balance checks
+        boolean resuming = request.getMetadata() != null && request.getMetadata().remove(RESUMED) != null;
 
         // Rate limit check — runs before any external calls
-        LimitExceeded exceeded = rateLimitService.checkAndConsume(request);
+        LimitExceeded exceeded = resuming ? null : rateLimitService.checkAndConsume(request);
         if (exceeded != null) {
             String reason = String.format("%s rate limit exceeded (%d/%d, resets at %s)",
                     exceeded.window(), exceeded.used(), exceeded.limit(), exceeded.resetAt());
@@ -73,7 +80,7 @@ public class VerificationProcessor {
 
         // Wallet balance check — billing implements BalanceCheck by asking billing-service.
         // The local check-and-hold path (BillingService.checkSufficientBalance) is deprecated.
-        HoldDecision balanceDecision = balanceCheck.check(
+        HoldDecision balanceDecision = resuming ? HoldDecision.ALLOW : balanceCheck.check(
                 request.getCompany().getCompanyIdentifierCode(), request.getId(), request.getWorkflowId());
         if (balanceDecision.hold()) {
             request.markAsHeld(balanceDecision.reason());
@@ -89,10 +96,14 @@ public class VerificationProcessor {
         Optional<PinnedWorkflow> workflow = request.getWorkflowId() == null || request.getWorkflowVersion() == null
                 ? Optional.empty() : workflowRuntime.find(request.getWorkflowId(), request.getWorkflowVersion());
 
+        // Checks saved by an earlier pass that waited (business verifications waiting for their people)
+        List<VerificationStep> earlier = workflow.isPresent()
+                ? verificationStepRepository.findByVerificationRequestIdOrderByCreatedAtAsc(request.getId()) : List.of();
+
         ExternalKycServiceClient.VerificationResult result;
         try {
             result = workflow.isPresent()
-                    ? runReachedChecks(request, documents, workflow.get())
+                    ? runReachedChecks(request, documents, workflow.get(), earlier)
                     : externalKycServiceClient.performVerification(request.getTier(), request, documents, null).join();
         } catch (Exception e) {
             log.error("External KYC service call failed for: {}", request.getId(), e);
@@ -127,22 +138,21 @@ public class VerificationProcessor {
             return;
         }
 
+        if (WAITING.equals(result.getStatus())) {
+            saveNewSteps(request, result, earlier.size());
+            request.getMetadata().put(KybParties.WAITING, KybParties.WAITING_FOR_PEOPLE);
+            request.setStatus(GlobalStatuses.PENDING);
+            verificationRequestRepository.save(request);
+            log.info("Verification {} waits for its directors and owners to finish verification", request.getId());
+            publishStatusChanged(request);
+            return;
+        }
+
         if (request.getWorkflowId() != null) {
             applyWorkflow(request, workflow, result);
         }
 
-        for (ExternalKycServiceClient.CheckResult check : result.getChecks()) {
-            VerificationStep step = new VerificationStep();
-            step.setVerificationRequest(request);
-            step.setStepName(check.getStepName());
-            step.setStatus(mapStepStatus(check.getStatus()));
-            step.setConfidenceScore(check.getConfidenceScore());
-            step.setResult(check.getResult());
-            step.setExecutedAt(LocalDateTime.now());
-            step.setStartedAt(check.getStartedAt());
-            step.setDurationMs(check.getDurationMs());
-            verificationStepRepository.save(step);
-        }
+        saveNewSteps(request, result, earlier.size());
 
         if (result.getExtractedOcrData() != null && result.getOcrDocumentId() != null) {
             verificationDocumentRepository.findById(result.getOcrDocumentId()).ifPresent(doc -> {
@@ -219,18 +229,73 @@ public class VerificationProcessor {
         return ExternalServiceFailureClassifier.isTransient(cause);
     }
 
+    /** Saves the checks this pass ran; the first `alreadySaved` came from an earlier pass. */
+    private void saveNewSteps(VerificationRequest request, ExternalKycServiceClient.VerificationResult result, int alreadySaved) {
+        List<ExternalKycServiceClient.CheckResult> checks = result.getChecks();
+        for (ExternalKycServiceClient.CheckResult check : checks.subList(Math.min(alreadySaved, checks.size()), checks.size())) {
+            VerificationStep step = new VerificationStep();
+            step.setVerificationRequest(request);
+            step.setStepName(check.getStepName());
+            step.setStatus(mapStepStatus(check.getStatus()));
+            step.setCheckStatus(check.getStatus());
+            step.setConfidenceScore(check.getConfidenceScore());
+            step.setResult(check.getResult());
+            step.setExecutedAt(LocalDateTime.now());
+            step.setStartedAt(check.getStartedAt());
+            step.setDurationMs(check.getDurationMs());
+            verificationStepRepository.save(step);
+        }
+    }
+
+    /** A check saved by an earlier pass, as the run loop sees it. */
+    private static ExternalKycServiceClient.CheckResult fromStep(VerificationStep step) {
+        String status = step.getCheckStatus() != null ? step.getCheckStatus()
+                : step.getStatus() == GlobalStatuses.COMPLETED ? "passed"
+                : step.getStatus() == GlobalStatuses.PENDING_APPROVAL ? "review" : "failed";
+        return ExternalKycServiceClient.CheckResult.builder().stepName(step.getStepName()).status(status)
+                .confidenceScore(step.getConfidenceScore()).result(step.getResult())
+                .startedAt(step.getStartedAt()).durationMs(step.getDurationMs()).build();
+    }
+
+    /** The registry module's answer as a check: not registered fails, any status but ACTIVE goes to review. */
+    private ExternalKycServiceClient.CheckResult registryCheck(VerificationRequest request) {
+        Map<String, Object> business = Optional.ofNullable(request.getCustomerData()).orElse(Map.of());
+        LocalDateTime startedAt = LocalDateTime.now();
+        long start = System.nanoTime();
+        BusinessRegistry.Lookup lookup = businessRegistry.lookup(text(business.get("registrationNumber")),
+                text(business.get("companyName")), text(business.get("country")));
+        Map<String, Object> facts = new HashMap<>();
+        facts.put("registered", lookup.registered());
+        if (lookup.status() != null) facts.put("status", lookup.status());
+        facts.put("source", lookup.source());
+        String status = !lookup.registered() ? "failed" : "ACTIVE".equalsIgnoreCase(lookup.status()) ? "passed" : "review";
+        return ExternalKycServiceClient.CheckResult.builder().stepName(REGISTRY_STEP).status(status).result(facts)
+                .startedAt(startedAt).durationMs((System.nanoTime() - start) / 1_000_000).build();
+    }
+
+    private static String text(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    static final String WAITING = "waiting";
+    static final String REGISTRY_STEP = "business_registry";
+    public static final String RESUMED = "resumed";
+
     /**
      * Runs the workflow's checks one call at a time, in the order its path reaches them, so checks after an
      * early rejection (or on a branch not taken) are never called. Document check and data cross-check share
-     * one OCR call, so they run together.
+     * one OCR call, so they run together. The business registry and the directors-and-owners check run here.
+     * Returns status "waiting" when directors or owners still have verifications running.
      */
     private ExternalKycServiceClient.VerificationResult runReachedChecks(VerificationRequest request,
                                                                          List<VerificationDocument> documents,
-                                                                         PinnedWorkflow workflow) {
+                                                                         PinnedWorkflow workflow,
+                                                                         List<VerificationStep> earlier) {
         Set<String> inWorkflow = Set.copyOf(workflow.services());
         Map<String, Object> startFacts = WorkflowOutcomes.startFacts(request);
         ExternalKycServiceClient.VerificationResult combined = ExternalKycServiceClient.VerificationResult.builder()
-                .verificationId(request.getId()).status("completed").checks(new ArrayList<>())
+                .verificationId(request.getId()).status("completed")
+                .checks(new ArrayList<>(earlier.stream().map(VerificationProcessor::fromStep).toList()))
                 .overallDecision("approved").riskScore(0.1).build();
         Set<String> ran = new HashSet<>();
         while (true) {
@@ -242,8 +307,19 @@ public class VerificationProcessor {
             Set<String> call = OCR_SERVICES.contains(next.get())
                     ? OCR_SERVICES.stream().filter(inWorkflow::contains).collect(Collectors.toSet())
                     : Set.of(next.get());
-            ExternalKycServiceClient.VerificationResult part = externalKycServiceClient
-                    .performVerification(request.getTier(), request, documents, call).join();
+            ExternalKycServiceClient.VerificationResult part;
+            if (BUSINESS_REGISTRY.equals(next.get())) {
+                part = single(request, registryCheck(request));
+            } else if (OWNER_VERIFICATION.equals(next.get())) {
+                Optional<ExternalKycServiceClient.CheckResult> owners = kybParties.check(request);
+                if (owners.isEmpty()) {
+                    combined.setStatus(WAITING);
+                    return combined;
+                }
+                part = single(request, owners.get());
+            } else {
+                part = externalKycServiceClient.performVerification(request.getTier(), request, documents, call).join();
+            }
             ran.addAll(call);
             combined = combine(combined, part);
             if ("failed".equals(part.getStatus())) return combined;
@@ -251,6 +327,20 @@ public class VerificationProcessor {
     }
 
     private static final Set<String> OCR_SERVICES = Set.of("DOCUMENT_CHECK", "DATA_CROSSCHECK");
+    private static final String BUSINESS_REGISTRY = "BUSINESS_REGISTRY";
+    private static final String OWNER_VERIFICATION = "OWNER_VERIFICATION";
+
+    private static ExternalKycServiceClient.VerificationResult single(VerificationRequest request,
+                                                                      ExternalKycServiceClient.CheckResult check) {
+        String decision = switch (check.getStatus()) {
+            case "passed" -> "approved";
+            case "failed" -> "rejected";
+            default -> "manual_review";
+        };
+        return ExternalKycServiceClient.VerificationResult.builder().verificationId(request.getId()).status("completed")
+                .checks(new ArrayList<>(List.of(check))).overallDecision(decision).riskScore("approved".equals(decision) ? 0.1 : 0.5)
+                .build();
+    }
     private static final List<String> DECISION_ORDER = List.of("approved", "manual_review", "rejected", "error");
 
     /** Adds one call's checks to what has run so far; the worse decision and higher risk win. */

@@ -19,6 +19,8 @@ public class VerificationStatusResponseDto {
     private String tier;
     private String verificationType;
     private String workflowId;
+    // Business verifications: their directors and owners
+    private java.util.List<com.intact_id.orchestration.kyb.PartyView> parties;
     private Integer workflowVersion;
     private String overallDecision;
     private String failureReason;

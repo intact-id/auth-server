@@ -12,6 +12,7 @@ import com.intact_id.orchestration.model.VerificationDocumentRepository;
 import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.orchestration.model.VerificationStepRepository;
 import com.intact_id.orchestration.web.KycVerificationRequestDto;
+import com.intact_id.orchestration.kyb.KybParties;
 import com.intact_id.orchestration.web.KycVerificationResponseDto;
 import com.intact_id.orchestration.web.VerificationStatusResponseDto;
 import com.intact_id.orchestration.VerificationSubmitted;
@@ -55,6 +56,7 @@ public class VerificationService {
     private final PlatformTransactionManager transactionManager;
     private final DocumentStorage documentStorage;
     private final WorkflowRuntime workflowRuntime;
+    private final KybParties kybParties;
 
     /** Document type prefix for active-liveness frames: liveness_{index}_{label}. */
     public static final String LIVENESS_DOC_PREFIX = "liveness_";
@@ -81,6 +83,8 @@ public class VerificationService {
 
         // A workflow decides which uploads are needed; otherwise the tier does (in-memory, no DB/IO involved)
         PinnedWorkflow workflow = resolveWorkflow(request, company);
+        boolean business = isBusiness(request);
+        validateSubject(workflow, request, business);
         if (workflow != null) {
             validateWorkflowUploads(workflow, request);
         } else {
@@ -104,8 +108,13 @@ public class VerificationService {
             verificationRequest.setWebhookUrl(request.getWebhookUrl());
             verificationRequest.setExternalReference(externalReference);
 
-            // Store customer data
+            // Store customer data: the business's details, or the person's
             Map<String, Object> customerData = new HashMap<>();
+            if (business) {
+                request.getBusinessDetails().forEach((field, value) -> {
+                    if (value != null && !value.toString().isBlank()) customerData.put(field, value);
+                });
+            } else {
             customerData.put("firstName", request.getFirstName());
             customerData.put("lastName", request.getLastName());
             customerData.put("dateOfBirth", request.getDateOfBirth());
@@ -120,12 +129,23 @@ public class VerificationService {
                 customerData.put("phone", request.getPhone());
             if (request.getEmail() != null)
                 customerData.put("email", request.getEmail());
+            }
 
             verificationRequest.setCustomerData(customerData);
             verificationRequest
-                    .setMetadata(request.getCustomFields() != null ? request.getCustomFields() : new HashMap<>());
+                    .setMetadata(request.getCustomFields() != null ? new HashMap<>(request.getCustomFields()) : new HashMap<>());
 
-            return verificationRequestRepository.save(verificationRequest);
+            VerificationRequest saved = verificationRequestRepository.save(verificationRequest);
+            if (business) {
+                kybParties.attach(saved, request.getParties());
+                saved = verificationRequestRepository.save(saved);
+            }
+            String partyId = request.getPartyId() != null && !request.getPartyId().isBlank() ? request.getPartyId().trim()
+                    : KybParties.partyIdFromReference(externalReference).orElse(null);
+            if (partyId != null) {
+                kybParties.linkPerson(partyId, saved);
+            }
+            return saved;
         });
 
         // Save documents AFTER the transaction above has committed and released its
@@ -139,6 +159,8 @@ public class VerificationService {
                 saveDocument(savedRequest, request.getIdBack(), "id_back");
             if (request.getProofOfAddress() != null)
                 saveDocument(savedRequest, request.getProofOfAddress(), "proof_of_address");
+            if (request.getBusinessDocuments() != null)
+                request.getBusinessDocuments().forEach((type, file) -> saveDocument(savedRequest, file, type));
             // Index keeps capture order; label tells the face service which challenge the frame answers
             for (int i = 0; i < livenessLabels.size(); i++)
                 saveDocument(savedRequest, request.getLivenessFrames().get(i),
@@ -188,6 +210,36 @@ public class VerificationService {
         }
         // No workflow named: the company's default workflow, else the tier checks
         return workflowRuntime.pinDefault(company.getId()).orElse(null);
+    }
+
+    private static boolean isBusiness(KycVerificationRequestDto request) {
+        return "business".equalsIgnoreCase(request.getVerificationType());
+    }
+
+    /**
+     * Business verifications run a business workflow and carry the details its checks need; person verifications
+     * can't run a business workflow.
+     */
+    private static void validateSubject(PinnedWorkflow workflow, KycVerificationRequestDto request, boolean business) {
+        boolean businessWorkflow = workflow != null && workflow.subjectType() == com.intact_id.workflow.SubjectType.BUSINESS;
+        if (!business) {
+            if (businessWorkflow) {
+                throw new ApplicationExceptions.IntactBadRequestException(
+                        "Workflow " + workflow.key() + " verifies businesses; submit it to /api/v1/kyb/verify");
+            }
+            return;
+        }
+        if (!businessWorkflow) {
+            throw new ApplicationExceptions.IntactBadRequestException(
+                    "Business verifications need a business workflow: send workflow=<key>, or make one the default");
+        }
+        Map<String, Object> details = request.getBusinessDetails() == null ? Map.of() : request.getBusinessDetails();
+        List<String> missing = workflow.requirements().requiredFields().stream()
+                .filter(field -> details.get(field) == null || details.get(field).toString().isBlank()).toList();
+        if (!missing.isEmpty()) {
+            throw new ApplicationExceptions.IntactBadRequestException(
+                    "Workflow " + workflow.key() + " needs: " + String.join(", ", missing));
+        }
     }
 
     /** Only the uploads the workflow's services capture are required. A single selfie still covers liveness. */
@@ -359,6 +411,9 @@ public class VerificationService {
                 .documentCount(documents.size())
                 .steps(steps.stream().map(this::mapStepToDto).collect(Collectors.toList()))
                 .documents(documents.stream().map(this::mapDocumentToDto).collect(Collectors.toList()))
+                .parties("business".equalsIgnoreCase(request.getVerificationType())
+                        ? kybParties.forVerification(request.getId()).stream().map(com.intact_id.orchestration.kyb.PartyView::of).toList()
+                        : null)
                 .build();
     }
 

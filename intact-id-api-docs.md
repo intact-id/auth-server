@@ -362,6 +362,62 @@ curl -X POST https://api.intact-id.com/api/v1/kyc/verify/TIER_1 \
 
 ---
 
+## Business Verification (KYB)
+
+Verify a business and the people behind it. A business verification runs a **business workflow**: start
+from the console templates **Standard KYB** (registry check and sanctions screening) or **KYB plus owners**
+(adds directors and owners).
+
+```http
+POST /api/v1/kyb/verify
+Authorization: Bearer eyJ...
+Content-Type: multipart/form-data
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `companyName` | string | ✅ | Registered legal name |
+| `registrationNumber` | string | ✅ | Company registry number |
+| `country` | string | ✅ | ISO 3166 code, e.g. `KE` |
+| `tradingName`, `incorporationDate` (`YYYY-MM-DD`), `registeredAddress`, `taxPin`, `businessType` | string | ❌ | |
+| `workflow` | string | ❌ | Business workflow key; without it your default workflow runs, if it is a business one |
+| `parties` | JSON string | ❌ | Directors and owners: `[{"firstName","lastName","dateOfBirth","nationality","email","phone","director":true,"ownershipPercent":60}]` |
+| `certificateOfIncorporation`, `cr12`, `taxCertificate`, `proofOfAddress` | file | ❌ | Company documents, shown to reviewers |
+| `externalReference`, `webhookUrl` | string | ❌ | As for person verifications |
+
+The response is the same as a person verification's. `GET /api/v1/kyc/verify/{verificationId}` returns the
+business details in `customerData` and its people in `parties`.
+
+### Directors and owners
+
+Which people are checked, and how, comes from your **owner-check settings** (Intact ID sets a platform
+default; you can set your own in the console or with `PUT /api/v1/kyb/settings`):
+
+- **ownerCheck:** `NONE`, `SCREENING` (sanctions and PEP only), or `FULL_KYC` (each person completes their own identity verification).
+- **ownershipThreshold:** owners at or above this percentage are checked (default 25).
+- **includeDirectors:** whether directors are checked too.
+
+With `FULL_KYC`, the business verification waits (status `PENDING`) until every required person has a result,
+then finishes. Each person can be verified two ways:
+
+1. **Invite link:** `POST /api/v1/kyb/verifications/{verificationId}/parties/{partyId}/invite` emails the person
+   (if you gave an email) and returns their link. It works for 7 days.
+2. **Your own integration:** submit their verification to `POST /api/v1/kyc/verify/{tier}` with `partyId=<their id>`.
+
+List the people and where each one stands:
+
+```http
+GET /api/v1/kyb/verifications/{verificationId}/parties
+```
+
+Each has a `status`: `NOT_REQUIRED`, `PENDING`, `INVITED`, `VERIFYING`, `PASSED`, `FAILED` or `REVIEW`. A person
+who fails or needs review sends the business to manual review in the **KYB plus owners** template.
+
+**Business registry:** the registry check is being connected to its provider. Until then it reports every
+business as registered and active, and its result says `"source": "pending-provider"`.
+
+---
+
 ## Verification Status
 
 ### GET /api/v1/kyc/verify/{verificationId}

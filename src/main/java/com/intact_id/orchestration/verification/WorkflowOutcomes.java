@@ -88,6 +88,23 @@ final class WorkflowOutcomes {
                             ? ServiceOutcome.review("Risk assessment is missing required information", facts)
                             : outcome(check.getStatus(), "High risk customer", facts));
                 }
+                case "business_registry" -> {
+                    Map<String, Object> facts = new HashMap<>();
+                    putBoolean(facts, "business.registered", r.get("registered"));
+                    putIfPresent(facts, "business.status", r.get("status"));
+                    outcomes.put("BUSINESS_REGISTRY", outcome(check.getStatus(),
+                            Boolean.FALSE.equals(r.get("registered")) ? "Business not found in the registry"
+                                    : "Business is not active in the registry (" + r.get("status") + ")", facts));
+                }
+                case "owner_verification" -> {
+                    Map<String, Object> facts = new HashMap<>();
+                    putIfPresent(facts, "owners.required", r.get("required"));
+                    putIfPresent(facts, "owners.passed", r.get("passed"));
+                    putIfPresent(facts, "owners.failed", r.get("failed"));
+                    putIfPresent(facts, "owners.review", r.get("review"));
+                    String reason = r.get("reason") != null ? r.get("reason").toString() : "Directors and owners did not pass";
+                    outcomes.put("OWNER_VERIFICATION", outcome(check.getStatus(), reason, facts));
+                }
                 default -> { }
             }
         }

@@ -58,6 +58,8 @@ public class KycVerificationController {
                         @RequestParam(required = false) String externalReference,
                         @Parameter(description = "Workflow key. Without it the company's default workflow runs, else the tier checks.")
                         @RequestParam(required = false) String workflow,
+                        @Parameter(description = "A director's or owner's verification: their party id on a business verification")
+                        @RequestParam(required = false) String partyId,
                         @Parameter(description = "Required unless the workflow has no selfie or liveness step")
                         @RequestParam(required = false) MultipartFile selfie,
                         @Parameter(description = "Required unless the workflow has no document step")
@@ -68,7 +70,7 @@ public class KycVerificationController {
 
                 return submitVerificationInternal(tier, firstName, lastName, dateOfBirth,
                                 idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
-                                webhookUrl, externalReference, workflow, selfie, idFront, idBack, proofOfAddress, authentication);
+                                webhookUrl, externalReference, workflow, partyId, selfie, idFront, idBack, proofOfAddress, authentication);
         }
 
         private ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerificationInternal(
@@ -86,6 +88,7 @@ public class KycVerificationController {
                         String webhookUrl,
                         String externalReference,
                         String workflow,
+                        String partyId,
                         MultipartFile selfie,
                         MultipartFile idFront,
                         MultipartFile idBack,
@@ -113,6 +116,7 @@ public class KycVerificationController {
                         request.setWebhookUrl(webhookUrl);
                         request.setExternalReference(externalReference);
                         request.setWorkflow(workflow);
+                        request.setPartyId(partyId);
                         request.setSelfie(selfie);
                         request.setIdFront(idFront);
                         request.setIdBack(idBack);
