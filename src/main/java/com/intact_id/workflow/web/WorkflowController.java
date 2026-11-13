@@ -49,6 +49,13 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "OK", service.list(SecurityContextUtil.resolveCompanyId(companyId)));
     }
 
+    @GetMapping("/archived")
+    @Operation(summary = "Archived workflows", description = "The company's, or templates when template=true. Restore one to use it again.")
+    public ResponseEntity<ApiResponse<List<WorkflowSummary>>> archived(@RequestParam(required = false) String companyId,
+                                                                     @RequestParam(defaultValue = "false") boolean template) {
+        return respond(HttpStatus.OK, "OK", service.archived(owner(companyId, template)));
+    }
+
     @GetMapping("/templates")
     @Operation(summary = "Intact templates to start a workflow from")
     public ResponseEntity<ApiResponse<List<WorkflowSummary>>> templates() {
@@ -117,6 +124,14 @@ public class WorkflowController {
                                                     @RequestParam(defaultValue = "false") boolean template) {
         service.archive(owner(companyId, template), id);
         return respond(HttpStatus.OK, "Workflow archived", null);
+    }
+
+    @PostMapping("/{id}/restore")
+    @Operation(summary = "Restore an archived workflow", description = "Its versions and live version come back as they were.")
+    public ResponseEntity<ApiResponse<WorkflowDetail>> restore(@PathVariable String id,
+                                                              @RequestParam(required = false) String companyId,
+                                                              @RequestParam(defaultValue = "false") boolean template) {
+        return respond(HttpStatus.OK, "Workflow restored", service.restore(owner(companyId, template), id));
     }
 
     @PostMapping("/quote")

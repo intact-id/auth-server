@@ -68,6 +68,39 @@ public class NotificationController {
                                                 .build());
         }
 
+        // The bell: the signed-in person's own notifications (their company's; Intact staff's for super admins)
+        @GetMapping("/inbox")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        public ResponseEntity<ApiResponse<Page<NotificationResponseDto>>> inbox(
+                        @RequestParam(defaultValue = "0") int page,
+                        @RequestParam(defaultValue = "20") int size) {
+                return ResponseEntity.ok(ApiResponse.<Page<NotificationResponseDto>>builder()
+                                .success(true)
+                                .responseMessage("Inbox retrieved")
+                                .data(notificationService.inbox(PageRequest.of(page, size)))
+                                .build());
+        }
+
+        @GetMapping("/inbox/unread-count")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        public ResponseEntity<ApiResponse<Long>> inboxUnreadCount() {
+                return ResponseEntity.ok(ApiResponse.<Long>builder()
+                                .success(true)
+                                .responseMessage("Unread count retrieved")
+                                .data(notificationService.inboxUnreadCount())
+                                .build());
+        }
+
+        @PutMapping("/inbox/read")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        public ResponseEntity<ApiResponse<Integer>> markInboxRead() {
+                return ResponseEntity.ok(ApiResponse.<Integer>builder()
+                                .success(true)
+                                .responseMessage("Inbox marked as read")
+                                .data(notificationService.markInboxRead())
+                                .build());
+        }
+
         @GetMapping("/company/{companyId}")
         @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
         public ResponseEntity<ApiResponse<List<NotificationResponseDto>>> getNotificationsByCompany(
@@ -102,7 +135,7 @@ public class NotificationController {
         }
 
         @PutMapping("/{id}/read")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
         public ResponseEntity<ApiResponse<NotificationResponseDto>> markAsRead(@PathVariable Long id) {
                 log.info("Marking notification as read: {}", id);
 

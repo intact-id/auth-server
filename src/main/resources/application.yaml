@@ -19,6 +19,13 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+  flyway:
+    locations: classpath:db/migration
+    # A database that already has tables but no Flyway history (production before Flyway) is marked as
+    # version 1, so the baseline is skipped there and only newer migrations run
+    baseline-on-migrate: true
+    baseline-version: 1
+
   jpa:
     properties:
       hibernate:

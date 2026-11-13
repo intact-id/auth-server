@@ -19,8 +19,9 @@ is unaffected.
    STAGING_CORS_ORIGINS=https://<widget-tunnel-host>,http://localhost:5173
    ```
 3. `docker login` (if the images are private), then `docker compose up -d`.
-4. Tables are created on first start (`ddl-auto: update`). The DB is reachable on
-   `localhost:5433` (user/password from `env/postgres.env`) for seeding test data.
+4. auth-server's tables, roles and service catalog are created on first start by Flyway
+   (`src/main/resources/db/migration`). The DB is reachable on `localhost:5433` (user/password from
+   `env/postgres.env`) for seeding test data.
 
 billing-service does not create its own tables: on a fresh database, apply its schema from the
 billing-service repo once:

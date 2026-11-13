@@ -1,5 +1,6 @@
 package com.intact_id.accounts.application;
 
+import com.intact_id.accounts.NotificationService;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.accounts.model.CompanyApplication;
 import com.intact_id.accounts.model.CompanyApplicationApproval;
@@ -43,6 +44,9 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
     private final MapperUtils mapperUtils;
     private final EmailService emailService;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
+
+    private static final String APPLICATIONS_PAGE = "/dashboard/applications";
 
     @Value("${app.track-url:https://id.intact-io.com}")
     private String trackBaseUrl;
@@ -70,6 +74,9 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
         var saved = applicationRepository.save(application);
 
         log.info("Application submitted successfully: {}", saved.getApplicationNumber());
+        notificationService.notifyStaff("New company application",
+                saved.getLegalName() + " applied for API access (" + saved.getApplicationNumber() + ").",
+                "INFO", APPLICATIONS_PAGE);
 
         // Send confirmation email — fire-and-forget, never fail the submission
         try {
@@ -185,6 +192,10 @@ public class CompanyApplicationServiceImpl implements CompanyApplicationService 
 
         if (request.getPerformedByAction() == GlobalStatuses.APPROVED) {
             sendMakerApprovalEmails(application, request);
+            notificationService.notifyStaff("Application awaiting final approval",
+                    application.getLegalName() + " (" + application.getApplicationNumber()
+                            + ") passed the first review. A different super admin must make the final decision.",
+                    "WARNING", APPLICATIONS_PAGE);
         }
 
         return mapperUtils.toApplicationApprovalResponseDto(savedApproval);

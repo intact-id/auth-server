@@ -57,14 +57,14 @@ public class CompanyApplicationController {
     }
 
     @GetMapping("/api/public/applications/{appId}/status")
-    @Operation(summary = "Get application status (Public)")
-    public ResponseEntity<ApiResponse<CompanyApplicationResponseDto>> getPublicApplicationStatus(
+    @Operation(summary = "Get application status (Public)", description = "Number, company name, status and dates only; no contact details.")
+    public ResponseEntity<ApiResponse<PublicApplicationStatusDto>> getPublicApplicationStatus(
             @PathVariable String appId) {
 
         try {
-            var response = companyApplicationService.getApplication(appId);
+            var response = PublicApplicationStatusDto.from(companyApplicationService.getApplication(appId));
             return ResponseEntity.ok(
-                    ApiResponse.<CompanyApplicationResponseDto>builder()
+                    ApiResponse.<PublicApplicationStatusDto>builder()
                             .responseCode(HttpStatus.OK.value())
                             .responseMessage("Application status retrieved")
                             .success(true)
@@ -72,7 +72,7 @@ public class CompanyApplicationController {
                             .build());
         } catch (ApplicationExceptions.IntactCompanyNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                    ApiResponse.<CompanyApplicationResponseDto>builder()
+                    ApiResponse.<PublicApplicationStatusDto>builder()
                             .responseCode(HttpStatus.NOT_FOUND.value())
                             .responseMessage("Application not found")
                             .errorMessage(e.getMessage())

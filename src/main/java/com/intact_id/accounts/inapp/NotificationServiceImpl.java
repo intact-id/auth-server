@@ -15,7 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +33,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final CompanyRepository companyRepository;
     private final CompanyCommunicationRepository communicationRepository;
     private final com.intact_id.notifications.EmailService emailService;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     @Transactional
@@ -103,8 +107,8 @@ public class NotificationServiceImpl implements NotificationService {
                     .map(this::mapToDto);
         }
 
-        log.info("Fetching all notifications with pagination");
-        return notificationRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::mapToDto);
+        log.info("Fetching notifications sent to companies");
+        return notificationRepository.findByCompanyIsNotNullOrderByCreatedAtDesc(pageable).map(this::mapToDto);
     }
 
     @Override
@@ -167,13 +171,65 @@ public class NotificationServiceImpl implements NotificationService {
                 Notification.NotificationStatus.UNREAD);
     }
 
+    @Override
+    public void notifyStaff(String title, String message, String type, String link) {
+        // Own transaction, so a failure here never rolls back the work of whoever is notifying
+        TransactionTemplate separate = new TransactionTemplate(transactionManager);
+        separate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        try {
+            separate.executeWithoutResult(status -> {
+                Notification notification = new Notification();
+                notification.setTitle(title);
+                notification.setMessage(message);
+                notification.setLink(link);
+                notification.setType(Notification.NotificationType.valueOf(type.toUpperCase()));
+                notification.setStatus(Notification.NotificationStatus.UNREAD);
+                notificationRepository.save(notification);
+            });
+        } catch (Exception e) {
+            log.warn("Could not save staff notification '{}': {}", title, e.getMessage());
+        }
+    }
+
+    @Override
+    public Page<NotificationResponseDto> inbox(Pageable pageable) {
+        if (TenantContext.isSuperAdmin()) {
+            return notificationRepository.findByCompanyIsNullOrderByCreatedAtDesc(pageable).map(this::mapToDto);
+        }
+        return notificationRepository.findByCompanyIdOrderByCreatedAtDesc(TenantContext.requireCompanyId(), pageable)
+                .map(this::mapToDto);
+    }
+
+    @Override
+    public long inboxUnreadCount() {
+        if (TenantContext.isSuperAdmin()) {
+            return notificationRepository.countByCompanyIsNullAndStatus(Notification.NotificationStatus.UNREAD);
+        }
+        return notificationRepository.countByCompanyIdAndStatus(TenantContext.requireCompanyId(),
+                Notification.NotificationStatus.UNREAD);
+    }
+
+    @Override
+    @Transactional
+    public int markInboxRead() {
+        LocalDateTime now = LocalDateTime.now();
+        if (TenantContext.isSuperAdmin()) {
+            return notificationRepository.markAllStaffRead(now, Notification.NotificationStatus.READ,
+                    Notification.NotificationStatus.UNREAD);
+        }
+        return notificationRepository.markAllRead(TenantContext.requireCompanyId(), now,
+                Notification.NotificationStatus.READ, Notification.NotificationStatus.UNREAD);
+    }
+
     private NotificationResponseDto mapToDto(Notification notification) {
+        Company company = notification.getCompany();
         return NotificationResponseDto.builder()
                 .id(notification.getId())
-                .companyId(notification.getCompany().getId())
-                .companyName(notification.getCompany().getLegalName())
+                .companyId(company == null ? null : company.getId())
+                .companyName(company == null ? null : company.getLegalName())
                 .title(notification.getTitle())
                 .message(notification.getMessage())
+                .link(notification.getLink())
                 .type(notification.getType().name())
                 .status(notification.getStatus().name())
                 .createdAt(notification.getCreatedAt())

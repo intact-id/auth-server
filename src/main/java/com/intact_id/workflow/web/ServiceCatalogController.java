@@ -53,14 +53,14 @@ public class ServiceCatalogController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Add a service", description = "Starts IN_DEVELOPMENT, hidden from merchants until made AVAILABLE.")
     public ResponseEntity<ApiResponse<CatalogService>> create(@Valid @RequestBody CatalogServiceRequestDto request) {
         return respond(HttpStatus.CREATED, "Service created", adminService.create(request));
     }
 
     @PatchMapping("/{code}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Update a service", description = "Omitted fields are kept; the code can't change.")
     public ResponseEntity<ApiResponse<CatalogService>> update(@PathVariable String code,
                                                               @Valid @RequestBody CatalogServiceRequestDto request) {
@@ -68,7 +68,7 @@ public class ServiceCatalogController {
     }
 
     @PostMapping("/{code}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Change a service's status",
             description = "IN_DEVELOPMENT -> AVAILABLE | RETIRED; AVAILABLE -> DEPRECATED; DEPRECATED -> AVAILABLE | RETIRED.")
     public ResponseEntity<ApiResponse<CatalogService>> changeStatus(@PathVariable String code,
@@ -77,7 +77,7 @@ public class ServiceCatalogController {
     }
 
     @DeleteMapping("/{code}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Delete a service still in development", description = "Others are retired instead.")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable String code) {
         adminService.delete(code);

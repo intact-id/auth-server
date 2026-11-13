@@ -1,41 +1,26 @@
 package com.intact_id.workflow;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
-import javax.sql.DataSource;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Needs a database (like IntactIdApplicationTests): the migration seeds the catalog Hibernate reads. */
+/** Needs a database (like IntactIdApplicationTests): the Flyway baseline seeds the catalog Hibernate reads. */
 @SpringBootTest
 class ServiceCatalogIntegrationTests {
 
     @Autowired
-    DataSource dataSource;
-
-    @Autowired
     ServiceCatalog serviceCatalog;
 
-    @BeforeEach
-    void seed() {
-        // Run twice: the migration must be safe to repeat
-        ResourceDatabasePopulator populator = new ResourceDatabasePopulator(
-                new ClassPathResource("db/migrations/2026-11-09_add_workflow_service_catalog.sql"));
-        populator.execute(dataSource);
-        populator.execute(dataSource);
-    }
-
     @Test
-    void seededCatalogShowsOnlyAvailableServicesToMerchants() {
+    void baselineCatalogShowsOnlyAvailableServicesToMerchants() {
         assertThat(serviceCatalog.available(SubjectType.INDIVIDUAL)).extracting(CatalogService::code)
-                .containsExactly("DOCUMENT_CHECK", "DATA_CROSSCHECK", "LIVENESS", "FACE_MATCH");
-        assertThat(serviceCatalog.available(SubjectType.BUSINESS)).isEmpty();
+                .containsExactly("DOCUMENT_CHECK", "DATA_CROSSCHECK", "LIVENESS", "FACE_MATCH", "SANCTIONS_SCREENING", "CRA");
+        assertThat(serviceCatalog.available(SubjectType.BUSINESS)).extracting(CatalogService::code)
+                .containsExactly("SANCTIONS_SCREENING", "CRA");
 
         CatalogService iprs = serviceCatalog.find("IPRS_LOOKUP").orElseThrow();
         assertThat(iprs.status()).isEqualTo(ServiceStatus.IN_DEVELOPMENT);

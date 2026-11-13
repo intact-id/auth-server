@@ -11,6 +11,10 @@ public interface WorkflowDefinitionRepository extends JpaRepository<WorkflowDefi
 
     List<WorkflowDefinitionEntity> findByCompanyIdIsNullAndArchivedFalseOrderByNameAsc();
 
+    List<WorkflowDefinitionEntity> findByCompanyIdAndArchivedTrueOrderByNameAsc(String companyId);
+
+    List<WorkflowDefinitionEntity> findByCompanyIdIsNullAndArchivedTrueOrderByNameAsc();
+
     boolean existsByCompanyIdAndKey(String companyId, String key);
 
     boolean existsByCompanyIdIsNullAndKey(String key);
