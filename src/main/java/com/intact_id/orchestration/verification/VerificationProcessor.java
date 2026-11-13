@@ -31,6 +31,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Locale;
 
 @Slf4j
@@ -81,16 +85,15 @@ public class VerificationProcessor {
         List<VerificationDocument> documents = verificationDocumentRepository
                 .findByVerificationRequestId(request.getId());
 
-        // A workflow run calls only its services' checks; a tier-based run calls them all
+        // A workflow run calls only the checks its path reaches; a tier-based run calls them all
         Optional<PinnedWorkflow> workflow = request.getWorkflowId() == null || request.getWorkflowVersion() == null
                 ? Optional.empty() : workflowRuntime.find(request.getWorkflowId(), request.getWorkflowVersion());
-        Set<String> services = workflow.map(w -> Set.copyOf(w.services())).orElse(null);
 
         ExternalKycServiceClient.VerificationResult result;
         try {
-            result = externalKycServiceClient
-                    .performVerification(request.getTier(), request, documents, services)
-                    .join();
+            result = workflow.isPresent()
+                    ? runReachedChecks(request, documents, workflow.get())
+                    : externalKycServiceClient.performVerification(request.getTier(), request, documents, null).join();
         } catch (Exception e) {
             log.error("External KYC service call failed for: {}", request.getId(), e);
             String failureReason = "SystemError";
@@ -214,6 +217,60 @@ public class VerificationProcessor {
     // parsing, "selfie not found", etc.) is terminal. See ExternalServiceFailureClassifier.
     private static boolean isRetryableServiceError(Throwable cause) {
         return ExternalServiceFailureClassifier.isTransient(cause);
+    }
+
+    /**
+     * Runs the workflow's checks one call at a time, in the order its path reaches them, so checks after an
+     * early rejection (or on a branch not taken) are never called. Document check and data cross-check share
+     * one OCR call, so they run together.
+     */
+    private ExternalKycServiceClient.VerificationResult runReachedChecks(VerificationRequest request,
+                                                                         List<VerificationDocument> documents,
+                                                                         PinnedWorkflow workflow) {
+        Set<String> inWorkflow = Set.copyOf(workflow.services());
+        Map<String, Object> startFacts = WorkflowOutcomes.startFacts(request);
+        ExternalKycServiceClient.VerificationResult combined = ExternalKycServiceClient.VerificationResult.builder()
+                .verificationId(request.getId()).status("completed").checks(new ArrayList<>())
+                .overallDecision("approved").riskScore(0.1).build();
+        Set<String> ran = new HashSet<>();
+        while (true) {
+            Optional<String> next = WorkflowExecutor.nextService(workflow.graph(),
+                    WorkflowOutcomes.from(combined, inWorkflow), startFacts);
+            // Done, or a check that ran but left no result (the walk then stops at manual review)
+            if (next.isEmpty() || ran.contains(next.get())) return combined;
+
+            Set<String> call = OCR_SERVICES.contains(next.get())
+                    ? OCR_SERVICES.stream().filter(inWorkflow::contains).collect(Collectors.toSet())
+                    : Set.of(next.get());
+            ExternalKycServiceClient.VerificationResult part = externalKycServiceClient
+                    .performVerification(request.getTier(), request, documents, call).join();
+            ran.addAll(call);
+            combined = combine(combined, part);
+            if ("failed".equals(part.getStatus())) return combined;
+        }
+    }
+
+    private static final Set<String> OCR_SERVICES = Set.of("DOCUMENT_CHECK", "DATA_CROSSCHECK");
+    private static final List<String> DECISION_ORDER = List.of("approved", "manual_review", "rejected", "error");
+
+    /** Adds one call's checks to what has run so far; the worse decision and higher risk win. */
+    private static ExternalKycServiceClient.VerificationResult combine(ExternalKycServiceClient.VerificationResult so,
+                                                                       ExternalKycServiceClient.VerificationResult part) {
+        List<ExternalKycServiceClient.CheckResult> checks = new ArrayList<>(so.getChecks());
+        if (part.getChecks() != null) checks.addAll(part.getChecks());
+        String decision = DECISION_ORDER.indexOf(part.getOverallDecision()) > DECISION_ORDER.indexOf(so.getOverallDecision())
+                ? part.getOverallDecision() : so.getOverallDecision();
+        return ExternalKycServiceClient.VerificationResult.builder()
+                .verificationId(so.getVerificationId())
+                .status("failed".equals(part.getStatus()) ? part.getStatus() : so.getStatus())
+                .checks(checks)
+                .overallDecision(decision)
+                .riskScore(Math.max(Optional.ofNullable(so.getRiskScore()).orElse(0.0), Optional.ofNullable(part.getRiskScore()).orElse(0.0)))
+                .failureReason(so.getFailureReason() != null ? so.getFailureReason() : part.getFailureReason())
+                .errorDetails(so.getErrorDetails() != null ? so.getErrorDetails() : part.getErrorDetails())
+                .extractedOcrData(so.getExtractedOcrData() != null ? so.getExtractedOcrData() : part.getExtractedOcrData())
+                .ocrDocumentId(so.getOcrDocumentId() != null ? so.getOcrDocumentId() : part.getOcrDocumentId())
+                .build();
     }
 
     /** The workflow, not the fixed check bundle, decides: walk the pinned graph and keep the path for audit. */

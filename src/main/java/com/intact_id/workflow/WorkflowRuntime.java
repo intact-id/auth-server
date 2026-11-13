@@ -11,6 +11,12 @@ public interface WorkflowRuntime {
      */
     PinnedWorkflow pin(String companyId, String workflowKey, boolean live);
 
+    /**
+     * The company's default workflow, for a session or API call that names none: its live version in
+     * production, its latest published version in sandbox. Empty when there is no default (or nothing to run yet).
+     */
+    Optional<PinnedWorkflow> pinDefault(String companyId, boolean live);
+
     /** A pinned version, for submitting and processing a run. */
     Optional<PinnedWorkflow> find(String workflowId, int version);
 }

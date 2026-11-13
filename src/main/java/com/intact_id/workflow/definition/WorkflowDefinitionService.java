@@ -12,6 +12,7 @@ import com.intact_id.workflow.WorkflowInvalidException;
 import com.intact_id.workflow.WorkflowPricing;
 import com.intact_id.workflow.WorkflowPricing.PriceQuote;
 import com.intact_id.workflow.web.WorkflowDtos.CreateWorkflowRequest;
+import com.intact_id.workflow.web.WorkflowDtos.PublishResult;
 import com.intact_id.workflow.web.WorkflowDtos.UpdateDraftRequest;
 import com.intact_id.workflow.web.WorkflowDtos.ValidationResponse;
 import com.intact_id.workflow.web.WorkflowDtos.VersionSummary;
@@ -120,10 +121,19 @@ public class WorkflowDefinitionService {
         return new ValidationResponse(result.valid(), result.problems(), result.services(), requirements, price);
     }
 
-    /** Publishes the draft as the next version (sandbox uses it at once) and prices it in billing. */
+    /**
+     * Publishes the draft as the next version (sandbox uses it at once) and prices it in billing. When the draft
+     * is the same as the latest version, nothing is created and that version is returned.
+     */
     @Transactional
-    public VersionSummary publish(String companyId, String id, String notes, String publishedBy) {
+    public PublishResult publish(String companyId, String id, String notes, String publishedBy) {
         WorkflowDefinitionEntity definition = editable(companyId, id);
+        Optional<WorkflowVersionEntity> latest = definition.getLatestVersion() == 0 ? Optional.empty()
+                : versions.findByDefinitionIdAndNumber(id, definition.getLatestVersion());
+        if (latest.isPresent() && Objects.equals(latest.get().getGraph(), definition.getDraftGraph())) {
+            log.info("Workflow {} unchanged since v{}; nothing published", definition.getKey(), latest.get().getNumber());
+            return new PublishResult(versionSummary(latest.get(), definition), false);
+        }
         WorkflowValidator.Result result = validator.validate(definition.getDraftGraph(), definition.getSubjectType());
         if (!result.valid()) {
             throw new WorkflowInvalidException(result.problems());
@@ -148,7 +158,7 @@ public class WorkflowDefinitionService {
         definitions.save(definition);
         log.info("Workflow {} v{} published by {} ({} {})", definition.getKey(), number, publishedBy,
                 version.getPrice(), version.getCurrency());
-        return versionSummary(version, definition);
+        return new PublishResult(versionSummary(version, definition), true);
     }
 
     /** Makes a published version the one live sessions use. */
@@ -169,8 +179,43 @@ public class WorkflowDefinitionService {
     public void archive(String companyId, String id) {
         WorkflowDefinitionEntity definition = editable(companyId, id);
         definition.setArchived(true);
+        definition.setDefaultWorkflow(false);
         definitions.save(definition);
         log.info("Workflow {} archived", definition.getKey());
+    }
+
+    /**
+     * Makes this the workflow sessions and API calls run when they name none (instead of the tier checks).
+     * Needs a live version, so production never falls back silently. Replaces any previous default.
+     */
+    @Transactional
+    public WorkflowDetail makeDefault(String companyId, String id) {
+        WorkflowDefinitionEntity definition = editable(companyId, id);
+        if (definition.isTemplate()) {
+            throw new ApplicationExceptions.IntactBadRequestException("Templates can't be a company's default");
+        }
+        if (definition.getLiveVersion() == null) {
+            throw new ApplicationExceptions.IntactBadRequestException("Make a version live before making it the default");
+        }
+        definitions.findByCompanyIdAndDefaultWorkflowTrueAndArchivedFalse(companyId)
+                .filter(previous -> !previous.getId().equals(id))
+                .ifPresent(previous -> {
+                    previous.setDefaultWorkflow(false);
+                    definitions.saveAndFlush(previous);
+                });
+        definition.setDefaultWorkflow(true);
+        definitions.save(definition);
+        log.info("Workflow {} is now the default for company {}", definition.getKey(), companyId);
+        return detail(companyId, id);
+    }
+
+    /** Sessions and API calls that name no workflow go back to the tier checks. */
+    @Transactional
+    public WorkflowDetail clearDefault(String companyId, String id) {
+        WorkflowDefinitionEntity definition = editable(companyId, id);
+        definition.setDefaultWorkflow(false);
+        definitions.save(definition);
+        return detail(companyId, id);
     }
 
     /** Brings an archived workflow back with its draft, versions and live version as they were. */
@@ -217,7 +262,8 @@ public class WorkflowDefinitionService {
                 .flatMap(n -> versions.findByDefinitionIdAndNumber(d.getId(), n));
         return new WorkflowSummary(d.getId(), d.getKey(), d.getName(), d.getDescription(), d.getSubjectType(),
                 d.isTemplate(), d.getLatestVersion(), d.getLiveVersion(), d.getDraftUpdatedAt(),
-                live.map(WorkflowVersionEntity::getPrice).orElse(null), live.map(WorkflowVersionEntity::getCurrency).orElse(null));
+                live.map(WorkflowVersionEntity::getPrice).orElse(null), live.map(WorkflowVersionEntity::getCurrency).orElse(null),
+                d.isDefaultWorkflow());
     }
 
     private static VersionSummary versionSummary(WorkflowVersionEntity v, WorkflowDefinitionEntity d) {
