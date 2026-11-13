@@ -2,7 +2,7 @@ package com.intact_id.billing.client;
 
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,7 +31,7 @@ public interface BillingAccountClient {
     @PostMapping("/v1/billing-profile")
     BillingApiResult<BillingApi.BillingProfile> createBillingProfile(@RequestBody BillingApi.BillingProfileCreation profile);
 
-    @PatchMapping("/v1/billing-profile")
+    @PutMapping("/v1/billing-profile")
     BillingApiResult<BillingApi.BillingProfile> updateBillingProfile(@RequestParam("id") String id,
                                                                      @RequestBody BillingApi.ProfileChanges changes);
 
@@ -48,7 +48,7 @@ public interface BillingAccountClient {
     @PostMapping("/v1/billing-profile/per-call-pricing")
     BillingApiResult<BillingApi.PerCallPricing> createPerCallPricing(@RequestBody BillingApi.PerCallPricingCreation pricing);
 
-    @PatchMapping("/v1/billing-profile/per-call-pricing")
+    @PutMapping("/v1/billing-profile/per-call-pricing")
     BillingApiResult<BillingApi.PerCallPricing> updatePerCallPricing(@RequestParam("billingProfileId") String billingProfileId,
                                                                      @RequestBody BillingApi.PerCallChanges changes);
 
@@ -59,7 +59,7 @@ public interface BillingAccountClient {
     @PostMapping("/v1/service-charges")
     BillingApiResult<BillingApi.ServiceCharge> createServiceCharge(@RequestBody BillingApi.ServiceChargeCreation charge);
 
-    @PatchMapping("/v1/service-charges/{id}")
+    @PutMapping("/v1/service-charges/{id}")
     BillingApiResult<BillingApi.ServiceCharge> updateServiceCharge(@PathVariable("id") String id,
                                                                    @RequestBody BillingApi.ServiceChargeChanges changes);
 
