@@ -20,6 +20,7 @@ import com.intact_id.orchestration.model.VerificationDocumentRepository;
 import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.orchestration.model.VerificationStepRepository;
 import com.intact_id.notifications.EmailService;
+import com.intact_id.accounts.NotificationService;
 import com.intact_id.orchestration.events.VerificationStatusChangedData;
 import com.intact_id.orchestration.events.VerificationStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ public class VerificationProcessor {
     private final PlatformTransactionManager transactionManager;
     private final WorkflowRuntime workflowRuntime;
     private final BalanceCheck balanceCheck;
+    private final NotificationService notificationService;
 
     @Value("${app.support-email:support@intact-id.com}")
     private String supportEmail;
@@ -183,8 +185,11 @@ public class VerificationProcessor {
     }
 
     private void notifyManualReviewRequired(VerificationRequest request) {
+        String companyName = request.getCompany() != null ? request.getCompany().getLegalName() : "Unknown";
+        notificationService.notifyStaff("Verification needs manual review",
+                companyName + ": " + Optional.ofNullable(request.getReviewReason()).orElse("a reviewer must decide") + ".",
+                "WARNING", "/dashboard/verifications/" + request.getId());
         try {
-            String companyName = request.getCompany() != null ? request.getCompany().getLegalName() : "Unknown";
             emailService.sendSimpleEmail(
                     supportEmail,
                     "[Action Required] Manual KYC Review: " + request.getId(),

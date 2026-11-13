@@ -1,5 +1,6 @@
 package com.intact_id.ops;
 
+import com.intact_id.accounts.NotificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -13,6 +14,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Pings each service auth-server depends on once a minute and records whether it answered and how fast.
@@ -24,18 +26,22 @@ class ServiceHealthMonitor {
 
     static final String DATABASE = "database";
     static final Duration KEEP = Duration.ofDays(30);
+    private static final String SYSTEM_PAGE = "/dashboard/analytics";
 
     /** Display order is the order here. */
     private final Map<String, String> healthUrls = new LinkedHashMap<>();
     private final RestClient http;
     private final JdbcTemplate jdbc;
     private final ServicePingRepository pings;
+    private final NotificationService notifications;
+    // Last known state per service, so staff are told when one goes down or comes back, not every minute
+    private final Map<String, Boolean> lastUp = new ConcurrentHashMap<>();
 
     ServiceHealthMonitor(@Value("${face-service.url}") String faceUrl,
                          @Value("${ocr-service.url}") String ocrUrl,
                          @Value("${screening-service.url}") String screeningUrl,
                          @Value("${billing-service.url}") String billingUrl,
-                         JdbcTemplate jdbc, ServicePingRepository pings) {
+                         JdbcTemplate jdbc, ServicePingRepository pings, NotificationService notifications) {
         healthUrls.put("face-service", faceUrl + "/health/live");
         healthUrls.put("ocr-service", ocrUrl + "/health");
         healthUrls.put("screening-service", screeningUrl + "/actuator/health");
@@ -46,6 +52,7 @@ class ServiceHealthMonitor {
         this.http = RestClient.builder().requestFactory(timeouts).build();
         this.jdbc = jdbc;
         this.pings = pings;
+        this.notifications = notifications;
     }
 
     /** Every service this monitor checks, in display order. */
@@ -56,8 +63,25 @@ class ServiceHealthMonitor {
     @Scheduled(fixedDelayString = "${ops.health.interval-ms:60000}", initialDelayString = "${ops.health.initial-delay-ms:30000}")
     void pingAll() {
         LocalDateTime now = LocalDateTime.now();
-        pings.save(pingDatabase(now));
-        healthUrls.forEach((service, url) -> pings.save(ping(service, url, now)));
+        record(pingDatabase(now));
+        healthUrls.forEach((service, url) -> record(ping(service, url, now)));
+    }
+
+    private void record(ServicePing ping) {
+        pings.save(ping);
+        Boolean before = lastUp.put(ping.getService(), ping.isUp());
+        // The first check after a restart only sets the baseline
+        if (before == null || before == ping.isUp()) return;
+        if (ping.isUp()) {
+            notifications.notifyStaff(ping.getService() + " is back up",
+                    ping.getService() + " is answering again.", "SUCCESS", SYSTEM_PAGE);
+        } else {
+            notifications.notifyStaff(ping.getService() + " is down",
+                    ping.getService() + " stopped answering its health check"
+                            + (ping.getError() != null ? ": " + ping.getError() : ".")
+                            + " Verifications that need it may fail or go to manual review.",
+                    "ERROR", SYSTEM_PAGE);
+        }
     }
 
     @Scheduled(cron = "0 15 3 * * *")

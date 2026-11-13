@@ -18,6 +18,7 @@ public class NotificationResponseDto {
     private String companyName;
     private String title;
     private String message;
+    private String link;
     private String type;
     private String status;
     private LocalDateTime createdAt;

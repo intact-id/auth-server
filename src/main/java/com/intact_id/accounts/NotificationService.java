@@ -26,4 +26,14 @@ public interface NotificationService {
     void deleteNotification(Long notificationId);
 
     long getUnreadCount(String companyId);
+
+    /** For Intact staff (super admins), shown in their bell. Never fails the caller. link: console page, or null. */
+    void notifyStaff(String title, String message, String type, String link);
+
+    /** The signed-in person's inbox: their company's notifications, or the staff inbox for super admins. */
+    Page<NotificationResponseDto> inbox(Pageable pageable);
+
+    long inboxUnreadCount();
+
+    int markInboxRead();
 }

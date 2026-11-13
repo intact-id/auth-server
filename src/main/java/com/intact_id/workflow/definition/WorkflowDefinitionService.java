@@ -50,6 +50,14 @@ public class WorkflowDefinitionService {
         return definitions.findByCompanyIdIsNullAndArchivedFalseOrderByNameAsc().stream().map(this::summary).toList();
     }
 
+    /** Archived workflows of a company, or archived templates when companyId is null. */
+    public List<WorkflowSummary> archived(String companyId) {
+        List<WorkflowDefinitionEntity> archived = companyId == null
+                ? definitions.findByCompanyIdIsNullAndArchivedTrueOrderByNameAsc()
+                : definitions.findByCompanyIdAndArchivedTrueOrderByNameAsc(companyId);
+        return archived.stream().map(this::summary).toList();
+    }
+
     public WorkflowDetail detail(String companyId, String id) {
         WorkflowDefinitionEntity definition = readable(companyId, id);
         List<VersionSummary> history = versions.findByDefinitionIdOrderByNumberDesc(id).stream()
@@ -163,6 +171,19 @@ public class WorkflowDefinitionService {
         definition.setArchived(true);
         definitions.save(definition);
         log.info("Workflow {} archived", definition.getKey());
+    }
+
+    /** Brings an archived workflow back with its draft, versions and live version as they were. */
+    @Transactional
+    public WorkflowDetail restore(String companyId, String id) {
+        WorkflowDefinitionEntity definition = definitions.findById(id)
+                .filter(WorkflowDefinitionEntity::isArchived)
+                .filter(d -> Objects.equals(d.getCompanyId(), companyId))
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Archived workflow not found"));
+        definition.setArchived(false);
+        definitions.save(definition);
+        log.info("Workflow {} restored", definition.getKey());
+        return detail(companyId, id);
     }
 
     public PriceQuote quote(String companyId, Collection<String> services) {
