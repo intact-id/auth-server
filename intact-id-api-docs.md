@@ -469,6 +469,50 @@ GET /api/v1/screening/results/summary?days=30
 
 ---
 
+## Verification Stats
+
+Counts for verifications submitted in the last `days` days (default 30, max 365), with the same counts for the
+period before, a daily series, and breakdowns by type, country (`countryOfResidence`, else `nationality`) and check:
+
+```http
+GET /api/v1/stats/verifications?days=30&environment=PROD
+Authorization: Bearer eyJ...
+```
+
+`current` and `previous` hold `total`, `approved`, `rejected`, `inReview`, `inProgress`, `failed` and `passRate`
+(approved out of approved + rejected, 0–100). `daily` has one entry per day; `byType`, `byCountry` (top 8) and
+`checks` (per check: `passed`, `review`, `failed`) follow.
+
+### Turnaround time (super admins)
+
+```http
+GET /api/v1/stats/turnaround?days=30&environment=PROD&companyId=...
+GET /api/v1/kyc/verifications/{verificationId}/timeline
+```
+
+The first returns the average, median and 90th-percentile seconds from submission to decision (finished
+verifications only), the average for automated and reviewed verifications, the average per stage (`queued`,
+`checks`, `waitingForReviewer`, `underReview`), the average and p90 milliseconds per check, and a daily series.
+The second returns one verification's stages with their start, end and duration; a stage still running has no
+`endedAt`. Per-check times and the queued stage are recorded from 13 Nov 2026 onwards.
+
+---
+
+## System Status (super admins)
+
+auth-server checks the database, face, OCR, screening and billing services every minute and keeps 30 days.
+
+```http
+GET /api/v1/system/status
+GET /api/v1/system/status/history?hours=24
+```
+
+`status` returns each service's latest check (`up`, `latencyMs`, `error`), its uptime over 24 hours and 30 days,
+24-hour average and p95 latency, and when it was last down. `history` returns uptime and latency in buckets of
+5 minutes (up to 6 hours), an hour (up to 7 days) or a day.
+
+---
+
 ## Webhooks
 
 Webhooks deliver real-time verification results to your server. Configure a webhook URL in your dashboard or per-request via the `webhookUrl` field.

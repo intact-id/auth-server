@@ -24,6 +24,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 
@@ -117,19 +119,22 @@ public class ExternalKycServiceClient {
                         .map(ExternalKycServiceClient::livenessFrameLabel)
                         .collect(java.util.stream.Collectors.joining(","));
 
+                // When each service call started and how long it took, by the step it produces
+                Map<String, CallTiming> timings = new ConcurrentHashMap<>();
+
                 CircuitBreaker faceBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.FACE_SERVICE);
                 CircuitBreaker ocrBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.OCR_SERVICE);
 
                 // Face match — critical, failure propagates
                 CompletableFuture<FaceVerificationResponse> faceFuture = !runFace ? CompletableFuture.completedFuture(null)
-                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> faceScreeningClient.verifyFace(
-                                faceApiKey, faceApiSecret, selfieForFace, idFileForFace)));
+                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, timed(timings, () -> faceScreeningClient.verifyFace(
+                                faceApiKey, faceApiSecret, selfieForFace, idFileForFace), "face_match")));
 
                 // Liveness — degrades to manual_review if service is down (or breaker is open)
                 CompletableFuture<LivenessResponse> livenessFuture = !runLiveness ? CompletableFuture.completedFuture(null)
-                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, () -> livenessFrames.length > 0
+                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(faceBreaker, timed(timings, () -> livenessFrames.length > 0
                                 ? faceScreeningClient.checkLivenessSequence(faceApiKey, faceApiSecret, livenessFrames, livenessLabels)
-                                : faceScreeningClient.checkLiveness(faceApiKey, faceApiSecret, selfieForLiveness)))
+                                : faceScreeningClient.checkLiveness(faceApiKey, faceApiSecret, selfieForLiveness), "liveness_detection")))
                         .exceptionally(ex -> {
                             log.warn("Liveness check unavailable for {}: {}", request.getId(), ex.getMessage());
                             return null;
@@ -137,8 +142,8 @@ public class ExternalKycServiceClient {
 
                 // OCR extraction — degrades to manual_review if service is down (or breaker is open)
                 CompletableFuture<OcrExtractionResponse> ocrFuture = !runOcr ? CompletableFuture.completedFuture(null)
-                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(ocrBreaker, () -> ocrScreeningClient.extractDocument(
-                                ocrApiKey, ocrApiSecret, idFileForOcr)))
+                        : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(ocrBreaker, timed(timings, () -> ocrScreeningClient.extractDocument(
+                                ocrApiKey, ocrApiSecret, idFileForOcr), "ocr_extraction")))
                         .exceptionally(ex -> {
                             log.warn("OCR service unavailable for {}: {}", request.getId(), ex.getMessage());
                             return null;
@@ -148,7 +153,8 @@ public class ExternalKycServiceClient {
                 CircuitBreaker screeningBreaker = circuitBreakerRegistry.circuitBreaker(ResilienceConfig.SCREENING_SERVICE);
                 CompletableFuture<RiskChecks> riskFuture = !(runScreening || runCra) ? CompletableFuture.completedFuture(null)
                         : CompletableFuture.supplyAsync(CircuitBreaker.decorateSupplier(screeningBreaker,
-                                () -> runRiskChecks(request, runScreening, runCra)))
+                                timed(timings, () -> runRiskChecks(request, runScreening, runCra),
+                                        "sanctions_screening", "risk_assessment")))
                         .exceptionally(ex -> {
                             log.warn("Screening service unavailable for {}: {}", request.getId(), ex.getMessage());
                             String reason = "screening_service_unavailable";
@@ -261,6 +267,14 @@ public class ExternalKycServiceClient {
                     }
                 }
 
+                for (CheckResult check : checks) {
+                    CallTiming timing = timings.get(check.getStepName());
+                    if (timing != null) {
+                        check.setStartedAt(timing.startedAt());
+                        check.setDurationMs(timing.durationMs());
+                    }
+                }
+
                 // Build extracted OCR data map for persistence on the id_front document
                 Map<String, Object> extractedOcrData = buildExtractedOcrData(ocrResponse);
 
@@ -292,6 +306,27 @@ public class ExternalKycServiceClient {
                 return buildErrorResult(request.getId(), e);
             }
         });
+    }
+
+    /** When a service call started and how long it took. */
+    record CallTiming(java.time.LocalDateTime startedAt, long durationMs) {
+    }
+
+    /**
+     * Times a service call, failed calls included, and records it for each step the call produces.
+     * Screening and risk assessment share one call to sactions-service, so they share its time.
+     */
+    private static <T> Supplier<T> timed(Map<String, CallTiming> timings, Supplier<T> call, String... steps) {
+        return () -> {
+            java.time.LocalDateTime startedAt = java.time.LocalDateTime.now();
+            long start = System.nanoTime();
+            try {
+                return call.get();
+            } finally {
+                CallTiming timing = new CallTiming(startedAt, (System.nanoTime() - start) / 1_000_000);
+                for (String step : steps) timings.put(step, timing);
+            }
+        };
     }
 
     /** What sactions-service returned; an error is set instead when that check could not run. */
@@ -517,5 +552,8 @@ public class ExternalKycServiceClient {
         private Double confidenceScore;
         private Map<String, Object> result;
         private String errorMessage;
+        // When the service call behind this check started and how long it took; null when it didn't run
+        private java.time.LocalDateTime startedAt;
+        private Long durationMs;
     }
 }

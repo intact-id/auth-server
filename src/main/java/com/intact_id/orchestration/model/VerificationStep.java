@@ -44,6 +44,13 @@ public class VerificationStep extends Auditable {
     @Column(name = "executed_at")
     private LocalDateTime executedAt;
 
+    // When the service call behind this step started and how long it took (turnaround per check)
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
+
+    @Column(name = "duration_ms")
+    private Long durationMs;
+
     @Column(name = "error_message")
     private String errorMessage;
 

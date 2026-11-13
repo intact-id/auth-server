@@ -134,6 +134,8 @@ public class VerificationProcessor {
             step.setConfidenceScore(check.getConfidenceScore());
             step.setResult(check.getResult());
             step.setExecutedAt(LocalDateTime.now());
+            step.setStartedAt(check.getStartedAt());
+            step.setDurationMs(check.getDurationMs());
             verificationStepRepository.save(step);
         }
 
