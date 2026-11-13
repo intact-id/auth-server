@@ -48,8 +48,11 @@ public class KycSessionController {
         log.info("Creating widget session for company={} tier={} env={}",
                 company.getId(), request.getTier(), request.getEnvironment());
 
-        PinnedWorkflow workflow = request.getWorkflow() == null || request.getWorkflow().isBlank() ? null
-                : workflowRuntime.pin(company.getId(), request.getWorkflow().trim(), request.getEnvironment() == ApiKeyEnvironment.PROD);
+        boolean live = request.getEnvironment() == ApiKeyEnvironment.PROD;
+        // The named workflow, else the company's default workflow, else the tier checks
+        PinnedWorkflow workflow = request.getWorkflow() == null || request.getWorkflow().isBlank()
+                ? workflowRuntime.pinDefault(company.getId(), live).orElse(null)
+                : workflowRuntime.pin(company.getId(), request.getWorkflow().trim(), live);
         String tier = request.getTier();
         if (workflow == null && (tier == null || tier.isBlank())) {
             throw new ApplicationExceptions.IntactBadRequestException("tier is required (tier1, tier2, tier3) unless a workflow is given");

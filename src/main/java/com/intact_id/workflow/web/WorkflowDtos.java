@@ -50,7 +50,12 @@ public final class WorkflowDtos {
 
     public record WorkflowSummary(String id, String key, String name, String description, SubjectType subjectType,
                                   boolean template, int latestVersion, Integer liveVersion,
-                                  LocalDateTime draftUpdatedAt, BigDecimal livePrice, String currency) {
+                                  LocalDateTime draftUpdatedAt, BigDecimal livePrice, String currency,
+                                  boolean defaultWorkflow) {
+    }
+
+    /** created is false when the draft had not changed since the latest version, which is returned instead. */
+    public record PublishResult(VersionSummary version, boolean created) {
     }
 
     public record WorkflowDetail(WorkflowSummary workflow, WorkflowGraph draft, List<VersionSummary> versions) {

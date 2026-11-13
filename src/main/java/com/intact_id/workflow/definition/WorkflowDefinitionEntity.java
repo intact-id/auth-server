@@ -65,6 +65,10 @@ public class WorkflowDefinitionEntity extends Auditable {
     @Column(name = "archived", nullable = false)
     private boolean archived;
 
+    // Runs when a session or API call names no workflow; at most one per company
+    @Column(name = "is_default", nullable = false)
+    private boolean defaultWorkflow;
+
     public boolean isTemplate() {
         return companyId == null;
     }

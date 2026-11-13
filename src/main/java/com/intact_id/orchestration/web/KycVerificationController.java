@@ -56,15 +56,20 @@ public class KycVerificationController {
                         @RequestParam(required = false) String verificationType,
                         @RequestParam(required = false) String webhookUrl,
                         @RequestParam(required = false) String externalReference,
-                        @RequestParam MultipartFile selfie,
-                        @RequestParam MultipartFile idFront,
+                        @Parameter(description = "Workflow key. Without it the company's default workflow runs, else the tier checks. "
+                                        + "Production runs the live version, sandbox the latest published one.")
+                        @RequestParam(required = false) String workflow,
+                        @Parameter(description = "Required unless the workflow has no selfie or liveness step")
+                        @RequestParam(required = false) MultipartFile selfie,
+                        @Parameter(description = "Required unless the workflow has no document step")
+                        @RequestParam(required = false) MultipartFile idFront,
                         @RequestParam(required = false) MultipartFile idBack,
                         @RequestParam(required = false) MultipartFile proofOfAddress,
                         Authentication authentication) {
 
                 return submitVerificationInternal(ApiKeyEnvironment.PROD, tier, firstName, lastName, dateOfBirth,
                                 idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
-                                webhookUrl, externalReference, selfie, idFront, idBack, proofOfAddress, authentication);
+                                webhookUrl, externalReference, workflow, selfie, idFront, idBack, proofOfAddress, authentication);
         }
 
         @PostMapping(value = "/dev/verify/{tier}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -86,15 +91,20 @@ public class KycVerificationController {
                         @RequestParam(required = false) String verificationType,
                         @RequestParam(required = false) String webhookUrl,
                         @RequestParam(required = false) String externalReference,
-                        @RequestParam MultipartFile selfie,
-                        @RequestParam MultipartFile idFront,
+                        @Parameter(description = "Workflow key. Without it the company's default workflow runs, else the tier checks. "
+                                        + "Production runs the live version, sandbox the latest published one.")
+                        @RequestParam(required = false) String workflow,
+                        @Parameter(description = "Required unless the workflow has no selfie or liveness step")
+                        @RequestParam(required = false) MultipartFile selfie,
+                        @Parameter(description = "Required unless the workflow has no document step")
+                        @RequestParam(required = false) MultipartFile idFront,
                         @RequestParam(required = false) MultipartFile idBack,
                         @RequestParam(required = false) MultipartFile proofOfAddress,
                         Authentication authentication) {
 
                 return submitVerificationInternal(ApiKeyEnvironment.DEV, tier, firstName, lastName, dateOfBirth,
                                 idNumber, idType, nationality, countryOfResidence, phone, email, verificationType,
-                                webhookUrl, externalReference, selfie, idFront, idBack, proofOfAddress, authentication);
+                                webhookUrl, externalReference, workflow, selfie, idFront, idBack, proofOfAddress, authentication);
         }
 
         private ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerificationInternal(
@@ -112,6 +122,7 @@ public class KycVerificationController {
                         String verificationType,
                         String webhookUrl,
                         String externalReference,
+                        String workflow,
                         MultipartFile selfie,
                         MultipartFile idFront,
                         MultipartFile idBack,
@@ -138,6 +149,7 @@ public class KycVerificationController {
                         request.setVerificationType(verificationType != null ? verificationType : "individual");
                         request.setWebhookUrl(webhookUrl);
                         request.setExternalReference(externalReference);
+                        request.setWorkflow(workflow);
                         request.setSelfie(selfie);
                         request.setIdFront(idFront);
                         request.setIdBack(idBack);

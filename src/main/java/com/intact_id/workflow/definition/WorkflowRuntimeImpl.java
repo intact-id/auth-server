@@ -5,10 +5,12 @@ import com.intact_id.workflow.PinnedWorkflow;
 import com.intact_id.workflow.ServiceCatalog;
 import com.intact_id.workflow.WorkflowRuntime;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WorkflowRuntimeImpl implements WorkflowRuntime {
@@ -30,6 +32,21 @@ public class WorkflowRuntimeImpl implements WorkflowRuntime {
         }
         return find(definition.getId(), number)
                 .orElseThrow(() -> new ApplicationExceptions.IntactBadRequestException("Workflow version not found"));
+    }
+
+    @Override
+    public Optional<PinnedWorkflow> pinDefault(String companyId, boolean live) {
+        return definitions.findByCompanyIdAndDefaultWorkflowTrueAndArchivedFalse(companyId)
+                .flatMap(definition -> {
+                    Integer number = live ? definition.getLiveVersion()
+                            : (definition.getLatestVersion() > 0 ? definition.getLatestVersion() : null);
+                    if (number == null) {
+                        log.warn("Default workflow {} of company {} has no {} version; using the tier checks",
+                                definition.getKey(), companyId, live ? "live" : "published");
+                        return Optional.empty();
+                    }
+                    return find(definition.getId(), number);
+                });
     }
 
     @Override
