@@ -39,7 +39,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Needs a database. A verification pinned to "ID check only" runs only OCR and follows the published graph. */
-@SpringBootTest
+// The test processes verifications itself; keep the background scheduler from picking up the same one
+@SpringBootTest(properties = "verification.processing.poll-interval-ms=3600000")
 class WorkflowRunIntegrationTests {
 
     @MockitoBean OcrScreeningClient ocr;

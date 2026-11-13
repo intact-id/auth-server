@@ -46,6 +46,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     private static final List<String> EXCLUDED_PATHS = Arrays.asList(
             "/api/public/companies/register",
             "/api/public/applications/",
+            "/api/public/kyb/invites/",
             "/api/auth/",
             "/api/admin/",
             "/api/company-approval/",

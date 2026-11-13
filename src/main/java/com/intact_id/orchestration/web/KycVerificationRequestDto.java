@@ -75,4 +75,17 @@ public class KycVerificationRequestDto {
 
     @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
     private Integer workflowVersion;
+
+    // Business verifications (KYB): company details, its directors and owners, and company documents by type
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    private Map<String, Object> businessDetails;
+
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    private List<com.intact_id.orchestration.kyb.PartyInput> parties;
+
+    @io.swagger.v3.oas.annotations.media.Schema(hidden = true)
+    private Map<String, MultipartFile> businessDocuments;
+
+    // A director's or owner's own verification: the party it belongs to on a business verification
+    private String partyId;
 }
