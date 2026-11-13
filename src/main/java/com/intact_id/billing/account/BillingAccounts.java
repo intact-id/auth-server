@@ -4,7 +4,7 @@ import com.intact_id.accounts.Company;
 import com.intact_id.accounts.CompanyRepository;
 import com.intact_id.billing.client.BillingApi;
 import com.intact_id.billing.client.BillingApiResult;
-import com.intact_id.billing.client.BillingServiceClient;
+import com.intact_id.billing.client.BillingAccountClient;
 import com.intact_id.billing.client.ResolvedServiceCharge;
 import com.intact_id.util.exception.ApplicationExceptions;
 import feign.FeignException;
@@ -24,7 +24,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BillingAccounts {
 
-    private final BillingServiceClient client;
+    private final BillingAccountClient client;
     private final CompanyRepository companies;
 
     /** 404 when billing doesn't know the company yet. */
