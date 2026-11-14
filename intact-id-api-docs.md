@@ -475,6 +475,25 @@ status shows `documentsDeletedAt` and `personalDataErasedAt` once that data is g
 
 ---
 
+## Wallet Top-ups
+
+Prepaid companies top up their wallet by bank transfer: transfer the money, then report it with the receipt.
+Intact checks it against the bank statement and credits the wallet (in the wallet's currency). Card, M-Pesa and
+Airtel Money top-ups are coming through our payment partner.
+
+```http
+GET  /api/v1/billing/top-ups/instructions          wallet currency and where to send transfers
+POST /api/v1/billing/top-ups/bank                  multipart: amount, reference, paidOn (YYYY-MM-DD), bankName?, note?, receipt (PDF/JPEG/PNG/WebP, 10 MB)
+GET  /api/v1/billing/top-ups                       your top-ups, newest first (status: PENDING_REVIEW, APPROVED, REJECTED, CANCELLED)
+GET  /api/v1/billing/top-ups/{id}/receipt          the receipt file
+POST /api/v1/billing/top-ups/{id}/cancel           withdraw one that is still waiting for review
+```
+
+A bank reference can only be claimed once (unless that claim was rejected or cancelled). A reviewer may credit
+what the bank statement shows if it differs from the amount reported; you are notified either way.
+
+---
+
 ## Verification Status
 
 ### GET /api/v1/kyc/verify/{verificationId}

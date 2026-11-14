@@ -19,6 +19,24 @@ import java.util.List;
         configuration = BillingAccountFeignConfig.class)
 public interface BillingAccountClient {
 
+    // ----- FX: KES prices converted for companies billed in another currency -----
+
+    @GetMapping("/v1/fx/rates")
+    BillingApiResult<java.util.Map<String, Object>> fxRates();
+
+    @PostMapping("/v1/fx/rates/refresh")
+    BillingApiResult<List<java.util.Map<String, Object>>> refreshFxRates();
+
+    @GetMapping("/v1/fx/markup")
+    BillingApiResult<java.util.Map<String, Object>> fxMarkup(@RequestParam(value = "billingProfileId", required = false) String billingProfileId);
+
+    @PutMapping("/v1/fx/markup")
+    BillingApiResult<java.util.Map<String, Object>> setFxMarkup(@RequestParam(value = "billingProfileId", required = false) String billingProfileId,
+                                                                @RequestBody java.util.Map<String, Object> change);
+
+    @GetMapping("/v1/fx/client")
+    BillingApiResult<java.util.Map<String, Object>> fxForClient(@RequestParam("clientIdentifier") String clientIdentifier);
+
     @GetMapping("/v1/service-charges/resolved")
     BillingApiResult<List<ResolvedServiceCharge>> resolvedServiceCharges(@RequestParam("clientIdentifier") String clientIdentifier);
 

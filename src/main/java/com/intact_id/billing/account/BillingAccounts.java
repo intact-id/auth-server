@@ -127,6 +127,34 @@ public class BillingAccounts {
         return data(client.voidInvoice(invoiceId));
     }
 
+    // ----- FX -----
+
+    /** The base currency, the currencies a company can be billed in, today's rates and the platform markup. */
+    public Map<String, Object> fxRates() {
+        return data(client.fxRates());
+    }
+
+    public List<Map<String, Object>> refreshFxRates() {
+        return data(client.refreshFxRates());
+    }
+
+    /** companyId null: the platform markup; otherwise that company's (with the platform default). */
+    public Map<String, Object> fxMarkup(String companyId) {
+        return data(client.fxMarkup(companyId == null ? null : profileId(companyId)));
+    }
+
+    /** companyId null sets the platform markup; percent null removes a company's own markup. */
+    public Map<String, Object> setFxMarkup(String companyId, java.math.BigDecimal percent) {
+        Map<String, Object> change = new java.util.HashMap<>();
+        change.put("markupPercent", percent);
+        return data(client.setFxMarkup(companyId == null ? null : profileId(companyId), change));
+    }
+
+    /** What this company pays in its currency: rate, markup and rate date. */
+    public Map<String, Object> fxForCompany(String companyId) {
+        return data(client.fxForClient(company(companyId).getCompanyIdentifierCode()));
+    }
+
     private String profileId(String companyId) {
         BillingApi.BillingProfile profile = account(companyId).billingProfile();
         if (profile == null) {
