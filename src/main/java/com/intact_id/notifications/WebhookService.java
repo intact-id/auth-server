@@ -327,6 +327,12 @@ public class WebhookService {
         }
     }
 
+    /** Retention: a purged verification's delivery history goes with it. */
+    @Transactional
+    public void deleteDeliveries(String verificationId) {
+        webhookDeliveryRepository.deleteAll(webhookDeliveryRepository.findByVerificationId(verificationId));
+    }
+
     /** Data erasure: the stored payloads of a verification's deliveries carry personal data, so they are blanked. */
     @Transactional
     public void redactDeliveries(String verificationId) {
