@@ -36,4 +36,8 @@ public class KybSettingsEntity extends Auditable {
     // Workflow key each person's verification runs (FULL_KYC); null = the company's default, else tier1
     @Column(name = "person_workflow", length = 100)
     private String personWorkflow;
+
+    // Email people their link as soon as the business reaches the owner step (FULL_KYC)
+    @Column(name = "auto_invite", nullable = false)
+    private boolean autoInvite;
 }

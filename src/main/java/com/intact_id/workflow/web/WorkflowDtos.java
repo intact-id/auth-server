@@ -65,6 +65,11 @@ public final class WorkflowDtos {
                                  String publishedBy, LocalDateTime publishedAt, LocalDateTime promotedAt, boolean live) {
     }
 
+    /** A live version priced again from today's service charges; error says why it could not be. */
+    public record RepriceResult(String workflowId, String key, String name, String companyId, Integer version,
+                                BigDecimal oldPrice, BigDecimal newPrice, String currency, String error) {
+    }
+
     /** What the builder shows next to the canvas: problems to fix, what the widget will ask for, and the price. */
     public record ValidationResponse(boolean valid, List<WorkflowProblem> problems, List<String> services,
                                      ServiceRequirements requirements, PriceQuote price) {

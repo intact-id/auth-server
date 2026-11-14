@@ -6,6 +6,8 @@ import com.intact_id.billing.model.BillingChargeStatus;
 import com.intact_id.billing.model.BillingEvent;
 import com.intact_id.billing.model.BillingInvoiceStatus;
 import com.intact_id.billing.model.BillingMode;
+import com.intact_id.billing.charge.ChargeMode;
+import com.intact_id.billing.charge.ChargeModes;
 import com.intact_id.billing.model.WalletTransactionType;
 import com.intact_id.accounts.Company;
 import com.intact_id.notifications.CompanyCommunicationDetails;
@@ -72,6 +74,7 @@ public class BillingService {
     private final BillingEventPublisher billingEventPublisher;
     private final TiersConfig tiersConfig;
     private final Cache<String, CompanyBillingProfile> companyBillingProfileCache;
+    private final ChargeModes chargeModes;
 
     @Transactional(readOnly = true)
     public CompanyBillingProfileResponseDto getCompanyBillingProfile(String companyId) {
@@ -385,6 +388,10 @@ public class BillingService {
         metadata.put("verificationId", outcome.verificationId());
         if (outcome.workflowId() != null) {
             metadata.put("workflowId", outcome.workflowId());
+            // Billing then charges only these checks instead of the workflow's price
+            if (outcome.checksRun() != null && chargeModes.effective(outcome.companyId()) == ChargeMode.CHECKS_RUN) {
+                metadata.put("chargeFor", outcome.checksRun());
+            }
         }
 
         String clientIdentifier = outcome.clientIdentifier();

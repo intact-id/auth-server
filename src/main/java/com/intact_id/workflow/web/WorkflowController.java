@@ -12,6 +12,7 @@ import com.intact_id.workflow.web.WorkflowDtos.CreateWorkflowRequest;
 import com.intact_id.workflow.web.WorkflowDtos.PromoteRequest;
 import com.intact_id.workflow.web.WorkflowDtos.PublishRequest;
 import com.intact_id.workflow.web.WorkflowDtos.QuoteRequest;
+import com.intact_id.workflow.web.WorkflowDtos.RepriceResult;
 import com.intact_id.workflow.web.WorkflowDtos.UpdateDraftRequest;
 import com.intact_id.workflow.web.WorkflowDtos.ValidationResponse;
 import com.intact_id.workflow.web.WorkflowDtos.VersionSummary;
@@ -133,6 +134,23 @@ public class WorkflowController {
                                                               @Valid @RequestBody PromoteRequest request) {
         return respond(HttpStatus.OK, "Version is live",
                 service.promote(SecurityContextUtil.resolveCompanyId(companyId), id, request.version(), actor()));
+    }
+
+    @PostMapping("/{id}/reprice")
+    @Operation(summary = "Update a workflow's price", description = "Prices the live version again from today's service charges.")
+    public ResponseEntity<ApiResponse<RepriceResult>> reprice(@PathVariable String id,
+                                                             @RequestParam(required = false) String companyId) {
+        return respond(HttpStatus.OK, "Price updated", service.reprice(SecurityContextUtil.resolveCompanyId(companyId), id));
+    }
+
+    @PostMapping("/reprice")
+    @Operation(summary = "Update the price of every workflow in use",
+            description = "The company's workflows; super admins without companyId re-price every company's. "
+                    + "Each result has the old and new price, or the error that stopped that workflow.")
+    public ResponseEntity<ApiResponse<List<RepriceResult>>> repriceAll(@RequestParam(required = false) String companyId) {
+        boolean everyCompany = SecurityContextUtil.isSuperAdminAuthenticated() && (companyId == null || companyId.isBlank());
+        String company = everyCompany ? null : SecurityContextUtil.resolveCompanyId(companyId);
+        return respond(HttpStatus.OK, "Prices updated", service.repriceAll(company));
     }
 
     @DeleteMapping("/{id}")

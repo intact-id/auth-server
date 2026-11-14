@@ -136,10 +136,10 @@ public class KybController {
         VerificationRequest business = verifications.findByIdWithCompany(party.getVerificationId())
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Business verification not found"));
         Company company = business.getCompany();
-        KybSettings rules = settings.effective(company.getId());
+        String personWorkflow = kybParties.personWorkflow(business);
 
-        PinnedWorkflow workflow = rules.personWorkflow() != null
-                ? workflowRuntime.pin(company.getId(), rules.personWorkflow())
+        PinnedWorkflow workflow = personWorkflow != null
+                ? workflowRuntime.pin(company.getId(), personWorkflow)
                 : workflowRuntime.pinDefault(company.getId()).filter(w -> w.subjectType() == SubjectType.INDIVIDUAL).orElse(null);
         String tier = workflow == null ? "tier1" : KycSessionController.WORKFLOW_TIER;
         String reference = KybParties.PARTY_REFERENCE_PREFIX + party.getId();
