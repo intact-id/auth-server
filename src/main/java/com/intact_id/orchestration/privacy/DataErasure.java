@@ -18,8 +18,6 @@ import lombok.Setter;
 @Table(name = "data_erasures")
 public class DataErasure extends Auditable {
 
-    public enum Scope { DOCUMENTS, PERSONAL_DATA }
-
     public enum Trigger { MANUAL, RETENTION }
 
     @Column(name = "verification_id", nullable = false)
@@ -28,9 +26,10 @@ public class DataErasure extends Auditable {
     @Column(name = "company_id", nullable = false)
     private String companyId;
 
+    // What was erased; each kind includes the ones before it (RetentionCategory)
     @Enumerated(EnumType.STRING)
     @Column(name = "scope", nullable = false, length = 20)
-    private Scope scope;
+    private RetentionCategory scope;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "trigger_type", nullable = false, length = 20)
@@ -44,4 +43,8 @@ public class DataErasure extends Auditable {
 
     @Column(name = "documents_deleted", nullable = false)
     private int documentsDeleted;
+
+    // A super admin erased it before the minimum period was over
+    @Column(name = "overrode_minimum", nullable = false)
+    private boolean overrodeMinimum;
 }

@@ -1,8 +1,5 @@
 package com.intact_id.orchestration.privacy;
 
-import com.intact_id.accounts.Company;
-import com.intact_id.accounts.CompanyRepository;
-import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.notifications.WebhookService;
 import com.intact_id.orchestration.VerificationDocument;
 import com.intact_id.orchestration.VerificationRequest;
@@ -13,11 +10,8 @@ import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.orchestration.model.VerificationStep;
 import com.intact_id.orchestration.model.VerificationStepRepository;
 import com.intact_id.orchestration.verification.VerificationDocumentFiles;
-import com.intact_id.util.exception.ApplicationExceptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -28,26 +22,21 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Deletes applicants' data: documents (uploaded files, selfies, liveness frames), and personal details (names, ID
- * numbers, contact, OCR results, directors' and owners' details, webhook payloads). The decision, the checks'
- * outcomes and scores stay, so a verification remains auditable. Each erasure is recorded in data_erasures.
- * Runs on request, and daily for each company's retention rule.
+ * Erases one kind of a verification's data (and every kind before it, see RetentionCategory), and records it in
+ * data_erasures. Files go first: if one can't be deleted, nothing is marked and the next attempt tries again.
+ * Whether an erasure is allowed (holds, minimum periods) is decided by Retention, not here.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DataEraser {
+class DataEraser {
 
-    static final String RETENTION_ACTOR = "retention";
-    private static final List<GlobalStatuses> FINISHED = List.of(GlobalStatuses.COMPLETED, GlobalStatuses.REJECTED,
-            GlobalStatuses.FAILED, GlobalStatuses.CANCELLED);
-    private static final int BATCH = 200;
-    // What a check's result keeps after erasure: outcomes and scores, no names, numbers or dates
+    // What a check's result keeps once personal details are erased: outcomes and scores only
     private static final Set<String> RESULT_KEYS_KEPT = Set.of("verdict", "hits", "top_score", "topScore", "pep", "adverse_media",
             "level", "score", "complete", "override_applied", "passed", "liveness_score", "match_score", "verified",
             "document_type", "overall_confidence", "document_expired", "name_match", "id_number_match", "dob_match",
             "reason", "registered", "status", "mode", "required", "failed", "review", "source");
-    // Metadata the platform itself uses; anything else (the merchant's custom fields) is erased
+    // Metadata the platform itself uses; the merchant's custom fields are personal-data candidates and go
     private static final Set<String> METADATA_KEPT = Set.of("checksRun", "ownerCheck", "autoInvite", "personWorkflow", "resumed");
 
     private final VerificationRequestRepository verifications;
@@ -56,84 +45,30 @@ public class DataEraser {
     private final VerificationStepRepository steps;
     private final VerificationPartyRepository parties;
     private final DataErasureRepository erasures;
-    private final RetentionSettingsService retention;
-    private final CompanyRepository companies;
     private final WebhookService webhooks;
     private final TransactionTemplate transactions;
 
-    /** Erases a finished verification's documents and personal details now, for an applicant's request. */
-    public DataErasure eraseNow(String companyId, String verificationId, String reason, String performedBy) {
-        if (reason == null || reason.isBlank()) {
-            throw new ApplicationExceptions.IntactBadRequestException("Say why the data is erased (e.g. the applicant asked)");
-        }
-        VerificationRequest request = verifications.findByIdWithCompany(verificationId)
-                .filter(v -> companyId == null || v.getCompany().getId().equals(companyId))
-                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Verification not found"));
-        if (!FINISHED.contains(request.getStatus())) {
-            throw new ApplicationExceptions.IntactBadRequestException(
-                    "Only a finished verification can be erased; decide or cancel it first");
-        }
-        if (request.getPersonalDataErasedAt() != null) {
-            throw new ApplicationExceptions.IntactBadRequestException("This verification's personal data was already erased");
-        }
-        return erase(request, DataErasure.Scope.PERSONAL_DATA, DataErasure.Trigger.MANUAL, reason.trim(), performedBy);
-    }
-
-    /** Each company's retention rule, once a day (02:30 server time). */
-    @Scheduled(cron = "${privacy.retention-cron:0 30 2 * * *}")
-    public void applyRetention() {
-        for (Company company : companies.findAll()) {
-            RetentionSettings rule = retention.effective(company.getId());
-            int documentsDone = 0;
-            int personalDone = 0;
-            if (rule.personalDataDays() != null) {
-                for (VerificationRequest v : verifications.findPersonalDataDue(company.getId(), FINISHED,
-                        LocalDateTime.now().minusDays(rule.personalDataDays()), PageRequest.of(0, BATCH))) {
-                    personalDone += tryErase(v, DataErasure.Scope.PERSONAL_DATA);
-                }
-            }
-            if (rule.documentsDays() != null) {
-                for (VerificationRequest v : verifications.findDocumentsDue(company.getId(), FINISHED,
-                        LocalDateTime.now().minusDays(rule.documentsDays()), PageRequest.of(0, BATCH))) {
-                    documentsDone += tryErase(v, DataErasure.Scope.DOCUMENTS);
-                }
-            }
-            if (documentsDone + personalDone > 0) {
-                log.info("Retention for {}: documents deleted from {} verifications, personal data erased from {}",
-                        company.getId(), documentsDone, personalDone);
-            }
-        }
-    }
-
-    public List<DataErasure> log(String companyId, int limit) {
-        PageRequest page = PageRequest.of(0, Math.min(Math.max(limit, 1), 500));
-        return companyId == null ? erasures.findAllByOrderByCreatedAtDesc(page) : erasures.findByCompanyIdOrderByCreatedAtDesc(companyId, page);
-    }
-
-    private int tryErase(VerificationRequest request, DataErasure.Scope scope) {
-        try {
-            erase(request, scope, DataErasure.Trigger.RETENTION, "Retention rule", RETENTION_ACTOR);
-            return 1;
-        } catch (RuntimeException e) {
-            log.warn("Retention could not erase verification {}: {}", request.getId(), e.getMessage());
-            return 0;
-        }
-    }
-
-    private DataErasure erase(VerificationRequest request, DataErasure.Scope scope, DataErasure.Trigger trigger,
-                              String reason, String performedBy) {
-        // Files first: if a file can't be deleted, nothing is marked as erased and the next run tries again
-        List<VerificationDocument> docs = documents.findByVerificationRequestId(request.getId());
+    DataErasure erase(VerificationRequest request, RetentionCategory scope, DataErasure.Trigger trigger, String reason,
+                      String performedBy, boolean overrodeMinimum) {
+        List<VerificationDocument> docs = documents.findByVerificationRequestId(request.getId()).stream()
+                .filter(d -> scope.includes(RetentionCategory.DOCUMENTS) || isBiometric(d))
+                .toList();
         docs.forEach(files::delete);
 
         return transactions.execute(status -> {
             documents.deleteAll(docs);
             LocalDateTime now = LocalDateTime.now();
-            if (request.getDocumentsDeletedAt() == null) request.setDocumentsDeletedAt(now);
-            if (scope == DataErasure.Scope.PERSONAL_DATA) {
+            if (request.getBiometricsDeletedAt() == null) request.setBiometricsDeletedAt(now);
+            if (scope.includes(RetentionCategory.DOCUMENTS) && request.getDocumentsDeletedAt() == null) request.setDocumentsDeletedAt(now);
+            if (scope.includes(RetentionCategory.PERSONAL_DATA) && request.getPersonalDataErasedAt() == null) {
                 erasePersonalDetails(request);
                 request.setPersonalDataErasedAt(now);
             }
+            if (scope == RetentionCategory.RECORD) {
+                purgeRecord(request);
+                request.setRecordPurgedAt(now);
+            }
+            request.setRetentionPlanned(false);
             verifications.save(request);
 
             DataErasure erasure = new DataErasure();
@@ -144,15 +79,21 @@ public class DataEraser {
             erasure.setReason(reason);
             erasure.setPerformedBy(performedBy);
             erasure.setDocumentsDeleted(docs.size());
-            log.info("Erased {} of verification {} ({}, {} documents) by {}", scope, request.getId(), trigger, docs.size(), performedBy);
+            erasure.setOverrodeMinimum(overrodeMinimum);
+            log.info("Erased {} of verification {} ({}, {} files) by {}{}", scope, request.getId(), trigger, docs.size(),
+                    performedBy, overrodeMinimum ? ", before its minimum period" : "");
             return erasures.save(erasure);
         });
     }
 
+    private static boolean isBiometric(VerificationDocument document) {
+        String type = document.getDocumentType();
+        return "selfie".equals(type) || type.startsWith("liveness_");
+    }
+
     private void erasePersonalDetails(VerificationRequest request) {
-        boolean business = "business".equalsIgnoreCase(request.getVerificationType());
-        if (!business) {
-            // A business's own registration details aren't personal data; a person's details are
+        if (!"business".equalsIgnoreCase(request.getVerificationType())) {
+            // A business's registration details aren't personal data; a person's details are
             request.setCustomerData(new HashMap<>());
         }
         Map<String, Object> metadata = new HashMap<>();
@@ -187,7 +128,18 @@ public class DataEraser {
             party.setInviteExpiresAt(null);
             parties.save(party);
         }
-
         webhooks.redactDeliveries(request.getId());
+    }
+
+    /** The end of the record: only a bare row (id, company, status, dates) remains, for the erasure log. */
+    private void purgeRecord(VerificationRequest request) {
+        request.setCustomerData(new HashMap<>());
+        request.setMetadata(new HashMap<>());
+        request.setErrorDetails(null);
+        request.setReviewReason(null);
+        request.setReviewNotes(null);
+        steps.deleteAll(steps.findByVerificationRequestIdOrderByCreatedAtAsc(request.getId()));
+        parties.deleteAll(parties.findByVerificationIdOrderByCreatedAtAsc(request.getId()));
+        webhooks.deleteDeliveries(request.getId());
     }
 }
