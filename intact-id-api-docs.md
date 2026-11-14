@@ -433,6 +433,45 @@ business as registered and active, and its result says `"source": "pending-provi
 
 ---
 
+## Ongoing Monitoring (re-screening)
+
+With monitoring on, approved customers are screened again against sanctions and PEP lists on a schedule (daily,
+weekly or monthly): the person, the business, and its directors and owners. The first screen is the baseline;
+after that each change is an alert, sent to you as the `screening.updated` webhook:
+
+| change | Meaning | Needs a decision |
+|--------|---------|------------------|
+| `NEW_MATCH` | They now match a watchlist entry | Yes |
+| `MATCH_CHANGED` | An entry they match gained topics (`newTopics`, e.g. `sanction`, `role.pep`) | Yes |
+| `MATCH_REMOVED` | They no longer match an entry (delisted) | No |
+
+```json
+{ "type": "screening.updated", "version": 2, "data": {
+    "alertId": "…", "subjectId": "…", "verificationId": "…", "externalReference": "user-123", "partyId": null,
+    "subjectType": "person", "applicant": { "name": "Jane Wanjiru" },
+    "change": "NEW_MATCH", "previousVerdict": "NO_HIT", "verdict": "POTENTIAL_MATCH", "needsDecision": true,
+    "matches": [ { "entityId": "Q1", "caption": "Jane W. Wanjiru", "score": 0.82, "datasets": ["ke_peps"], "topics": ["role.pep"] } ],
+    "screenedAt": "2026-11-15T06:00:00" } }
+```
+
+Decide an alert: `PUT /api/v1/monitoring/alerts/{alertId}` with `{"decision": "CONFIRMED" | "DISMISSED", "note": "…"}`.
+A dismissed entry is not raised again for that customer unless it gains topics. Monitoring never changes the
+original verification's decision.
+
+```http
+GET  /api/v1/monitoring/settings                 PUT the same: { "enabled": true, "frequency": "DAILY", "includePeople": true, "includeBusinesses": true, "includeParties": true }
+GET  /api/v1/monitoring/subjects                 monitored customers (status, search)
+POST /api/v1/monitoring/subjects                 { "verificationId": "…" } start by hand
+POST /api/v1/monitoring/subjects/{id}/rescreen   screen now
+POST /api/v1/monitoring/subjects/{id}/stop
+GET  /api/v1/monitoring/alerts                   status: OPEN, CONFIRMED, DISMISSED, INFO
+```
+
+Monitoring stops when the customer relationship ends, and its copy of the details goes when their personal
+data is erased.
+
+---
+
 ## Data Retention and Erasure
 
 Applicants' data is kept per **kind of data**, by the rules of the **applicant's country** (a person's country of

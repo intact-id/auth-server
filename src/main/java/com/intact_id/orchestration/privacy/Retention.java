@@ -39,6 +39,7 @@ public class Retention {
     private final RetentionRules rules;
     private final DataEraser eraser;
     private final DataErasureRepository erasures;
+    private final com.intact_id.orchestration.monitoring.Monitoring monitoring;
 
     /** One kind of data's period for one verification. dueAt null: kept (no period, or waiting for the relationship to end). */
     public record CategoryStatus(RetentionCategory category, Integer days, StartsFrom startsFrom, LocalDateTime dueAt,
@@ -270,6 +271,7 @@ public class Retention {
         request.setRelationshipEndedAt(at);
         request.setRetentionPlanned(false);
         verifications.save(request);
+        monitoring.stopForVerification(request.getId(), "The customer relationship ended");
     }
 
     public List<Map<String, Object>> holds(String companyId) {
