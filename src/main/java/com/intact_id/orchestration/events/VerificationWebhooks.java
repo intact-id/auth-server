@@ -7,6 +7,8 @@ import com.intact_id.orchestration.kyb.KybParties;
 import com.intact_id.orchestration.kyb.VerificationParty;
 import com.intact_id.orchestration.model.VerificationStep;
 import com.intact_id.orchestration.model.VerificationStepRepository;
+import com.intact_id.orchestration.monitoring.MonitoredSubject;
+import com.intact_id.orchestration.monitoring.MonitoringAlert;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +26,7 @@ import java.util.Optional;
  *   <li>verification.review_required: a person must decide</li>
  *   <li>business.waiting_for_people: a business waits for its directors and owners</li>
  *   <li>party.invite_created: a director or owner got a new verification link</li>
+ *   <li>screening.updated: ongoing monitoring found a change for a customer (new match, now sanctioned or PEP, delisted)</li>
  * </ul>
  */
 @Component
@@ -35,6 +38,7 @@ public class VerificationWebhooks {
     public static final String REVIEW_REQUIRED = "verification.review_required";
     public static final String WAITING_FOR_PEOPLE = "business.waiting_for_people";
     public static final String INVITE_CREATED = "party.invite_created";
+    public static final String SCREENING_UPDATED = "screening.updated";
 
     /** Steps the processor records, as the catalog codes merchants build workflows from */
     private static final Map<String, String> SERVICE_OF_STEP = Map.of(
@@ -84,6 +88,28 @@ public class VerificationWebhooks {
         data.put("emailed", invite.emailed());
         data.put("reminder", invite.reminder());
         webhookService.publish(invite.companyId(), companyName, invite.businessVerificationId(), INVITE_CREATED, data);
+    }
+
+    /** Re-screening found a change; the company confirms or dismisses the alert (PUT /api/v1/monitoring/alerts/{id}). */
+    public void screeningUpdated(MonitoringAlert alert, MonitoredSubject subject) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("alertId", alert.getId());
+        data.put("subjectId", subject.getId());
+        data.put("verificationId", subject.getVerificationId());
+        data.put("externalReference", subject.getExternalReference());
+        if (subject.getPartyId() != null) data.put("partyId", subject.getPartyId());
+        data.put("subjectType", subject.getKind().name().toLowerCase());
+        Map<String, Object> who = new LinkedHashMap<>();
+        who.put("name", subject.getDisplayName());
+        data.put("applicant", who);
+        // NEW_MATCH, MATCH_CHANGED (a match gained topics: newTopics) or MATCH_REMOVED (delisted; nothing to decide)
+        data.put("change", alert.getKind().name());
+        data.put("previousVerdict", alert.getPreviousVerdict());
+        data.put("verdict", alert.getVerdict());
+        data.put("matches", alert.getMatches());
+        data.put("needsDecision", alert.getStatus() == MonitoringAlert.Status.OPEN);
+        data.put("screenedAt", subject.getLastScreenedAt());
+        webhookService.publish(subject.getCompanyId(), null, subject.getVerificationId(), SCREENING_UPDATED, data);
     }
 
     private void publish(VerificationRequest request, String type, Map<String, Object> data) {
