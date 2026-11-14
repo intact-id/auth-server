@@ -104,6 +104,9 @@ billing:
   # How workflow runs are charged unless a company chooses otherwise: WORKFLOW_PRICE (the published price)
   # or CHECKS_RUN (only the checks a run reached)
   charge-mode: ${BILLING_CHARGE_MODE:WORKFLOW_PRICE}
+  top-up:
+    # Shown on the top-up form: where companies send bank transfers (bank, account name and number, branch, SWIFT)
+    bank-instructions: ${BILLING_TOPUP_BANK_INSTRUCTIONS:}
 
 
 kafka:
