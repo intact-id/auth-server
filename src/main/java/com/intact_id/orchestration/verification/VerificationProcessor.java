@@ -151,6 +151,9 @@ public class VerificationProcessor {
         if (request.getWorkflowId() != null) {
             applyWorkflow(request, workflow, result);
         }
+        // Billing can charge for only these, if the company is charged per check
+        workflow.ifPresent(w -> request.getMetadata().put(VerificationOutcome.CHECKS_RUN,
+                WorkflowOutcomes.servicesRun(result, Set.copyOf(w.services()))));
 
         saveNewSteps(request, result, earlier.size());
 

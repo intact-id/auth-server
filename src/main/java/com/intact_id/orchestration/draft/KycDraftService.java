@@ -3,6 +3,10 @@ package com.intact_id.orchestration.draft;
 import java.util.Optional;
 import com.intact_id.workflow.WorkflowRuntime;
 import com.intact_id.workflow.PinnedWorkflow;
+import com.intact_id.workflow.SubjectType;
+import com.intact_id.orchestration.kyb.PartyInput;
+import com.intact_id.orchestration.web.DraftBusinessRequestDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.intact_id.orchestration.config.KycDraftConfig;
 import com.intact_id.orchestration.model.KycDraftStatus;
 import com.intact_id.orchestration.model.KycHandoffStatus;
@@ -63,6 +67,14 @@ import java.util.regex.Pattern;
 public class KycDraftService {
 
     private static final Set<String> DOCUMENT_TYPES = Set.of("selfie", "id_front", "id_back", "proof_of_address");
+    // A business's documents; like proof of address, they may be PDFs
+    private static final Set<String> BUSINESS_DOCUMENT_TYPES = Set.of("certificate_of_incorporation", "cr12",
+            "tax_certificate", "business_proof_of_address");
+    private static final Set<String> BUSINESS_FIELDS = Set.of("companyName", "tradingName", "registrationNumber", "country",
+            "incorporationDate", "registeredAddress", "taxPin", "businessType");
+    // Where a business draft keeps its details and people inside the draft's details
+    private static final String BUSINESS = "business";
+    private static final String PARTIES = "parties";
     // Same naming the one-shot submit uses: liveness_{index}_{label}
     private static final Pattern LIVENESS_TYPE = Pattern.compile("liveness_([0-7])_(neutral|turn_left|turn_right)");
     private static final Pattern UNSAFE_FILENAME_CHARS = Pattern.compile("[^A-Za-z0-9._-]");
@@ -83,6 +95,7 @@ public class KycDraftService {
     private final WorkflowRuntime workflowRuntime;
     private final GeneratorUtils generatorUtils;
     private final KycDraftConfig config;
+    private final ObjectMapper objectMapper;
 
     public KycDraftSessionResponseDto createDraft(WidgetSessionContext context) {
         requireEmbedded(context);
@@ -147,6 +160,30 @@ public class KycDraftService {
         putIfPresent(details, "email", request.getEmail());
         draft.setDetails(details);
 
+        return toResponse(draftRepository.save(draft));
+    }
+
+    public KycDraftResponseDto updateBusiness(WidgetSessionContext context, String draftId, DraftBusinessRequestDto request) {
+        KycDraft draft = requireEditableDraft(context, draftId);
+        if (pinned(draft).map(w -> w.subjectType() != SubjectType.BUSINESS).orElse(true)) {
+            throw new ApplicationExceptions.IntactBadRequestException("This verification is for a person, not a business");
+        }
+        Map<String, Object> details = new HashMap<>(draft.getDetails() != null ? draft.getDetails() : Map.of());
+        if (request.getBusiness() != null) {
+            Map<String, Object> business = new LinkedHashMap<>();
+            request.getBusiness().forEach((field, value) -> {
+                if (!BUSINESS_FIELDS.contains(field)) {
+                    throw new ApplicationExceptions.IntactBadRequestException("Unknown business field: " + field);
+                }
+                if (value != null && !value.isBlank()) business.put(field, value.trim());
+            });
+            if (business.get("country") != null) business.put("country", business.get("country").toString().toUpperCase(Locale.ROOT));
+            details.put(BUSINESS, business);
+        }
+        if (request.getParties() != null) {
+            details.put(PARTIES, request.getParties());
+        }
+        draft.setDetails(details);
         return toResponse(draftRepository.save(draft));
     }
 
@@ -387,12 +424,17 @@ public class KycDraftService {
                 .expiresAt(draft.getExpiresAt())
                 .verificationId(draft.getVerificationId())
                 .details(maskDetails(draft.getDetails()))
+                .business(draft.getDetails() != null && draft.getDetails().get(BUSINESS) instanceof Map<?, ?> business
+                        ? copyOf(business) : null)
+                .partyCount(draft.getDetails() != null && draft.getDetails().get(PARTIES) instanceof List<?> parties ? parties.size() : null)
                 .documents(documents)
                 .handoff(handoff)
                 .uploadMode(documentStorage.supportsDirectUpload() ? "direct" : "proxy")
                 .workflow(pinned(draft).map(w -> KycDraftResponseDto.WorkflowSteps.builder()
                         .key(w.key())
                         .version(w.version())
+                        .subjectType(w.subjectType().name())
+                        .services(w.services())
                         .screens(w.requirements().screens())
                         .requiredFields(w.requirements().requiredFields())
                         .captures(w.requirements().captures())
@@ -415,6 +457,9 @@ public class KycDraftService {
 
     private KycVerificationRequestDto buildVerificationRequest(KycDraft draft) {
         Map<String, Object> details = draft.getDetails() != null ? draft.getDetails() : Map.of();
+        if (pinned(draft).map(w -> w.subjectType() == SubjectType.BUSINESS).orElse(false)) {
+            return buildBusinessRequest(draft, details);
+        }
 
         KycVerificationRequestDto request = new KycVerificationRequestDto();
         request.setFirstName(requireDetail(details, "firstName"));
@@ -467,6 +512,41 @@ public class KycDraftService {
         return request;
     }
 
+    /** A business draft as the same request the KYB API builds; the business checks then validate it. */
+    private KycVerificationRequestDto buildBusinessRequest(KycDraft draft, Map<String, Object> details) {
+        if (!(details.get(BUSINESS) instanceof Map<?, ?> business) || business.isEmpty()) {
+            throw new ApplicationExceptions.IntactBadRequestException("Add the business's details before submitting");
+        }
+        Map<String, Object> businessDetails = new LinkedHashMap<>();
+        business.forEach((field, value) -> businessDetails.put(field.toString(), value));
+
+        List<PartyInput> parties = details.get(PARTIES) instanceof List<?> saved
+                ? saved.stream().map(p -> objectMapper.convertValue(p, PartyInput.class)).toList() : List.of();
+
+        Map<String, MultipartFile> documents = new LinkedHashMap<>();
+        for (KycDraftDocument document : documentRepository.findByDraftId(draft.getId())) {
+            if (BUSINESS_DOCUMENT_TYPES.contains(document.getDocumentType())) {
+                documents.put(document.getDocumentType(), asMultipartFile(document));
+            }
+        }
+
+        KycVerificationRequestDto request = new KycVerificationRequestDto();
+        request.setVerificationType("business");
+        request.setBusinessDetails(businessDetails);
+        request.setParties(parties);
+        request.setBusinessDocuments(documents);
+        request.setExternalReference(draft.getExternalReference());
+        request.setWorkflowId(draft.getWorkflowId());
+        request.setWorkflowVersion(draft.getWorkflowVersion());
+        return request;
+    }
+
+    private static Map<String, Object> copyOf(Map<?, ?> map) {
+        Map<String, Object> copy = new LinkedHashMap<>();
+        map.forEach((key, value) -> copy.put(String.valueOf(key), value));
+        return copy;
+    }
+
     private Optional<PinnedWorkflow> pinned(KycDraft draft) {
         return draft.getWorkflowId() == null || draft.getWorkflowVersion() == null ? Optional.empty()
                 : workflowRuntime.find(draft.getWorkflowId(), draft.getWorkflowVersion());
@@ -492,7 +572,7 @@ public class KycDraftService {
         }
         String contentType = file.getContentType();
         boolean isImage = contentType != null && contentType.startsWith("image/");
-        boolean isPdfProof = "proof_of_address".equals(type) && "application/pdf".equals(contentType);
+        boolean isPdfProof = mayBePdf(type) && "application/pdf".equals(contentType);
         if (!isImage && !isPdfProof) {
             throw new ApplicationExceptions.IntactBadRequestException(type + " must be an image file");
         }
@@ -506,10 +586,14 @@ public class KycDraftService {
             throw new ApplicationExceptions.IntactBadRequestException(type + " exceeds maximum size of 10MB");
         }
         boolean isImage = DIRECT_IMAGE_TYPES.contains(contentType);
-        boolean isPdfProof = "proof_of_address".equals(type) && "application/pdf".equals(contentType);
+        boolean isPdfProof = mayBePdf(type) && "application/pdf".equals(contentType);
         if (!isImage && !isPdfProof) {
             throw new ApplicationExceptions.IntactBadRequestException(type + " must be a JPEG, PNG or WebP image");
         }
+    }
+
+    private static boolean mayBePdf(String type) {
+        return "proof_of_address".equals(type) || BUSINESS_DOCUMENT_TYPES.contains(type);
     }
 
     private static String normalizeContentType(String contentType) {
@@ -546,10 +630,10 @@ public class KycDraftService {
 
     private String normalizeDocumentType(String documentType) {
         String type = documentType != null ? documentType.trim().toLowerCase() : "";
-        if (!DOCUMENT_TYPES.contains(type) && !LIVENESS_TYPE.matcher(type).matches()) {
+        if (!DOCUMENT_TYPES.contains(type) && !BUSINESS_DOCUMENT_TYPES.contains(type) && !LIVENESS_TYPE.matcher(type).matches()) {
             throw new ApplicationExceptions.IntactBadRequestException(
                     "Invalid document type. Must be one of: selfie, id_front, id_back, proof_of_address, "
-                            + "liveness_{0-7}_{neutral|turn_left|turn_right}");
+                            + "liveness_{0-7}_{neutral|turn_left|turn_right}, " + String.join(", ", BUSINESS_DOCUMENT_TYPES));
         }
         return type;
     }
@@ -580,7 +664,7 @@ public class KycDraftService {
             return masked;
         }
         details.forEach((key, value) -> {
-            if (value != null) {
+            if (value != null && !BUSINESS.equals(key) && !PARTIES.equals(key)) {
                 masked.put(key, mask(key, value.toString()));
             }
         });

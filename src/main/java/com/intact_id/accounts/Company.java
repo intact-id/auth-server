@@ -64,6 +64,10 @@ public class Company extends Auditable {
     @OneToOne(mappedBy = "company", cascade = CascadeType.ALL)
     private CompanyCredentials credentials;
 
+    // WORKFLOW_PRICE or CHECKS_RUN; null = the platform default. Read through billing's ChargeModes.
+    @Column(name = "charge_mode", length = 20)
+    private String chargeMode;
+
     @Column(name = "extra_details",columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     @Convert(converter = PgJsonbToMapConverter.class)

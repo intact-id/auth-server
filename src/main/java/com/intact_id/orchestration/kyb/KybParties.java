@@ -9,6 +9,8 @@ import com.intact_id.orchestration.model.VerificationRequestRepository;
 import com.intact_id.orchestration.verification.ExternalKycServiceClient.CheckResult;
 import com.intact_id.util.exception.ApplicationExceptions;
 import com.intact_id.util.generator.GeneratorUtils;
+import com.intact_id.workflow.NodeType;
+import com.intact_id.workflow.PinnedWorkflow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +38,10 @@ import java.util.Optional;
 public class KybParties {
 
     public static final String OWNER_CHECK = "ownerCheck";
+    public static final String AUTO_INVITE = "autoInvite";
+    /** Workflow key each person's verification runs, as the settings at submission had it */
+    public static final String PERSON_WORKFLOW = "personWorkflow";
+    private static final String OWNER_STEP_SERVICE = "OWNER_VERIFICATION";
     public static final String WAITING = "waitingFor";
     public static final String WAITING_FOR_PEOPLE = "people";
     /** externalReference of a person's verification started from an invite link */
@@ -52,10 +58,16 @@ public class KybParties {
     @Value("${kyb.invite-url:https://widget.intact-io.com/invite}")
     private String inviteUrl;
 
-    /** Saves the people with a new business verification and records how they are checked. Runs in its transaction. */
-    public void attach(VerificationRequest business, List<PartyInput> people) {
-        KybSettings rules = settings.effective(business.getCompany().getId());
+    /**
+     * Saves the people with a new business verification and records how they are checked: the company's (or the
+     * platform's) settings, with whatever the workflow's "Directors and owners" step sets itself. Runs in its
+     * transaction.
+     */
+    public void attach(VerificationRequest business, List<PartyInput> people, PinnedWorkflow workflow) {
+        KybSettings rules = rulesFor(business.getCompany().getId(), workflow);
         business.getMetadata().put(OWNER_CHECK, rules.ownerCheck().name());
+        business.getMetadata().put(AUTO_INVITE, rules.autoInvite());
+        if (rules.personWorkflow() != null) business.getMetadata().put(PERSON_WORKFLOW, rules.personWorkflow());
         for (PartyInput person : people == null ? List.<PartyInput>of() : people) {
             if (blank(person.firstName()) || blank(person.lastName())) {
                 throw new ApplicationExceptions.IntactBadRequestException("Each director or owner needs a first and last name");
@@ -78,6 +90,23 @@ public class KybParties {
             party.setStatus(party.isMustVerify() ? PartyStatus.PENDING : PartyStatus.NOT_REQUIRED);
             parties.save(party);
         }
+    }
+
+    /** The settings a business verification runs with: the company's or platform's, then the workflow step's own. */
+    public KybSettings rulesFor(String companyId, PinnedWorkflow workflow) {
+        KybSettings rules = settings.effective(companyId);
+        if (workflow == null) return rules;
+        return workflow.graph().nodes().stream()
+                .filter(node -> node.type() == NodeType.SERVICE && OWNER_STEP_SERVICE.equals(node.service()))
+                .findFirst()
+                .map(node -> rules.withStep(node.settings()))
+                .orElse(rules);
+    }
+
+    /** The workflow key each person behind this business runs: as recorded at submission, else today's settings. */
+    public String personWorkflow(VerificationRequest business) {
+        Object recorded = business.getMetadata().get(PERSON_WORKFLOW);
+        return recorded != null ? recorded.toString() : settings.effective(business.getCompany().getId()).personWorkflow();
     }
 
     /**
@@ -121,6 +150,10 @@ public class KybParties {
         if (mode == OwnerCheck.SCREENING) {
             required.stream().filter(p -> !p.getStatus().isFinal()).forEach(this::screen);
         } else if (mode == OwnerCheck.FULL_KYC && required.stream().anyMatch(p -> !p.getStatus().isFinal())) {
+            if (Boolean.TRUE.equals(business.getMetadata().get(AUTO_INVITE))) {
+                required.stream().filter(p -> p.getStatus() == PartyStatus.PENDING && !blank(p.getEmail()))
+                        .forEach(p -> sendInvite(business, p));
+            }
             return Optional.empty();
         }
 
@@ -223,6 +256,11 @@ public class KybParties {
         if (!party.isMustVerify() || party.getStatus().isFinal()) {
             throw new ApplicationExceptions.IntactBadRequestException(party.fullName() + " doesn't need verifying");
         }
+        return sendInvite(business, party);
+    }
+
+    /** A new 7-day link for the person (replacing any earlier one), emailed when they have an email; returns it. */
+    private String sendInvite(VerificationRequest business, VerificationParty party) {
         String token = generatorUtils.generateUrlSafeToken(32);
         party.setInviteTokenHash(generatorUtils.hashString(token));
         party.setInviteExpiresAt(LocalDateTime.now().plusDays(INVITE_DAYS));
@@ -238,6 +276,7 @@ public class KybParties {
                             + companyName + ". Please complete your identity verification here:\n\n" + link + "\n\n"
                             + "The link works for " + INVITE_DAYS + " days.\n\nIntact ID");
         }
+        log.info("Invite for {} ({}) on business verification {}", party.fullName(), party.getId(), business.getId());
         return link;
     }
 

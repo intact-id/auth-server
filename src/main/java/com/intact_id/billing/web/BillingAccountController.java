@@ -2,6 +2,7 @@ package com.intact_id.billing.web;
 
 import com.intact_id.accounts.SecurityContextUtil;
 import com.intact_id.billing.account.BillingAccounts;
+import com.intact_id.billing.charge.ChargeModes;
 import com.intact_id.billing.client.BillingApi;
 import com.intact_id.billing.client.ResolvedServiceCharge;
 import com.intact_id.config.web.DownstreamApi;
@@ -36,6 +37,7 @@ public class BillingAccountController {
     private static final String COMPANY_ID = "Super admins only: the company to act for";
 
     private final BillingAccounts billing;
+    private final ChargeModes chargeModes;
 
     // --- The company's own billing (super admins: ?companyId=) ---
 
@@ -71,7 +73,22 @@ public class BillingAccountController {
         return ok(billing.invoice(owner, id));
     }
 
+    @GetMapping("/charge-mode")
+    @Operation(summary = "How workflow runs are charged",
+            description = "WORKFLOW_PRICE: the workflow's published price. CHECKS_RUN: only the checks a run reached. "
+                    + "mode is the company's, platformDefault applies when the company has none of its own.")
+    public ResponseEntity<ApiResponse<ChargeModes.Settings>> chargeMode(@Parameter(description = COMPANY_ID) @RequestParam(required = false) String companyId) {
+        return ok(chargeModes.settings(company(companyId)));
+    }
+
     // --- Super admin ---
+
+    @PutMapping("/admin/charge-mode")
+    @Operation(summary = "Set how a company's workflow runs are charged", description = "mode null puts the company back on the platform default.")
+    public ResponseEntity<ApiResponse<ChargeModes.Settings>> updateChargeMode(@RequestParam String companyId, @RequestBody ChargeModes.Change change) {
+        requireSuperAdmin();
+        return respond(HttpStatus.OK, "Charge mode saved", chargeModes.update(companyId, change.mode()));
+    }
 
     @PostMapping("/admin/setup")
     @Operation(summary = "Set a company's billing terms", description = "Creates the billing profile with the given model, payment type and currency, then the wallet (prepaid) and the default per-call price if pricePerCall is given. Only what is missing is created, so it is safe to repeat; change terms later with PATCH /admin/profile.")
