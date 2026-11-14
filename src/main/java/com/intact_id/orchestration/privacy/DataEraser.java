@@ -47,6 +47,7 @@ class DataEraser {
     private final DataErasureRepository erasures;
     private final WebhookService webhooks;
     private final TransactionTemplate transactions;
+    private final com.intact_id.orchestration.monitoring.Monitoring monitoring;
 
     DataErasure erase(VerificationRequest request, RetentionCategory scope, DataErasure.Trigger trigger, String reason,
                       String performedBy, boolean overrodeMinimum) {
@@ -129,6 +130,8 @@ class DataEraser {
             parties.save(party);
         }
         webhooks.redactDeliveries(request.getId());
+        // The copy monitoring keeps for re-screening is personal data too
+        monitoring.deleteForVerification(request.getId());
     }
 
     /** The end of the record: only a bare row (id, company, status, dates) remains, for the erasure log. */
