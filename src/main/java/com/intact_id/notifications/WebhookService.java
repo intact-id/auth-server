@@ -174,63 +174,61 @@ public class WebhookService {
         }
     }
 
+    /** Payload version merchants receive; also sent as the X-Webhook-Version header. */
+    public static final int PAYLOAD_VERSION = 2;
+
     /**
-     * Build a filtered payload map based on the company's payloadFields configuration.
-     * Sensitive fields (raw scores, applicant info, IDs) are stripped when disabled.
+     * The envelope {id, type, version, createdAt, companyId, companyName, data}, with the company's payloadFields
+     * applied. Applicant details and raw scores are left out unless the company turns them on.
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> buildFilteredPayload(WebhookEventDto event, CompanyCommunicationDetails communication) {
-        Map<String, Object> payload = objectMapper.convertValue(event, Map.class);
+        Map<String, Object> data = event.getData() == null ? new java.util.LinkedHashMap<>()
+                : objectMapper.convertValue(event.getData(), java.util.LinkedHashMap.class);
 
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("id", event.getEventId());
+        payload.put("type", event.getEventType());
+        payload.put("version", PAYLOAD_VERSION);
+        payload.put("createdAt", event.getTimestamp());
+        if (communication.isPayloadFieldEnabled("includeCompanyId")) payload.put("companyId", event.getCompanyId());
+        if (communication.isPayloadFieldEnabled("includeCompanyName")) payload.put("companyName", event.getCompanyName());
+        payload.put("data", data);
+
+        List<Map<String, Object>> checks = data.get("checks") instanceof List<?> list ? (List<Map<String, Object>>) list : List.of();
         if (!communication.isPayloadFieldEnabled("includeVerificationId")) {
-            payload.remove("verificationId");
-            Map<String, Object> d = (Map<String, Object>) payload.get("data");
-            if (d != null) d.remove("verification_id");
+            data.remove("verificationId");
         }
-        if (!communication.isPayloadFieldEnabled("includeCompanyId")) {
-            payload.remove("companyId");
+        if (!communication.isPayloadFieldEnabled("includeRejectionReason")) {
+            data.remove("reason");
+            data.remove("reviewReason");
+            checks.forEach(check -> check.remove("reason"));
         }
-        if (!communication.isPayloadFieldEnabled("includeCompanyName")) {
-            payload.remove("companyName");
+        if (!communication.isPayloadFieldEnabled("includeTier")) {
+            data.remove("tier");
         }
-
-        Map<String, Object> data = (Map<String, Object>) payload.get("data");
-        if (data != null) {
-            if (!communication.isPayloadFieldEnabled("includeRejectionReason")) {
-                data.remove("rejection_reason");
-                data.remove("rejection_details");
-                Map<String, Object> results = (Map<String, Object>) data.get("results");
-                if (results != null) {
-                    results.forEach((key, val) -> {
-                        if (val instanceof Map) ((Map<String, Object>) val).remove("error");
-                    });
-                }
-            }
-            if (!communication.isPayloadFieldEnabled("includeTier")) {
-                data.remove("tier");
-            }
-            if (!communication.isPayloadFieldEnabled("includeTimestamps")) {
-                data.remove("started_at");
-                data.remove("completed_at");
-                data.remove("failed_at");
-            }
-            if (!communication.isPayloadFieldEnabled("includeApplicant")) {
-                data.remove("applicant");
-            }
-            if (!communication.isPayloadFieldEnabled("includeResults")) {
-                data.remove("results");
-            } else if (!communication.isPayloadFieldEnabled("includeRawScores")) {
-                Map<String, Object> results = (Map<String, Object>) data.get("results");
-                if (results != null) {
-                    results.forEach((key, val) -> {
-                        if (val instanceof Map) {
-                            ((Map<String, Object>) val).remove("checks");
-                        }
-                    });
-                }
+        if (!communication.isPayloadFieldEnabled("includeTimestamps")) {
+            data.remove("submittedAt");
+            data.remove("completedAt");
+            checks.forEach(check -> check.remove("completedAt"));
+        }
+        if (!communication.isPayloadFieldEnabled("includeApplicant")) {
+            data.remove("applicant");
+            if (data.get("parties") instanceof List<?> parties) {
+                parties.forEach(party -> {
+                    if (party instanceof Map<?, ?> m) {
+                        ((Map<String, Object>) m).remove("firstName");
+                        ((Map<String, Object>) m).remove("lastName");
+                    }
+                });
             }
         }
-
+        if (!communication.isPayloadFieldEnabled("includeResults")) {
+            data.remove("checks");
+        } else if (!communication.isPayloadFieldEnabled("includeRawScores")) {
+            data.remove("riskScore");
+            checks.forEach(check -> check.remove("score"));
+        }
         return payload;
     }
 
@@ -246,7 +244,8 @@ public class WebhookService {
                     .header("Content-Type", "application/json")
                     .header("X-Webhook-Signature", "sha256=" + signature)
                     .header("X-Event-Type", delivery.getEventType())
-                    .header("User-Agent", "IntactID-Webhook/1.0")
+                    .header("X-Webhook-Version", String.valueOf(PAYLOAD_VERSION))
+                    .header("User-Agent", "IntactID-Webhook/2.0")
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
 
@@ -328,6 +327,15 @@ public class WebhookService {
         }
     }
 
+    /** Data erasure: the stored payloads of a verification's deliveries carry personal data, so they are blanked. */
+    @Transactional
+    public void redactDeliveries(String verificationId) {
+        for (WebhookDelivery delivery : webhookDeliveryRepository.findByVerificationId(verificationId)) {
+            delivery.setPayload("{\"erased\":true}");
+            webhookDeliveryRepository.save(delivery);
+        }
+    }
+
     /**
      * Send test webhook to verify endpoint configuration
      */
@@ -337,15 +345,15 @@ public class WebhookService {
         try {
             log.info("Sending test webhook to: {}", communication.getWebhookUrl());
 
-            // Build test event payload
-            Map<String, Object> testEvent = new HashMap<>();
-            testEvent.put("event_type", "test.webhook");
-            testEvent.put("event_id", java.util.UUID.randomUUID().toString());
-            testEvent.put("timestamp", LocalDateTime.now().toString());
-            testEvent.put("message", "This is a test webhook from IntactID");
-            testEvent.put("company_id", communication.getCompanyId());
-
-            String payload = objectMapper.writeValueAsString(testEvent);
+            // Same envelope as real events
+            WebhookEventDto test = WebhookEventDto.builder()
+                    .eventType("test.webhook")
+                    .eventId(java.util.UUID.randomUUID().toString())
+                    .timestamp(LocalDateTime.now())
+                    .companyId(communication.getCompanyId())
+                    .data(new HashMap<>(Map.of("message", "This is a test webhook from Intact ID")))
+                    .build();
+            String payload = objectMapper.writeValueAsString(buildFilteredPayload(test, communication));
 
             // Generate signature using the company's dedicated webhook secret
             String signature = webhookSigner.sign(payload, communication.getWebhookSecret());
@@ -357,7 +365,8 @@ public class WebhookService {
                     .header("Content-Type", "application/json")
                     .header("X-Webhook-Signature", "sha256=" + signature)
                     .header("X-Event-Type", "test.webhook")
-                    .header("User-Agent", "IntactID-Webhook/1.0")
+                    .header("X-Webhook-Version", String.valueOf(PAYLOAD_VERSION))
+                    .header("User-Agent", "IntactID-Webhook/2.0")
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
 

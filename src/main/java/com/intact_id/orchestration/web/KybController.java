@@ -9,6 +9,8 @@ import com.intact_id.orchestration.KycSessionService;
 import com.intact_id.orchestration.VerificationRequest;
 import com.intact_id.orchestration.kyb.KybParties;
 import com.intact_id.orchestration.kyb.KybSettings;
+import com.intact_id.orchestration.WidgetSessionContext;
+import com.intact_id.orchestration.model.KycDraftRepository;
 import com.intact_id.orchestration.kyb.KybSettingsService;
 import com.intact_id.orchestration.kyb.PartyInput;
 import com.intact_id.orchestration.kyb.PartyView;
@@ -56,6 +58,7 @@ public class KybController {
     private final KycSessionService sessions;
     private final WorkflowRuntime workflowRuntime;
     private final ObjectMapper objectMapper;
+    private final KycDraftRepository drafts;
 
     @PostMapping(value = "/api/v1/kyb/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('COMPANY')")
@@ -133,6 +136,57 @@ public class KybController {
             description = "Returns a widget session token; the verification is linked to their place on the business.")
     public ResponseEntity<ApiResponse<KycSessionResponseDto>> inviteSession(@PathVariable String token) {
         VerificationParty party = kybParties.fromInvite(token);
+        return respond(HttpStatus.OK, "Session token created", personSession(party));
+    }
+
+    @GetMapping("/api/v1/kyb/waiting")
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Business verifications waiting for their directors and owners",
+            description = "Oldest first, with each required person's status and link details. Super admins without companyId see every company's.")
+    public ResponseEntity<ApiResponse<List<KybParties.WaitingBusiness>>> waiting(@RequestParam(required = false) String companyId) {
+        boolean everyCompany = SecurityContextUtil.isSuperAdminAuthenticated() && (companyId == null || companyId.isBlank());
+        return respond(HttpStatus.OK, "OK", kybParties.waiting(everyCompany ? null : SecurityContextUtil.resolveCompanyId(companyId)));
+    }
+
+    // ----- widget: the person who submitted the business verifies themselves straight away -----
+
+    @GetMapping("/api/v1/kyc/widget/business/{id}/people")
+    @PreAuthorize("hasRole('COMPANY')")
+    @Operation(summary = "Directors and owners who must verify, for the session that submitted the business")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> widgetPeople(
+            @PathVariable String id, @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context) {
+        VerificationRequest business = submittedBy(context, id);
+        List<Map<String, Object>> people = kybParties.forVerification(business.getId()).stream()
+                .filter(VerificationParty::isMustVerify)
+                .map(p -> Map.<String, Object>of("id", p.getId(), "firstName", p.getFirstName(), "lastName", p.getLastName(),
+                        "status", p.getStatus().name()))
+                .toList();
+        return respond(HttpStatus.OK, "OK", people);
+    }
+
+    @PostMapping("/api/v1/kyc/widget/business/{id}/people/{partyId}/session")
+    @PreAuthorize("hasRole('COMPANY')")
+    @Operation(summary = "Start a director's or owner's own verification from the business's widget session")
+    public ResponseEntity<ApiResponse<KycSessionResponseDto>> widgetPersonSession(
+            @PathVariable String id, @PathVariable String partyId,
+            @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context) {
+        VerificationRequest business = submittedBy(context, id);
+        return respond(HttpStatus.OK, "Session token created", personSession(kybParties.startable(business.getId(), partyId)));
+    }
+
+    /** The business verification this widget session's draft submitted; nothing else is reachable from it. */
+    private VerificationRequest submittedBy(WidgetSessionContext context, String businessId) {
+        boolean ownDraft = context.draftId() != null && drafts.findById(context.draftId())
+                .map(d -> businessId.equals(d.getVerificationId())).orElse(false);
+        if (!ownDraft) {
+            throw new ApplicationExceptions.IntactResourceNotFoundException("Business verification not found");
+        }
+        return verifications.findByIdWithCompany(businessId)
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Business verification not found"));
+    }
+
+    /** A widget session for the person's own identity verification, linked to their place on the business. */
+    private KycSessionResponseDto personSession(VerificationParty party) {
         VerificationRequest business = verifications.findByIdWithCompany(party.getVerificationId())
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Business verification not found"));
         Company company = business.getCompany();
@@ -145,14 +199,14 @@ public class KybController {
         String reference = KybParties.PARTY_REFERENCE_PREFIX + party.getId();
         String sessionToken = sessions.createSessionToken(company.getId(), KycSessionService.displayName(company), tier, reference, workflow);
 
-        return respond(HttpStatus.OK, "Session token created", KycSessionResponseDto.builder()
+        return KycSessionResponseDto.builder()
                 .sessionToken(sessionToken)
                 .expiresInSeconds(900)
                 .tier(tier)
                 .workflow(workflow == null ? null : workflow.key())
                 .workflowVersion(workflow == null ? null : workflow.version())
                 .externalReference(reference)
-                .build());
+                .build();
     }
 
     // ----- settings -----

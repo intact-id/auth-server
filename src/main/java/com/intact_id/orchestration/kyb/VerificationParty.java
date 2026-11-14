@@ -78,6 +78,19 @@ public class VerificationParty extends Auditable {
     @Column(name = "invite_expires_at")
     private LocalDateTime inviteExpiresAt;
 
+    @Column(name = "invited_at")
+    private LocalDateTime invitedAt;
+
+    // Whether Intact emailed the current link (false: the merchant shares it)
+    @Column(name = "invite_emailed", nullable = false)
+    private boolean inviteEmailed;
+
+    @Column(name = "reminders_sent", nullable = false)
+    private int remindersSent;
+
+    @Column(name = "last_reminded_at")
+    private LocalDateTime lastRemindedAt;
+
     public String fullName() {
         return firstName + " " + lastName;
     }

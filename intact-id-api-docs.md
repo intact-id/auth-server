@@ -397,12 +397,27 @@ default; you can set your own in the console or with `PUT /api/v1/kyb/settings`)
 - **ownershipThreshold:** owners at or above this percentage are checked (default 25).
 - **includeDirectors:** whether directors are checked too.
 
-With `FULL_KYC`, the business verification waits (status `PENDING`) until every required person has a result,
-then finishes. Each person can be verified two ways:
+- **autoInvite:** whether Intact ID emails each person their link (with reminders).
 
-1. **Invite link:** `POST /api/v1/kyb/verifications/{verificationId}/parties/{partyId}/invite` emails the person
-   (if you gave an email) and returns their link. It works for 7 days.
-2. **Your own integration:** submit their verification to `POST /api/v1/kyc/verify/{tier}` with `partyId=<their id>`.
+A workflow's **Directors and owners** step can set any of these itself; what it leaves unset comes from your settings.
+
+With `FULL_KYC`, the business verification waits (status `PENDING`) until every required person has a result,
+then finishes. When it starts waiting, every required person gets a 7-day link, and you receive a
+`party.invite_created` webhook for each one. Each person can be verified three ways:
+
+1. **Invite link:** share the link from the webhook (when `emailed` is false), or let Intact ID email it
+   (`autoInvite`, for people with an email). `POST /api/v1/kyb/verifications/{verificationId}/parties/{partyId}/invite`
+   makes a new link (emailing it when they have an email) and returns it; the earlier link stops working.
+   Emailed people who haven't started get up to 2 reminders, 3 days apart, each with a new link.
+2. **Straight away in the widget:** after submitting a business in the widget, a required person can choose
+   "This is me" and verify themselves right there.
+3. **Your own integration:** submit their verification to `POST /api/v1/kyc/verify/{tier}` with `partyId=<their id>`.
+
+Every business still waiting, with its people, oldest first:
+
+```http
+GET /api/v1/kyb/waiting
+```
 
 List the people and where each one stands:
 
@@ -415,6 +430,32 @@ who fails or needs review sends the business to manual review in the **KYB plus 
 
 **Business registry:** the registry check is being connected to its provider. Until then it reports every
 business as registered and active, and its result says `"source": "pending-provider"`.
+
+---
+
+## Data Retention and Erasure
+
+Applicants' data is kept until a retention rule or an erasure request removes it. Erasing keeps the decision,
+the check outcomes and scores, so a verification stays auditable; it removes documents (ID photos, selfies,
+liveness frames, business documents) and personal details (names, ID numbers, dates of birth, contact details,
+what was read from documents, directors' and owners' details, and stored webhook payloads).
+
+**Retention rule** (days after a verification finishes; `null` keeps the data). It runs nightly:
+
+```http
+GET /api/v1/privacy/retention
+PUT /api/v1/privacy/retention          { "documentsDays": 90, "personalDataDays": 365 }
+DELETE /api/v1/privacy/retention       (back to the platform rule)
+```
+
+**Erase one applicant now**, for example when they ask (finished verifications only; cannot be undone):
+
+```http
+POST /api/v1/privacy/verifications/{verificationId}/erase   { "reason": "The applicant asked us to delete their data" }
+```
+
+**Erasure log**, newest first: `GET /api/v1/privacy/erasures`. A verification's status shows `documentsDeletedAt` and
+`personalDataErasedAt` once its data is gone.
 
 ---
 
@@ -689,55 +730,79 @@ Counts deliveries created in the last `hours` hours (default 24, maximum 720) by
 { "since": "2024-01-14T10:31:45", "total": 46, "delivered": 40, "failed": 3, "retrying": 2, "pending": 1 }
 ```
 
-### Webhook Event Payload
+### Webhook Event Payload (version 2)
+
+Every event has the same envelope. The `X-Webhook-Version: 2` header says which version you receive.
 
 ```json
 {
-  "eventType": "verification.completed",
-  "eventId": "evt_abc123xyz",
-  "timestamp": "2024-01-15T10:31:45",
-  "companyId": "CMP-001",
+  "id": "6b1f0c1e-…",
+  "type": "verification.completed",
+  "version": 2,
+  "createdAt": "2026-11-14T18:02:11",
+  "companyId": "f0a93576-…",
   "companyName": "Acme Pay",
-  "verificationId": "VRF-20240115-A1B2C3",
-  "apiVersion": "v1",
   "data": {
-    "verification_id": "VRF-20240115-A1B2C3",
+    "verificationId": "8c2e…",
+    "externalReference": "user-123",
+    "type": "individual",
     "status": "COMPLETED",
-    "overall_decision": "approved",
-    "tier": "TIER_1",
-    "verification_type": "individual",
-    "completed_at": "2024-01-15T10:31:45",
-    "started_at": "2024-01-15T10:30:10",
-    "rejection_reason": null,
-    "rejection_details": null,
-    "applicant": {
-      "email": "jane@example.com",
-      "phone": "+254700000000",
-      "name": "Jane Doe"
-    },
-    "results": {
-      "face_screening": {
-        "status": "completed",
-        "decision": "approved",
-        "checks": {
-          "face_detected": true,
-          "liveness_passed": true,
-          "face_match_score": 0.97,
-          "quality_score": 0.88
-        }
-      }
-    }
+    "decision": "approved",
+    "riskScore": 0.1,
+    "reason": null,
+    "workflow": { "id": "6946…", "version": 3 },
+    "tier": "workflow",
+    "applicant": { "firstName": "Jane", "lastName": "Doe", "dateOfBirth": "1990-01-01", "email": "jane@example.com" },
+    "checks": [
+      { "service": "DOCUMENT_CHECK", "status": "passed", "score": 0.93, "completedAt": "2026-11-14T18:02:05" },
+      { "service": "LIVENESS", "status": "passed", "score": 0.97, "completedAt": "2026-11-14T18:02:09" }
+    ],
+    "submittedAt": "2026-11-14T18:01:40",
+    "completedAt": "2026-11-14T18:02:10"
   }
 }
 ```
+
+- `decision`: `approved`, `rejected`, `manual_review`, `waiting` (a business waiting for its people) or `error`.
+- `checks`: the checks the run reached, in order, by catalog code. `status` is `passed`, `failed`, `review` or `skipped`.
+- `reason`: `{code, message}` when the verification was rejected or failed.
+- Business verifications have `business` (the details submitted) and `parties` (each director and owner:
+  `partyId`, names, `director`, `ownershipPercent`, `required`, `status`, and `verificationId` once they verify)
+  instead of `applicant`.
+- A director's or owner's own verification has `partyId`, linking it to their business.
+- `verification.review_required` adds `reviewReason`.
+
+`party.invite_created` has a different `data`:
+
+```json
+{
+  "verificationId": "business verification id",
+  "externalReference": "your reference for the business",
+  "partyId": "c41d…",
+  "applicant": { "firstName": "John", "lastName": "Kamau", "email": null },
+  "link": "https://widget.intact-io.com/invite?token=…",
+  "expiresAt": "2026-11-21T18:02:11",
+  "emailed": false,
+  "reminder": false
+}
+```
+
+When `emailed` is false, Intact ID did not email the person (no email given, or automatic invites are off), so
+send them the link yourself. A new link replaces the earlier one.
+
+What the payload carries follows your webhook settings: applicant details (names, date of birth, contact) and
+scores are left out unless you switch them on.
 
 ### Event Types
 
 | Event | When it fires |
 |-------|--------------|
-| `verification.completed` | Verification reaches a final state (approved, rejected, manual_review) |
-| `verification.failed` | Processing error occurred |
-| `test.webhook` | Triggered manually via the test endpoint |
+| `verification.completed` | Approved or rejected, including a reviewer's decision |
+| `verification.failed` | Could not be finished on our side |
+| `verification.review_required` | Went to manual review; a person must decide |
+| `business.waiting_for_people` | A business verification waits for its directors and owners |
+| `party.invite_created` | A director or owner got a verification link (on reaching the step, a resend or a reminder) |
+| `test.webhook` | Sent from the console's Send test event, in the same envelope |
 
 ### Rejection Reason Codes
 
