@@ -101,6 +101,9 @@ company-access-token:
 billing:
   profile-cache-ttl-seconds: 30
   profile-cache-max-size: 5000
+  # How workflow runs are charged unless a company chooses otherwise: WORKFLOW_PRICE (the published price)
+  # or CHECKS_RUN (only the checks a run reached)
+  charge-mode: ${BILLING_CHARGE_MODE:WORKFLOW_PRICE}
 
 
 kafka:

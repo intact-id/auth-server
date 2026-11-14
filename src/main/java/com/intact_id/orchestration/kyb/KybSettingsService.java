@@ -22,7 +22,7 @@ public class KybSettingsService {
 
     public KybSettings platformDefault() {
         return settings.findByCompanyIdIsNull().map(s -> toDto(s, false))
-                .orElse(new KybSettings(OwnerCheck.FULL_KYC, new BigDecimal("25"), false, null, false));
+                .orElse(new KybSettings(OwnerCheck.FULL_KYC, new BigDecimal("25"), false, null, false, false));
     }
 
     /** companyId null updates the platform default; otherwise creates or replaces the company's override. */
@@ -43,6 +43,7 @@ public class KybSettingsService {
         row.setIncludeDirectors(changes.includeDirectors());
         row.setPersonWorkflow(changes.personWorkflow() == null || changes.personWorkflow().isBlank()
                 ? null : changes.personWorkflow().trim());
+        row.setAutoInvite(changes.autoInvite());
         return toDto(settings.save(row), companyId != null);
     }
 
@@ -55,6 +56,6 @@ public class KybSettingsService {
 
     private static KybSettings toDto(KybSettingsEntity s, boolean companyOverride) {
         return new KybSettings(s.getOwnerCheck(), s.getOwnershipThreshold(), s.isIncludeDirectors(), s.getPersonWorkflow(),
-                companyOverride);
+                s.isAutoInvite(), companyOverride);
     }
 }

@@ -137,7 +137,7 @@ public class VerificationService {
 
             VerificationRequest saved = verificationRequestRepository.save(verificationRequest);
             if (business) {
-                kybParties.attach(saved, request.getParties());
+                kybParties.attach(saved, request.getParties(), workflow);
                 saved = verificationRequestRepository.save(saved);
             }
             String partyId = request.getPartyId() != null && !request.getPartyId().isBlank() ? request.getPartyId().trim()

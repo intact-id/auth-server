@@ -135,6 +135,30 @@ public class WorkflowValidator {
         };
     }
 
+    /** Each set value against its property in the service's settings schema: allowed values, number range, yes/no. */
+    private static List<String> settingProblems(CatalogService service, Map<String, Object> settings) {
+        List<String> problems = new java.util.ArrayList<>();
+        if (settings == null || !(service.settingsSchema().get("properties") instanceof Map<?, ?> properties)) return problems;
+        settings.forEach((key, value) -> {
+            if (value == null || !(properties.get(key) instanceof Map<?, ?> schema)) return;
+            String name = service.name() + " setting \"" + key + "\"";
+            if (schema.get("enum") instanceof List<?> allowed && !allowed.contains(value)) {
+                problems.add(name + " must be one of " + allowed);
+            } else if ("boolean".equals(schema.get("type")) && !(value instanceof Boolean)) {
+                problems.add(name + " must be true or false");
+            } else if ("number".equals(schema.get("type")) || "integer".equals(schema.get("type"))) {
+                if (!(value instanceof Number number)) {
+                    problems.add(name + " must be a number");
+                } else if (schema.get("minimum") instanceof Number min && number.doubleValue() < min.doubleValue()
+                        || schema.get("maximum") instanceof Number max && number.doubleValue() > max.doubleValue()) {
+                    problems.add(name + " is out of range (" + Optional.ofNullable(schema.get("minimum")).orElse("…") + " to "
+                            + Optional.ofNullable(schema.get("maximum")).orElse("…") + ")");
+                }
+            }
+        });
+        return problems;
+    }
+
     private void checkNode(Node node, Map<String, String> ports, SubjectType subjectType, List<WorkflowProblem> problems) {
         switch (node.type()) {
             case START -> {
@@ -157,6 +181,7 @@ public class WorkflowValidator {
                         required.stream().map(String::valueOf).filter(k -> !settings.containsKey(k))
                                 .forEach(k -> problems.add(new WorkflowProblem(node.id(), s.name() + " needs the setting \"" + k + "\"")));
                     }
+                    settingProblems(s, node.settings()).forEach(p -> problems.add(new WorkflowProblem(node.id(), p)));
                 }
                 if (!ports.containsKey(PORT_PASSED)) {
                     problems.add(new WorkflowProblem(node.id(), "Connect what happens when this step passes"));

@@ -19,6 +19,9 @@ public class KycDraftResponseDto {
     private String verificationId;
     // Masked values only; raw PII and document content are never returned
     private Map<String, String> details;
+    // Business drafts: the business's details as entered, and how many directors and owners are saved
+    private Map<String, Object> business;
+    private Integer partyCount;
     private List<String> documents;
     private HandoffSummary handoff;
     // "direct": upload via /upload-url then /complete; "proxy": multipart to /documents/{type}
@@ -32,6 +35,9 @@ public class KycDraftResponseDto {
     public static class WorkflowSteps {
         private String key;
         private Integer version;
+        // INDIVIDUAL or BUSINESS: which flow the widget shows
+        private String subjectType;
+        private List<String> services;
         private List<String> screens;
         private List<String> requiredFields;
         private List<String> captures;

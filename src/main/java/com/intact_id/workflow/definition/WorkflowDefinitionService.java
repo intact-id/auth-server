@@ -13,6 +13,7 @@ import com.intact_id.workflow.WorkflowPricing;
 import com.intact_id.workflow.WorkflowPricing.PriceQuote;
 import com.intact_id.workflow.web.WorkflowDtos.CreateWorkflowRequest;
 import com.intact_id.workflow.web.WorkflowDtos.PublishResult;
+import com.intact_id.workflow.web.WorkflowDtos.RepriceResult;
 import com.intact_id.workflow.web.WorkflowDtos.UpdateDraftRequest;
 import com.intact_id.workflow.web.WorkflowDtos.ValidationResponse;
 import com.intact_id.workflow.web.WorkflowDtos.VersionSummary;
@@ -186,6 +187,51 @@ public class WorkflowDefinitionService {
         definitions.save(definition);
         log.info("Workflow {} v{} put back in use by {}", definition.getKey(), number, promotedBy);
         return versionSummary(version, definition);
+    }
+
+    /**
+     * Prices the live version again from today's service charges. Publishing fixes a workflow's price, so a
+     * changed service price only reaches workflows already in use through this.
+     */
+    @Transactional
+    public RepriceResult reprice(String companyId, String id) {
+        WorkflowDefinitionEntity definition = editable(companyId, id);
+        if (definition.isTemplate() || definition.getLiveVersion() == null) {
+            throw new ApplicationExceptions.IntactBadRequestException("Only a workflow in use has a price to update");
+        }
+        return repriceLive(definition);
+    }
+
+    /**
+     * Re-prices every workflow in use: the company's, or every company's when companyId is null. One that
+     * can't be priced (say a service has no charge) is reported and the rest carry on.
+     */
+    public List<RepriceResult> repriceAll(String companyId) {
+        List<WorkflowDefinitionEntity> inUse = companyId == null
+                ? definitions.findByCompanyIdIsNotNullAndArchivedFalseAndLiveVersionIsNotNull()
+                : definitions.findByCompanyIdAndArchivedFalseAndLiveVersionIsNotNull(companyId);
+        return inUse.stream().map(definition -> {
+            try {
+                return repriceLive(definition);
+            } catch (RuntimeException e) {
+                log.warn("Could not re-price workflow {} ({}): {}", definition.getKey(), definition.getId(), e.getMessage());
+                return new RepriceResult(definition.getId(), definition.getKey(), definition.getName(), definition.getCompanyId(),
+                        definition.getLiveVersion(), null, null, null, e.getMessage());
+            }
+        }).toList();
+    }
+
+    private RepriceResult repriceLive(WorkflowDefinitionEntity definition) {
+        WorkflowVersionEntity version = versions.findByDefinitionIdAndNumber(definition.getId(), definition.getLiveVersion())
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Live version not found"));
+        BigDecimal oldPrice = version.getPrice();
+        PriceQuote price = pricing.price(definition.getId(), clientIdentifier(definition.getCompanyId()), version.getServices());
+        version.setPrice(price.total());
+        version.setCurrency(price.currency());
+        versions.save(version);
+        log.info("Workflow {} v{} re-priced: {} -> {} {}", definition.getKey(), version.getNumber(), oldPrice, price.total(), price.currency());
+        return new RepriceResult(definition.getId(), definition.getKey(), definition.getName(), definition.getCompanyId(),
+                version.getNumber(), oldPrice, price.total(), price.currency(), null);
     }
 
     @Transactional

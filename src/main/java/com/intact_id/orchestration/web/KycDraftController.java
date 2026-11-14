@@ -55,6 +55,16 @@ public class KycDraftController {
         return respond(HttpStatus.OK, "OK", draftService.getDraft(context, draftId));
     }
 
+    @PutMapping("/{draftId}/business")
+    @Operation(summary = "Save a business's details and its directors and owners",
+            description = "For business workflows. Each part sent (business, parties) replaces what was saved.")
+    public ResponseEntity<ApiResponse<KycDraftResponseDto>> updateBusiness(
+            @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context,
+            @PathVariable String draftId,
+            @Valid @RequestBody DraftBusinessRequestDto request) {
+        return respond(HttpStatus.OK, "Business saved", draftService.updateBusiness(context, draftId, request));
+    }
+
     @PutMapping("/{draftId}/details")
     @Operation(summary = "Save applicant details", description = "Partial update; omitted fields are kept.")
     public ResponseEntity<ApiResponse<KycDraftResponseDto>> updateDetails(

@@ -22,4 +22,9 @@ public interface WorkflowDefinitionRepository extends JpaRepository<WorkflowDefi
     Optional<WorkflowDefinitionEntity> findByCompanyIdAndKeyAndArchivedFalse(String companyId, String key);
 
     Optional<WorkflowDefinitionEntity> findByCompanyIdAndDefaultWorkflowTrueAndArchivedFalse(String companyId);
+
+    /** Workflows in use: a company's, or every company's when re-pricing all. */
+    List<WorkflowDefinitionEntity> findByCompanyIdAndArchivedFalseAndLiveVersionIsNotNull(String companyId);
+
+    List<WorkflowDefinitionEntity> findByCompanyIdIsNotNullAndArchivedFalseAndLiveVersionIsNotNull();
 }

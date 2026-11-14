@@ -112,6 +112,15 @@ final class WorkflowOutcomes {
         return outcomes;
     }
 
+    /** Catalog codes of the workflow's checks that ran, sorted; a check that was skipped didn't run. */
+    static List<String> servicesRun(ExternalKycServiceClient.VerificationResult result, Set<String> services) {
+        ExternalKycServiceClient.VerificationResult ran = ExternalKycServiceClient.VerificationResult.builder()
+                .checks(result.getChecks().stream().filter(check -> !"skipped".equals(check.getStatus())).toList())
+                .extractedOcrData(result.getExtractedOcrData())
+                .build();
+        return from(ran, services).keySet().stream().sorted().toList();
+    }
+
     /** Facts known before any service: what the applicant and the client sent. */
     static Map<String, Object> startFacts(VerificationRequest request) {
         Map<String, Object> facts = new HashMap<>();
