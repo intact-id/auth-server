@@ -71,6 +71,13 @@ public class VerificationRequest extends Auditable {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    // Data retention: when the uploaded files, and then the personal details, were erased
+    @Column(name = "documents_deleted_at")
+    private LocalDateTime documentsDeletedAt;
+
+    @Column(name = "personal_data_erased_at")
+    private LocalDateTime personalDataErasedAt;
+
     @Column(name = "webhook_url")
     private String webhookUrl;
 

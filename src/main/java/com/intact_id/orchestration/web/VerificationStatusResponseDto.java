@@ -30,6 +30,9 @@ public class VerificationStatusResponseDto {
     private LocalDateTime completedAt;
     private Map<String, Object> customerData;
     private Integer documentCount;
+    // Set once retention or an erasure request removed the files / the personal details
+    private LocalDateTime documentsDeletedAt;
+    private LocalDateTime personalDataErasedAt;
     private List<VerificationStepDto> steps;
     private List<DocumentDto> documents;
 

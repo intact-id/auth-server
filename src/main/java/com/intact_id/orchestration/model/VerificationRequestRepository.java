@@ -104,4 +104,21 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
 
         @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company WHERE v.id = :id")
         Optional<VerificationRequest> findByIdWithCompany(@Param("id") String id);
+
+        /** Pending business verifications, oldest first: the company's, or every company's when companyId is null. */
+        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company c WHERE v.status = com.intact_id.constant.enums.GlobalStatuses.PENDING"
+                + " AND LOWER(v.verificationType) = 'business' AND (:companyId IS NULL OR c.id = :companyId) ORDER BY v.createdAt ASC")
+        List<VerificationRequest> findWaitingBusinesses(@Param("companyId") String companyId);
+
+        /** Finished before the cutoff with documents still kept (retention). */
+        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company c WHERE c.id = :companyId AND v.status IN :finished"
+                + " AND v.completedAt < :before AND v.documentsDeletedAt IS NULL AND v.personalDataErasedAt IS NULL ORDER BY v.completedAt ASC")
+        List<VerificationRequest> findDocumentsDue(@Param("companyId") String companyId, @Param("finished") List<GlobalStatuses> finished,
+                                                   @Param("before") java.time.LocalDateTime before, org.springframework.data.domain.Pageable page);
+
+        /** Finished before the cutoff with personal details still kept (retention). */
+        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company c WHERE c.id = :companyId AND v.status IN :finished"
+                + " AND v.completedAt < :before AND v.personalDataErasedAt IS NULL ORDER BY v.completedAt ASC")
+        List<VerificationRequest> findPersonalDataDue(@Param("companyId") String companyId, @Param("finished") List<GlobalStatuses> finished,
+                                                      @Param("before") java.time.LocalDateTime before, org.springframework.data.domain.Pageable page);
 }

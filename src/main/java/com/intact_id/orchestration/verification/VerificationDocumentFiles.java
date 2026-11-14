@@ -49,6 +49,19 @@ public class VerificationDocumentFiles {
         }
     }
 
+    /** Removes the document's file from storage (or the local disk, for older records). A missing file is fine. */
+    public void delete(VerificationDocument document) {
+        if (document.getStorageKey() != null) {
+            documentStorage.delete(document.getStorageKey());
+            return;
+        }
+        try {
+            Files.deleteIfExists(legacyPath(document.getFilePath()));
+        } catch (IOException e) {
+            throw new ApplicationExceptions.IntactInternalServerException("Could not delete a document file");
+        }
+    }
+
     private Path legacyPath(String storedPath) {
         Path rawPath = Paths.get(storedPath);
         if (rawPath.isAbsolute()) {

@@ -6,7 +6,7 @@ public enum PartyStatus {
     NOT_REQUIRED,
     /** Must be checked; nothing has started */
     PENDING,
-    /** An invite link was sent; the person hasn't started yet */
+    /** Their verification link was made (and emailed, if Intact sends it); they haven't started yet */
     INVITED,
     /** Their identity verification is running */
     VERIFYING,

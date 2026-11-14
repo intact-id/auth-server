@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import static com.intact_id.orchestration.web.WidgetResponses.respond;
 
-/** KYB errors ("Workflow x needs: …", "Unknown director or owner") in the usual ApiResponse body. */
+/** KYB, privacy and widget-session errors ("Workflow x needs: …", "Unknown director or owner") in the usual ApiResponse body. */
 @Slf4j
-@RestControllerAdvice(assignableTypes = KybController.class)
+@RestControllerAdvice(assignableTypes = {KybController.class, PrivacyController.class, KycSessionController.class})
 public class KybExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)

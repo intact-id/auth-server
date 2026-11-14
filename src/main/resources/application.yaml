@@ -162,6 +162,9 @@ app:
 kyb:
   # Where a director's or owner's invite link points; the widget reads ?token= and starts their verification
   invite-url: ${KYB_INVITE_URL:https://widget.intact-io.com/invite}
+  # People Intact emailed a link to get a reminder (with a fresh link) after this many days, at most max-reminders times
+  reminder-days: ${KYB_REMINDER_DAYS:3}
+  max-reminders: ${KYB_MAX_REMINDERS:2}
 
 kyc:
   storage:
