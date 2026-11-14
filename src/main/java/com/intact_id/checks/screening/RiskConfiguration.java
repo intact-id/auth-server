@@ -38,8 +38,10 @@ public class RiskConfiguration {
         return data(client.activeRiskModel(tenantOf(companyId), customerType));
     }
 
+    /** Creates a draft and returns it with its config, as the builder opens it next. */
     public RiskApi.RiskModelDetail createModel(String companyId, RiskApi.RiskModelConfig config) {
-        return data(client.createRiskModel(tenantOf(companyId), config));
+        RiskApi.RiskModel created = data(client.createRiskModel(tenantOf(companyId), config));
+        return data(client.getRiskModel(created.id()));
     }
 
     public RiskApi.RiskModelDetail getModel(String companyId, String id) {
