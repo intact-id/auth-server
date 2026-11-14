@@ -110,15 +110,32 @@ public interface VerificationRequestRepository extends JpaRepository<Verificatio
                 + " AND LOWER(v.verificationType) = 'business' AND (:companyId IS NULL OR c.id = :companyId) ORDER BY v.createdAt ASC")
         List<VerificationRequest> findWaitingBusinesses(@Param("companyId") String companyId);
 
-        /** Finished before the cutoff with documents still kept (retention). */
-        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company c WHERE c.id = :companyId AND v.status IN :finished"
-                + " AND v.completedAt < :before AND v.documentsDeletedAt IS NULL AND v.personalDataErasedAt IS NULL ORDER BY v.completedAt ASC")
-        List<VerificationRequest> findDocumentsDue(@Param("companyId") String companyId, @Param("finished") List<GlobalStatuses> finished,
-                                                   @Param("before") java.time.LocalDateTime before, org.springframework.data.domain.Pageable page);
+        // ----- retention -----
 
-        /** Finished before the cutoff with personal details still kept (retention). */
-        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company c WHERE c.id = :companyId AND v.status IN :finished"
-                + " AND v.completedAt < :before AND v.personalDataErasedAt IS NULL ORDER BY v.completedAt ASC")
-        List<VerificationRequest> findPersonalDataDue(@Param("companyId") String companyId, @Param("finished") List<GlobalStatuses> finished,
-                                                      @Param("before") java.time.LocalDateTime before, org.springframework.data.domain.Pageable page);
+        /** Finished verifications whose retention dates haven't been worked out since the last change. */
+        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company c WHERE v.status IN :finished AND v.retentionPlanned = false"
+                + " AND v.recordPurgedAt IS NULL ORDER BY v.completedAt ASC")
+        List<VerificationRequest> findUnplanned(@Param("finished") List<GlobalStatuses> finished, org.springframework.data.domain.Pageable page);
+
+        /** Verifications with something due now and no legal hold. */
+        @Query("SELECT v FROM VerificationRequest v JOIN FETCH v.company c WHERE v.retentionPlanned = true AND v.nextRetentionAt <= :now"
+                + " AND v.legalHold = false AND v.recordPurgedAt IS NULL ORDER BY v.nextRetentionAt ASC")
+        List<VerificationRequest> findRetentionDue(@Param("now") java.time.LocalDateTime now, org.springframework.data.domain.Pageable page);
+
+        @Query("SELECT v FROM VerificationRequest v WHERE v.legalHold = true AND (:companyId IS NULL OR v.company.id = :companyId) ORDER BY v.legalHoldAt DESC")
+        List<VerificationRequest> findOnLegalHold(@Param("companyId") String companyId);
+
+        List<VerificationRequest> findByCompanyIdAndExternalReference(String companyId, String externalReference);
+
+        @org.springframework.data.jpa.repository.Modifying
+        @Query("UPDATE VerificationRequest v SET v.retentionPlanned = false WHERE v.recordPurgedAt IS NULL")
+        int replanAll();
+
+        @org.springframework.data.jpa.repository.Modifying
+        @Query("UPDATE VerificationRequest v SET v.retentionPlanned = false WHERE v.recordPurgedAt IS NULL AND (v.dataCountry = :country OR v.dataCountry IS NULL)")
+        int replanCountry(@Param("country") String country);
+
+        @org.springframework.data.jpa.repository.Modifying
+        @Query("UPDATE VerificationRequest v SET v.retentionPlanned = false WHERE v.recordPurgedAt IS NULL AND v.company.id = :companyId")
+        int replanCompany(@Param("companyId") String companyId);
 }

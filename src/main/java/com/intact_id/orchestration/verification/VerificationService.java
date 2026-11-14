@@ -132,6 +132,9 @@ public class VerificationService {
             }
 
             verificationRequest.setCustomerData(customerData);
+            // Whose retention rules apply; kept even after the details themselves are erased
+            verificationRequest.setDataCountry(com.intact_id.orchestration.privacy.Countries
+                    .ofData(business, customerData, company.getCountry()).orElse(null));
             verificationRequest
                     .setMetadata(request.getCustomFields() != null ? new HashMap<>(request.getCustomFields()) : new HashMap<>());
 

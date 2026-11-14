@@ -78,6 +78,41 @@ public class VerificationRequest extends Auditable {
     @Column(name = "personal_data_erased_at")
     private LocalDateTime personalDataErasedAt;
 
+    @Column(name = "biometrics_deleted_at")
+    private LocalDateTime biometricsDeletedAt;
+
+    // The verification record itself was purged; only this bare row remains
+    @Column(name = "record_purged_at")
+    private LocalDateTime recordPurgedAt;
+
+    // Whose retention rules apply (ISO 3166 alpha-2); worked out from the data when first needed
+    @Column(name = "data_country", length = 2)
+    private String dataCountry;
+
+    // When the merchant said the customer relationship ended; periods that start then count from here
+    @Column(name = "relationship_ended_at")
+    private LocalDateTime relationshipEndedAt;
+
+    // Nothing is deleted while on legal hold (investigation, dispute, regulator request)
+    @Column(name = "legal_hold", nullable = false)
+    private boolean legalHold;
+
+    @Column(name = "legal_hold_reason", length = 1000)
+    private String legalHoldReason;
+
+    @Column(name = "legal_hold_by")
+    private String legalHoldBy;
+
+    @Column(name = "legal_hold_at")
+    private LocalDateTime legalHoldAt;
+
+    // The nightly retention run's plan: when something is next due (null = nothing ever); planned is reset on change
+    @Column(name = "retention_planned", nullable = false)
+    private boolean retentionPlanned;
+
+    @Column(name = "next_retention_at")
+    private LocalDateTime nextRetentionAt;
+
     @Column(name = "webhook_url")
     private String webhookUrl;
 

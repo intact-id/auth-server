@@ -435,27 +435,43 @@ business as registered and active, and its result says `"source": "pending-provi
 
 ## Data Retention and Erasure
 
-Applicants' data is kept until a retention rule or an erasure request removes it. Erasing keeps the decision,
-the check outcomes and scores, so a verification stays auditable; it removes documents (ID photos, selfies,
-liveness frames, business documents) and personal details (names, ID numbers, dates of birth, contact details,
-what was read from documents, directors' and owners' details, and stored webhook payloads).
+Applicants' data is kept per **kind of data**, by the rules of the **applicant's country** (a person's country of
+residence, else nationality; a business's country of registration; else your own country):
 
-**Retention rule** (days after a verification finishes; `null` keeps the data). It runs nightly:
+| Kind | What it covers |
+|------|----------------|
+| `BIOMETRICS` | Selfies and liveness frames |
+| `DOCUMENTS` | ID documents, proof of address, business documents |
+| `PERSONAL_DATA` | Names, ID numbers, dates of birth, contact details, what was read from documents, directors' details |
+| `RECORD` | The verification's checks, decision trail, people and webhook history (a bare row remains) |
+
+Erasing one kind also erases the kinds above it. Intact ID sets limits per country (`minDays`, `maxDays`,
+`defaultDays`, whether days count from when the verification finished or from the end of the customer
+relationship, and the legal basis). You choose your own periods within them:
 
 ```http
-GET /api/v1/privacy/retention
-PUT /api/v1/privacy/retention          { "documentsDays": 90, "personalDataDays": 365 }
-DELETE /api/v1/privacy/retention       (back to the platform rule)
+GET /api/v1/privacy/country-rules                       Intact's limits per country ('*' = any other)
+GET /api/v1/privacy/company-rules                       your periods, and what applies after the limits
+PUT /api/v1/privacy/company-rules/{country}             { "BIOMETRICS": 30, "DOCUMENTS": 365 }   ('*' = every country)
 ```
 
-**Erase one applicant now**, for example when they ask (finished verifications only; cannot be undone):
+Rules are applied every night. For one verification:
 
 ```http
-POST /api/v1/privacy/verifications/{verificationId}/erase   { "reason": "The applicant asked us to delete their data" }
+GET    /api/v1/privacy/verifications/{id}                     its country, legal hold, and when each kind is due
+POST   /api/v1/privacy/verifications/{id}/erase               { "scope": "PERSONAL_DATA", "reason": "The applicant asked" }
+PUT    /api/v1/privacy/verifications/{id}/hold                { "reason": "Dispute" }   (nothing is deleted while held)
+DELETE /api/v1/privacy/verifications/{id}/hold
+POST   /api/v1/privacy/verifications/{id}/relationship-ended  { "endedAt": "2026-11-14T00:00:00" }   (empty = now)
+POST   /api/v1/privacy/customers/{externalReference}/relationship-ended   every verification of that customer
 ```
 
-**Erasure log**, newest first: `GET /api/v1/privacy/erasures`. A verification's status shows `documentsDeletedAt` and
-`personalDataErasedAt` once its data is gone.
+Erasing is refused during a legal hold, and while a minimum period still applies (for example AML record
+keeping counted from the end of the relationship); the error says until when. Tell us when a customer leaves
+with `relationship-ended`, so those periods can start.
+
+The erasure log, newest first: `GET /api/v1/privacy/erasures`. Holds: `GET /api/v1/privacy/holds`. A verification's
+status shows `documentsDeletedAt` and `personalDataErasedAt` once that data is gone.
 
 ---
 
