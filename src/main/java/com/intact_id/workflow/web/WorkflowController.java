@@ -79,7 +79,7 @@ public class WorkflowController {
     public ResponseEntity<ApiResponse<WorkflowDetail>> detail(@PathVariable String id,
                                                              @RequestParam(required = false) String companyId,
                                                              @RequestParam(defaultValue = "false") boolean template) {
-        return respond(HttpStatus.OK, "OK", service.detail(owner(companyId, template), id));
+        return respond(HttpStatus.OK, "OK", service.detail(reader(companyId, template), id));
     }
 
     @PutMapping("/{id}/draft")
@@ -96,7 +96,7 @@ public class WorkflowController {
     public ResponseEntity<ApiResponse<ValidationResponse>> validate(@PathVariable String id,
                                                                    @RequestParam(required = false) String companyId,
                                                                    @RequestParam(defaultValue = "false") boolean template) {
-        return respond(HttpStatus.OK, "OK", service.validate(owner(companyId, template), id));
+        return respond(HttpStatus.OK, "OK", service.validate(reader(companyId, template), id));
     }
 
     @PostMapping("/{id}/publish")
@@ -175,6 +175,14 @@ public class WorkflowController {
     public ResponseEntity<ApiResponse<PriceQuote>> quote(@RequestParam(required = false) String companyId,
                                                         @Valid @RequestBody QuoteRequest request) {
         return respond(HttpStatus.OK, "OK", service.quote(SecurityContextUtil.resolveCompanyId(companyId), request.services()));
+    }
+
+    /**
+     * For reading: anyone may open a template (companies preview it before copying it); with companyId null the
+     * service only finds templates, never another company's workflow.
+     */
+    private static String reader(String companyId, boolean template) {
+        return template ? null : SecurityContextUtil.resolveCompanyId(companyId);
     }
 
     /** null = templates (super admins only); otherwise the caller's company. */
