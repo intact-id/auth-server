@@ -19,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.intact_id.config.web.DownstreamApiResponses.respond;
 
@@ -81,6 +82,18 @@ public class BillingAccountController {
         return ok(chargeModes.settings(company(companyId)));
     }
 
+    @GetMapping("/fx")
+    @Operation(summary = "The company's exchange rate", description = "Prices are set in KES; a company billed in another currency pays them converted at the day's rate plus the FX markup.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> fx(@Parameter(description = COMPANY_ID) @RequestParam(required = false) String companyId) {
+        return ok(billing.fxForCompany(company(companyId)));
+    }
+
+    @GetMapping("/fx/rates")
+    @Operation(summary = "Today's exchange rates", description = "Units of each currency per 1 KES, the currencies a company can be billed in, and the platform FX markup.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> fxRates() {
+        return ok(billing.fxRates());
+    }
+
     // --- Super admin ---
 
     @PutMapping("/admin/charge-mode")
@@ -139,6 +152,31 @@ public class BillingAccountController {
     public ResponseEntity<ApiResponse<BillingApi.ServiceCharge>> updateServiceCharge(@PathVariable String id, @Valid @RequestBody BillingApi.ServiceChargeChanges changes) {
         requireSuperAdmin();
         return respond(HttpStatus.OK, "Service price updated", billing.updateServiceCharge(id, changes));
+    }
+
+    @PostMapping("/admin/fx/rates/refresh")
+    @Operation(summary = "Fetch today's exchange rates now")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> refreshFxRates() {
+        requireSuperAdmin();
+        return ok(billing.refreshFxRates());
+    }
+
+    @GetMapping("/admin/fx/markup")
+    @Operation(summary = "FX markup", description = "Without companyId: the platform markup. With it: that company's, and the platform default.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> fxMarkup(@RequestParam(required = false) String companyId) {
+        requireSuperAdmin();
+        return ok(billing.fxMarkup(blank(companyId) ? null : companyId));
+    }
+
+    @PutMapping("/admin/fx/markup")
+    @Operation(summary = "Set the FX markup", description = "Without companyId: the platform markup. With it: that company's own; markupPercent null removes it.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> setFxMarkup(@RequestParam(required = false) String companyId,
+                                                                       @RequestBody FxMarkupChange change) {
+        requireSuperAdmin();
+        return respond(HttpStatus.OK, "FX markup saved", billing.setFxMarkup(blank(companyId) ? null : companyId, change.markupPercent()));
+    }
+
+    public record FxMarkupChange(java.math.BigDecimal markupPercent) {
     }
 
     @PostMapping("/admin/invoices/{id}/mark-paid")
