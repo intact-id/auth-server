@@ -106,7 +106,8 @@ billing:
   charge-mode: ${BILLING_CHARGE_MODE:WORKFLOW_PRICE}
   top-up:
     # Shown on the top-up form: where companies send bank transfers (bank, account name and number, branch, SWIFT)
-    bank-instructions: ${BILLING_TOPUP_BANK_INSTRUCTIONS:}
+    # Placeholder until the real account is set with BILLING_TOPUP_BANK_INSTRUCTIONS; marked so nobody pays into it
+    bank-instructions: "${BILLING_TOPUP_BANK_INSTRUCTIONS:SAMPLE DETAILS - do not transfer yet\nBank: Example Bank Kenya\nAccount name: Intact ID Ltd\nAccount number: 0000000000\nBranch: Nairobi\nSWIFT: EXAMPKEN\nReal bank details are coming soon.}"
 
 
 kafka:
