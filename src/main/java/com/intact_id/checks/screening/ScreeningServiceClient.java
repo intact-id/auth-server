@@ -44,8 +44,9 @@ public interface ScreeningServiceClient {
     ScreeningApi.Envelope<RiskApi.RiskModelDetail> activeRiskModel(@RequestParam("tenantId") String tenantId,
                                                                    @RequestParam("customerType") RiskApi.CustomerType customerType);
 
+    // sactions-service answers with the new model only (no config); RiskConfiguration then reads the full detail
     @PostMapping("/v1/risk-models")
-    ScreeningApi.Envelope<RiskApi.RiskModelDetail> createRiskModel(@RequestParam("tenantId") String tenantId,
+    ScreeningApi.Envelope<RiskApi.RiskModel> createRiskModel(@RequestParam("tenantId") String tenantId,
                                                                    @RequestBody RiskApi.RiskModelConfig config);
 
     @GetMapping("/v1/risk-models/{id}")
