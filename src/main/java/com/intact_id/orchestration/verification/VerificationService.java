@@ -409,6 +409,8 @@ public class VerificationService {
                 .completedAt(request.getCompletedAt())
                 .customerData(request.getCustomerData())
                 .documentCount(documents.size())
+                .documentsDeletedAt(request.getDocumentsDeletedAt())
+                .personalDataErasedAt(request.getPersonalDataErasedAt())
                 .steps(steps.stream().map(this::mapStepToDto).collect(Collectors.toList()))
                 .documents(documents.stream().map(this::mapDocumentToDto).collect(Collectors.toList()))
                 .parties("business".equalsIgnoreCase(request.getVerificationType())

@@ -13,7 +13,10 @@ import com.intact_id.workflow.NodeType;
 import com.intact_id.workflow.PinnedWorkflow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.intact_id.orchestration.PartyInviteCreated;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,8 +58,16 @@ public class KybParties {
     private final GeneratorUtils generatorUtils;
     private final EmailService emailService;
 
+    private final ApplicationEventPublisher events;
+
     @Value("${kyb.invite-url:https://widget.intact-io.com/invite}")
     private String inviteUrl;
+
+    @Value("${kyb.reminder-days:3}")
+    private int reminderDays;
+
+    @Value("${kyb.max-reminders:2}")
+    private int maxReminders;
 
     /**
      * Saves the people with a new business verification and records how they are checked: the company's (or the
@@ -150,10 +161,10 @@ public class KybParties {
         if (mode == OwnerCheck.SCREENING) {
             required.stream().filter(p -> !p.getStatus().isFinal()).forEach(this::screen);
         } else if (mode == OwnerCheck.FULL_KYC && required.stream().anyMatch(p -> !p.getStatus().isFinal())) {
-            if (Boolean.TRUE.equals(business.getMetadata().get(AUTO_INVITE))) {
-                required.stream().filter(p -> p.getStatus() == PartyStatus.PENDING && !blank(p.getEmail()))
-                        .forEach(p -> sendInvite(business, p));
-            }
+            // Everyone who hasn't got a link yet gets one; Intact emails it only when the settings say so
+            boolean email = Boolean.TRUE.equals(business.getMetadata().get(AUTO_INVITE));
+            required.stream().filter(p -> p.getStatus() == PartyStatus.PENDING)
+                    .forEach(p -> sendInvite(business, p, email, false));
             return Optional.empty();
         }
 
@@ -256,28 +267,98 @@ public class KybParties {
         if (!party.isMustVerify() || party.getStatus().isFinal()) {
             throw new ApplicationExceptions.IntactBadRequestException(party.fullName() + " doesn't need verifying");
         }
-        return sendInvite(business, party);
+        return sendInvite(business, party, true, false);
     }
 
-    /** A new 7-day link for the person (replacing any earlier one), emailed when they have an email; returns it. */
-    private String sendInvite(VerificationRequest business, VerificationParty party) {
+    /**
+     * A new 7-day link for the person, replacing any earlier one. Emailed when email is true and they have an
+     * address; announced as PartyInviteCreated either way, so the merchant can share it. Returns the link.
+     */
+    private String sendInvite(VerificationRequest business, VerificationParty party, boolean email, boolean reminder) {
         String token = generatorUtils.generateUrlSafeToken(32);
+        LocalDateTime now = LocalDateTime.now();
+        boolean emailed = email && !blank(party.getEmail());
         party.setInviteTokenHash(generatorUtils.hashString(token));
-        party.setInviteExpiresAt(LocalDateTime.now().plusDays(INVITE_DAYS));
+        party.setInviteExpiresAt(now.plusDays(INVITE_DAYS));
+        party.setInviteEmailed(emailed);
+        if (reminder) {
+            party.setRemindersSent(party.getRemindersSent() + 1);
+            party.setLastRemindedAt(now);
+        } else {
+            party.setInvitedAt(now);
+            party.setRemindersSent(0);
+            party.setLastRemindedAt(null);
+        }
         if (party.getStatus() == PartyStatus.PENDING) party.setStatus(PartyStatus.INVITED);
         parties.save(party);
 
         String link = inviteUrl + "?token=" + token;
-        if (party.getEmail() != null && !party.getEmail().isBlank()) {
+        if (emailed) {
             String companyName = Optional.ofNullable(business.getCustomerData().get("companyName")).map(Object::toString).orElse("a business");
-            emailService.sendSimpleEmail(party.getEmail(), "Verify your identity for " + companyName,
+            emailService.sendSimpleEmail(party.getEmail(),
+                    (reminder ? "Reminder: verify" : "Verify") + " your identity for " + companyName,
                     "Hello " + party.getFirstName() + ",\n\n"
                             + business.getCompany().getLegalName() + " needs to verify the directors and owners of "
-                            + companyName + ". Please complete your identity verification here:\n\n" + link + "\n\n"
+                            + companyName + "." + (reminder ? " We haven't received your verification yet." : "")
+                            + " Please complete your identity verification here:\n\n" + link + "\n\n"
                             + "The link works for " + INVITE_DAYS + " days.\n\nIntact ID");
         }
-        log.info("Invite for {} ({}) on business verification {}", party.fullName(), party.getId(), business.getId());
+        events.publishEvent(new PartyInviteCreated(business.getCompany().getId(), business.getId(), business.getExternalReference(),
+                party.getId(), party.getFirstName(), party.getLastName(), party.getEmail(), link,
+                party.getInviteExpiresAt(), emailed, reminder));
+        log.info("{} link for {} ({}) on business verification {}{}", reminder ? "Reminder" : "Invite", party.fullName(),
+                party.getId(), business.getId(), emailed ? ", emailed" : "");
         return link;
+    }
+
+    /**
+     * Emails a reminder, with a fresh link, to people Intact emailed who haven't started: after kyb.reminder-days,
+     * at most kyb.max-reminders times, while their link still works.
+     */
+    @Scheduled(fixedDelayString = "${kyb.reminder-check-ms:3600000}", initialDelayString = "${kyb.reminder-check-ms:3600000}")
+    @Transactional
+    public void sendReminders() {
+        LocalDateTime now = LocalDateTime.now();
+        for (VerificationParty party : parties.findByStatusAndInviteEmailedTrueAndInviteExpiresAtAfter(PartyStatus.INVITED, now)) {
+            LocalDateTime last = party.getLastRemindedAt() != null ? party.getLastRemindedAt() : party.getInvitedAt();
+            if (party.getRemindersSent() >= maxReminders || last == null || last.isAfter(now.minusDays(reminderDays))) continue;
+            verifications.findByIdWithCompany(party.getVerificationId())
+                    .filter(b -> b.getStatus() == GlobalStatuses.PENDING && WAITING_FOR_PEOPLE.equals(b.getMetadata().get(WAITING)))
+                    .ifPresent(business -> {
+                        try {
+                            sendInvite(business, party, true, true);
+                        } catch (RuntimeException e) {
+                            log.warn("Reminder for {} on {} failed: {}", party.getId(), party.getVerificationId(), e.getMessage());
+                        }
+                    });
+        }
+    }
+
+    /** Business verifications waiting for their directors and owners: the company's, or all when companyId is null. */
+    public List<WaitingBusiness> waiting(String companyId) {
+        return verifications.findWaitingBusinesses(companyId).stream()
+                .filter(b -> WAITING_FOR_PEOPLE.equals(b.getMetadata().get(WAITING)))
+                .map(b -> new WaitingBusiness(b.getId(), b.getCompany().getId(), b.getCompany().getLegalName(),
+                        Optional.ofNullable(b.getCustomerData().get("companyName")).map(Object::toString).orElse(null),
+                        b.getExternalReference(), b.getCreatedAt(),
+                        parties.findByVerificationIdOrderByCreatedAtAsc(b.getId()).stream()
+                                .filter(VerificationParty::isMustVerify).map(PartyView::of).toList()))
+                .toList();
+    }
+
+    /** A business waiting for people, with the people it still needs (and those already done). */
+    public record WaitingBusiness(String verificationId, String companyId, String companyName, String businessName,
+                                  String externalReference, LocalDateTime submittedAt, List<PartyView> people) {
+    }
+
+    /** For the widget: whether this person can start their own verification now (required, no result, not started). */
+    public VerificationParty startable(String businessId, String partyId) {
+        VerificationParty party = parties.findById(partyId).filter(p -> p.getVerificationId().equals(businessId))
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Director or owner not found"));
+        if (!party.isMustVerify() || party.getStatus().isFinal() || party.getStatus() == PartyStatus.VERIFYING) {
+            throw new ApplicationExceptions.IntactBadRequestException(party.fullName() + " doesn't need to start a verification");
+        }
+        return party;
     }
 
     /** The person behind a valid invite token, for starting their verification session. */

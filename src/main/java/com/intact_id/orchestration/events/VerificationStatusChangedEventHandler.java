@@ -1,5 +1,8 @@
 package com.intact_id.orchestration.events;
 
+import com.intact_id.orchestration.PartyInviteCreated;
+import com.intact_id.orchestration.kyb.KybParties;
+
 import org.springframework.scheduling.annotation.Async;
 import com.intact_id.constant.enums.GlobalStatuses;
 import com.intact_id.notifications.CompanyCommunicationDetails;
@@ -50,11 +53,24 @@ public class VerificationStatusChangedEventHandler {
             verificationWebhooks.completed(request);
         } else if (status == GlobalStatuses.FAILED) {
             verificationWebhooks.failed(request);
+        } else if (status == GlobalStatuses.PENDING_APPROVAL) {
+            verificationWebhooks.reviewRequired(request);
+        } else if (status == GlobalStatuses.PENDING
+                && KybParties.WAITING_FOR_PEOPLE.equals(request.getMetadata().get(KybParties.WAITING))) {
+            verificationWebhooks.waitingForPeople(request);
         } else {
             log.debug("No webhook action for status: {}", status);
         }
 
         sendApplicantEmailIfConfigured(request, status);
+    }
+
+    /** A director or owner got a new link: tell the merchant, so they can share it when Intact didn't email it. */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void handle(PartyInviteCreated invite) {
+        verificationRequestRepository.findByIdWithCompany(invite.businessVerificationId())
+                .ifPresent(business -> verificationWebhooks.inviteCreated(invite, business.getCompany().getLegalName()));
     }
 
     private void sendApplicantEmailIfConfigured(VerificationRequest request, GlobalStatuses status) {
