@@ -64,6 +64,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "OK", service.templates());
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PostMapping
     @Operation(summary = "Create a workflow", description = "Empty canvas, a graph, or a copy of fromTemplateId.")
     public ResponseEntity<ApiResponse<WorkflowDetail>> create(@RequestParam(required = false) String companyId,
@@ -82,6 +83,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "OK", service.detail(reader(companyId, template), id));
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PutMapping("/{id}/draft")
     @Operation(summary = "Save the draft", description = "Published versions are never changed by editing.")
     public ResponseEntity<ApiResponse<WorkflowDetail>> saveDraft(@PathVariable String id,
@@ -99,6 +101,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "OK", service.validate(reader(companyId, template), id));
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PostMapping("/{id}/publish")
     @Operation(summary = "Publish the draft as a new version", description = "It goes live at once and is priced in billing. 422 lists problems.")
     public ResponseEntity<ApiResponse<VersionSummary>> publish(@PathVariable String id,
@@ -112,6 +115,7 @@ public class WorkflowController {
                 : respond(HttpStatus.OK, "Nothing changed since v" + result.version().number() + "; no new version", result.version());
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PutMapping("/{id}/default")
     @Operation(summary = "Make this the company's default workflow",
             description = "Sessions and API calls that name no workflow run it instead of the tier checks. Needs a live version.")
@@ -120,6 +124,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "Default workflow set", service.makeDefault(SecurityContextUtil.resolveCompanyId(companyId), id));
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @DeleteMapping("/{id}/default")
     @Operation(summary = "Stop using this as the default", description = "Calls that name no workflow go back to the tier checks.")
     public ResponseEntity<ApiResponse<WorkflowDetail>> clearDefault(@PathVariable String id,
@@ -127,6 +132,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "Default workflow cleared", service.clearDefault(SecurityContextUtil.resolveCompanyId(companyId), id));
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PostMapping("/{id}/promote")
     @Operation(summary = "Put an earlier version back in use", description = "A rollback; billing is re-priced for that version.")
     public ResponseEntity<ApiResponse<VersionSummary>> promote(@PathVariable String id,
@@ -136,6 +142,7 @@ public class WorkflowController {
                 service.promote(SecurityContextUtil.resolveCompanyId(companyId), id, request.version(), actor()));
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PostMapping("/{id}/reprice")
     @Operation(summary = "Update a workflow's price", description = "Prices the live version again from today's service charges.")
     public ResponseEntity<ApiResponse<RepriceResult>> reprice(@PathVariable String id,
@@ -143,6 +150,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "Price updated", service.reprice(SecurityContextUtil.resolveCompanyId(companyId), id));
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PostMapping("/reprice")
     @Operation(summary = "Update the price of every workflow in use",
             description = "The company's workflows; super admins without companyId re-price every company's. "
@@ -153,6 +161,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "Prices updated", service.repriceAll(company));
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @DeleteMapping("/{id}")
     @Operation(summary = "Archive a workflow")
     public ResponseEntity<ApiResponse<Void>> archive(@PathVariable String id,
@@ -162,6 +171,7 @@ public class WorkflowController {
         return respond(HttpStatus.OK, "Workflow archived", null);
     }
 
+    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PostMapping("/{id}/restore")
     @Operation(summary = "Restore an archived workflow", description = "Its versions and live version come back as they were.")
     public ResponseEntity<ApiResponse<WorkflowDetail>> restore(@PathVariable String id,
