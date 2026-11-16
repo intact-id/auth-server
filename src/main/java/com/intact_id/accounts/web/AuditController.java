@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -40,7 +41,8 @@ public class AuditController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        Pageable pageable = PageRequest.of(page, size);
+        // Newest first; at most 500 a page
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 500), Sort.by(Sort.Direction.DESC, "loginAt"));
         Page<UserSessionResponseDto> sessions = auditService.getSessions(userId, companyId, status, fromDate, toDate, pageable);
 
         return ResponseEntity.ok(ApiResponse.<Page<UserSessionResponseDto>>builder()
@@ -80,7 +82,7 @@ public class AuditController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 500), Sort.by(Sort.Direction.DESC, "startedAt"));
         Page<UserActivityLogResponseDto> activities = auditService.getActivities(
                 userId, companyId, sessionId, httpMethod, path, statusCode, activityType, fromDate, toDate, pageable);
 
@@ -107,7 +109,7 @@ public class AuditController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 500), Sort.by(Sort.Direction.DESC, "startedAt"));
         Page<UserActivityLogResponseDto> activities = auditService.getActivities(
                 userId, null, sessionId, httpMethod, path, statusCode, activityType, fromDate, toDate, pageable);
 
