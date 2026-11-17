@@ -90,7 +90,7 @@ public class PrivacyController {
     }
 
     @PostMapping("/verifications/{id}/erase")
-    @PreAuthorize("hasAuthority('privacy:manage')")
+    @PreAuthorize("hasAuthority('privacy:requests')")
     @Operation(summary = "Erase data now", description = "scope: BIOMETRICS, DOCUMENTS, PERSONAL_DATA (default) or RECORD, each "
             + "including the ones before it. Refused during a legal hold or a minimum period; super admins may override=true. Cannot be undone.")
     public ResponseEntity<ApiResponse<DataErasure>> erase(@PathVariable String id, @RequestBody EraseRequest request) {
@@ -113,7 +113,7 @@ public class PrivacyController {
     }
 
     @PostMapping("/verifications/{id}/relationship-ended")
-    @PreAuthorize("hasAuthority('privacy:manage')")
+    @PreAuthorize("hasAuthority('privacy:requests')")
     @Operation(summary = "The customer relationship ended", description = "Periods that start at the end of the relationship "
             + "(e.g. AML record keeping) count from endedAt (now when left out).")
     public ResponseEntity<ApiResponse<Retention.Status>> relationshipEnded(@PathVariable String id,
