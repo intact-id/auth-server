@@ -98,7 +98,7 @@ public class SecurityContextUtil {
 
         Object principal = authentication.getPrincipal();
         if (principal instanceof User user) {
-            if (isSuperAdminUser(user) && requestedCompanyId != null && !requestedCompanyId.isBlank()) {
+            if (isStaffUser(user) && requestedCompanyId != null && !requestedCompanyId.isBlank()) {
                 return requestedCompanyId;
             }
             Company company = user.getCompany();
@@ -136,6 +136,33 @@ public class SecurityContextUtil {
             return isSuperAdminUser(user);
         }
         return false;
+    }
+
+    /**
+     * Intact staff: a signed-in person with no company of their own and a staff role. They may act for any company,
+     * as far as their permissions allow (what they may do is always checked separately).
+     */
+    public static boolean isStaffAuthenticated() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getPrincipal() instanceof User user && isStaffUser(user);
+    }
+
+    public static boolean isStaffUser(User user) {
+        return user.getCompany() == null && user.getRoles() != null
+                && user.getRoles().stream().anyMatch(role -> role.getName() != null && Permissions.STAFF_ROLES.contains(role.getName()));
+    }
+
+    /** Whether the caller holds this permission (see Permissions). */
+    public static boolean hasPermission(String permission) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> permission.equals(authority.getAuthority()));
+    }
+
+    public static void requirePermission(String permission) {
+        if (!hasPermission(permission)) {
+            throw new ApplicationExceptions.IntactForbiddenException("You don't have permission to do this");
+        }
     }
 
     /**

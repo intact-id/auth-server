@@ -146,7 +146,7 @@ public class RiskController {
 
     /** For lookups by id: a super admin without ?companyId= may open any company's record. */
     private static String owner(String companyId) {
-        if (SecurityContextUtil.isSuperAdminAuthenticated() && (companyId == null || companyId.isBlank())) return null;
+        if (SecurityContextUtil.isStaffAuthenticated() && (companyId == null || companyId.isBlank())) return null;
         return company(companyId);
     }
 

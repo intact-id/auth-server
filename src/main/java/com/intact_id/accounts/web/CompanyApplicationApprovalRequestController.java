@@ -29,7 +29,7 @@ public class CompanyApplicationApprovalRequestController {
     private final CompanyApplicationService companyApplicationService;
 
     @PostMapping("/{applicationId}/maker-action")
-    @PreAuthorize("hasAuthority('applications:manage')")
+    @PreAuthorize("hasAuthority('applications:make')")
     @Operation(summary = "Perform maker action on application")
     public ResponseEntity<ApiResponse<ApplicationApprovalResponseDto>> performMakerAction(
             @PathVariable String applicationId,

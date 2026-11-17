@@ -114,7 +114,7 @@ public class CompanyController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
+        if (!SecurityContextUtil.isStaffAuthenticated()) {
             Company company = SecurityContextUtil.getAuthenticatedCompanyFromAny();
             CompanyResponseDto response = mapToDto(company);
             Page<CompanyResponseDto> pageResponse = new PageImpl<>(java.util.List.of(response));
@@ -225,7 +225,7 @@ public class CompanyController {
 
     @PutMapping("/{id}/communication/webhook")
     @Operation(summary = "Update webhook settings")
-    @PreAuthorize("hasAuthority('companies:manage')")
+    @PreAuthorize("hasAuthority('webhooks:manage')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> updateWebhookSettings(
             @PathVariable String id,
             @Valid @RequestBody WebhookSettingsRequestDto request) {
@@ -254,7 +254,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/communication/webhook/test")
     @Operation(summary = "Test webhook endpoint")
-    @PreAuthorize("hasAuthority('companies:manage')")
+    @PreAuthorize("hasAuthority('webhooks:manage')")
     public ResponseEntity<ApiResponse<String>> testWebhook(@PathVariable String id) {
 
         try {
@@ -330,7 +330,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/communication/webhook/rotate-secret")
     @Operation(summary = "Rotate webhook signing secret")
-    @PreAuthorize("hasAuthority('companies:manage')")
+    @PreAuthorize("hasAuthority('webhooks:manage')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> rotateWebhookSecret(@PathVariable String id) {
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);

@@ -90,6 +90,7 @@ public class ApiKeyServiceImpl implements ApiKeyService {
                         .apiSecret("****************")
                         .expiresAt(creds.getExpiresAt())
                         .status(creds.getStatus().name())
+                        .access(creds.getApiAccess().name())
                         .build()))
                 .orElse(Collections.emptyList());
     }
@@ -129,5 +130,20 @@ public class ApiKeyServiceImpl implements ApiKeyService {
         } catch (Exception e) {
             log.error("Failed to notify company {} about regenerated API credentials", company.getId(), e);
         }
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public String setAccess(String companyId, com.intact_id.accounts.Permissions.ApiAccess access) {
+        if (access == null) {
+            throw new ApplicationExceptions.IntactBadRequestException("access must be FULL, VERIFY or READ_ONLY");
+        }
+        CompanyCredentials credentials = credentialsRepository.findByCompanyId(companyId)
+                .filter(creds -> creds.getApiKeyHash() != null)
+                .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("This company has no API key yet"));
+        credentials.setApiAccess(access);
+        credentialsRepository.save(credentials);
+        log.info("API key access of company {} set to {}", companyId, access);
+        return access.name();
     }
 }

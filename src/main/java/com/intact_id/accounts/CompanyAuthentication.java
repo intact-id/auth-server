@@ -16,23 +16,28 @@ import java.util.List;
 @Getter
 public class CompanyAuthentication implements Authentication {
 
-    // The COMPANY role plus every permission an API key holds (Permissions.API_KEY)
-    private static final List<GrantedAuthority> COMPANY_AUTHORITIES = java.util.stream.Stream.concat(
-            java.util.stream.Stream.of("ROLE_COMPANY", "kyc:read", "kyc:write"),
-            Permissions.API_KEY.stream())
-            .map(name -> (GrantedAuthority) new SimpleGrantedAuthority(name))
-            .toList();
-
     private final Company company;
+    // What the caller may do: the COMPANY role plus the permissions of the key's access level
+    private final List<GrantedAuthority> authorities;
     private boolean authenticated = true;
 
+    /** A full-access caller: a full key, or a widget session the company started. */
     public CompanyAuthentication(Company company) {
+        this(company, Permissions.ApiAccess.FULL);
+    }
+
+    public CompanyAuthentication(Company company, Permissions.ApiAccess access) {
         this.company = company;
+        this.authorities = java.util.stream.Stream.concat(
+                        java.util.stream.Stream.of("ROLE_COMPANY", "kyc:read", "kyc:write"),
+                        Permissions.forApiKey(access).stream())
+                .map(name -> (GrantedAuthority) new SimpleGrantedAuthority(name))
+                .toList();
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return COMPANY_AUTHORITIES;
+        return authorities;
     }
 
     @Override

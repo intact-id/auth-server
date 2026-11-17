@@ -156,7 +156,7 @@ public class WorkflowController {
             description = "The company's workflows; super admins without companyId re-price every company's. "
                     + "Each result has the old and new price, or the error that stopped that workflow.")
     public ResponseEntity<ApiResponse<List<RepriceResult>>> repriceAll(@RequestParam(required = false) String companyId) {
-        boolean everyCompany = SecurityContextUtil.isSuperAdminAuthenticated() && (companyId == null || companyId.isBlank());
+        boolean everyCompany = SecurityContextUtil.isStaffAuthenticated() && (companyId == null || companyId.isBlank());
         String company = everyCompany ? null : SecurityContextUtil.resolveCompanyId(companyId);
         return respond(HttpStatus.OK, "Prices updated", service.repriceAll(company));
     }
@@ -204,9 +204,10 @@ public class WorkflowController {
         return SecurityContextUtil.resolveCompanyId(companyId);
     }
 
+    /** Templates are shared by every company, so only Intact staff who may manage them change them. */
     private static void requireSuperAdmin() {
-        if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
-            throw new ApplicationExceptions.IntactForbiddenException("Only Intact super admins manage templates");
+        if (!SecurityContextUtil.hasPermission("templates:manage-platform")) {
+            throw new ApplicationExceptions.IntactForbiddenException("Only Intact staff who manage templates can do this");
         }
     }
 

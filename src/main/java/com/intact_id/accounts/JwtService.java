@@ -95,7 +95,13 @@ public class JwtService {
      * JwtAuthenticationFilter's username lookup safely no-ops on this token type.
      */
     public String generateCompanyAccessToken(String companyId) {
+        return generateCompanyAccessToken(companyId, Permissions.ApiAccess.FULL);
+    }
+
+    /** The token carries the key's access level, so it can't do more than the key it came from. */
+    public String generateCompanyAccessToken(String companyId, Permissions.ApiAccess access) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("access", (access == null ? Permissions.ApiAccess.FULL : access).name());
         claims.put("tokenType", COMPANY_ACCESS_TOKEN_TYPE);
         claims.put("cid", companyId);
         claims.put("scope", COMPANY_ACCESS_SCOPE);
@@ -118,6 +124,16 @@ public class JwtService {
 
     public String extractCompanyId(String token) {
         return extractClaim(token, claims -> claims.get("cid", String.class));
+    }
+
+    /** The access level in a company access token; tokens from before access levels are FULL. */
+    public Permissions.ApiAccess extractApiAccess(String token) {
+        String access = extractClaim(token, claims -> claims.get("access", String.class));
+        try {
+            return access == null ? Permissions.ApiAccess.FULL : Permissions.ApiAccess.valueOf(access);
+        } catch (IllegalArgumentException e) {
+            return Permissions.ApiAccess.READ_ONLY;
+        }
     }
 
     public String extractScope(String token) {

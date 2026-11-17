@@ -50,6 +50,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final GeneratorUtils generatorUtils;
+    private final com.intact_id.accounts.roles.RoleManagement roleManagement;
 
     /**
      * Create new user
@@ -121,13 +122,10 @@ public class UserService {
                 Role role = roleRepository.findById(roleId)
                         .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                                 "Role not found: " + roleId));
-                // Prevent privilege escalation: only SUPER_ADMIN can assign the SUPER_ADMIN role
-                if ("SUPER_ADMIN".equals(role.getName()) && !SecurityContextUtil.isSuperAdminAuthenticated()) {
-                    throw new ApplicationExceptions.IntactUnauthorizedException(
-                            "Insufficient privileges to assign the SUPER_ADMIN role");
-                }
                 roles.add(role);
             }
+            // Company roles in their company, staff roles for staff, nothing beyond the caller's own permissions
+            roleManagement.checkCanGrant(roles, request.getCompanyId());
             user.setRoles(roles);
         } else {
             // Assign default VIEWER role if no roles provided
@@ -284,12 +282,9 @@ public class UserService {
                 Role role = roleRepository.findById(roleId)
                         .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                                 "Role not found: " + roleId));
-                if ("SUPER_ADMIN".equals(role.getName()) && !SecurityContextUtil.isSuperAdminAuthenticated()) {
-                    throw new ApplicationExceptions.IntactUnauthorizedException(
-                            "Insufficient privileges to assign the SUPER_ADMIN role");
-                }
                 roles.add(role);
             }
+            roleManagement.checkCanGrant(roles, user.getCompany() == null ? null : user.getCompany().getId());
             user.setRoles(roles);
         }
 
@@ -409,12 +404,9 @@ public class UserService {
             Role role = roleRepository.findById(roleId)
                     .orElseThrow(() -> new ApplicationExceptions.IntactCompanyNotFoundException(
                             "Role not found: " + roleId));
-            if ("SUPER_ADMIN".equals(role.getName()) && !SecurityContextUtil.isSuperAdminAuthenticated()) {
-                throw new ApplicationExceptions.IntactUnauthorizedException(
-                        "Insufficient privileges to assign the SUPER_ADMIN role");
-            }
             roles.add(role);
         }
+        roleManagement.checkCanGrant(roles, user.getCompany() == null ? null : user.getCompany().getId());
 
         user.setRoles(roles);
         User updatedUser = userRepository.save(user);
@@ -528,8 +520,7 @@ public class UserService {
                 .roles(user.getRoles().stream()
                         .map(Role::getName)
                         .collect(Collectors.toList()))
-                .permissions(com.intact_id.accounts.Permissions.sorted(com.intact_id.accounts.Permissions.forRoles(
-                        user.getRoles().stream().map(Role::getName).toList())))
+                .permissions(com.intact_id.accounts.Permissions.sorted(com.intact_id.accounts.Permissions.forRoles(user.getRoles())))
                 .companyId(user.getCompany() != null ? user.getCompany().getId() : null)
                 .build();
     }

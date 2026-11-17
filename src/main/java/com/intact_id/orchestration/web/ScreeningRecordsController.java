@@ -57,7 +57,7 @@ public class ScreeningRecordsController {
 
     /** Super admins: the named company, or all when none is named. Everyone else: their own company. */
     private static String company(String companyId) {
-        if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+        if (SecurityContextUtil.isStaffAuthenticated()) {
             return companyId == null || companyId.isBlank() ? null : SecurityContextUtil.resolveCompanyId(companyId);
         }
         return SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
