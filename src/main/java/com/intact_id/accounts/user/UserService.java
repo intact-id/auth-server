@@ -523,6 +523,7 @@ public class UserService {
                 .mustChangePassword(user.getMustChangePassword())
                 .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
+                .googleAuthenticationKey(user.getGoogleAuthenticatorKey())
                 .is2faEnabled(user.getIs2faEnabled())
                 .roles(user.getRoles().stream()
                         .map(Role::getName)
