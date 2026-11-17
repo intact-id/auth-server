@@ -36,7 +36,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponseDto>> createUser(
             @Valid @RequestBody UserCreateDto request) {
         try {
-            if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
+            if (!SecurityContextUtil.isStaffAuthenticated()) {
                 String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
                 request.setCompanyId(companyId);
             }
@@ -67,7 +67,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponseDto>> getUserById(@PathVariable String userId) {
         try {
             UserResponseDto user = userService.getUserById(userId);
-            if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
+            if (!SecurityContextUtil.isStaffAuthenticated()) {
                 String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
                 if (user.getCompanyId() == null || !user.getCompanyId().equals(companyId)) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
@@ -105,7 +105,7 @@ public class UserController {
             @RequestParam(required = false) GlobalStatuses status,
             @RequestParam(required = false) String search,
             Pageable pageable) {
-        String companyId = SecurityContextUtil.isSuperAdminAuthenticated()
+        String companyId = SecurityContextUtil.isStaffAuthenticated()
                 ? null
                 : SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
         Page<UserResponseDto> users = userService.getAllUsers(status, search, companyId, pageable);
@@ -126,7 +126,7 @@ public class UserController {
             @PathVariable String userId,
             @Valid @RequestBody UserCreateDto request) {
         try {
-            if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
+            if (!SecurityContextUtil.isStaffAuthenticated()) {
                 UserResponseDto existing = userService.getUserById(userId);
                 String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
                 if (existing.getCompanyId() == null || !existing.getCompanyId().equals(companyId)) {
@@ -193,7 +193,7 @@ public class UserController {
     @PreAuthorize("hasAuthority('users:manage')")
     @Operation(summary = "Unlock user account")
     public ResponseEntity<ApiResponse<Void>> unlockUser(@PathVariable String userId) {
-        if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
+        if (!SecurityContextUtil.isStaffAuthenticated()) {
             UserResponseDto existing = userService.getUserById(userId);
             String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
             if (existing.getCompanyId() == null || !existing.getCompanyId().equals(companyId)) {
@@ -222,7 +222,7 @@ public class UserController {
             @PathVariable String userId,
             @Valid @RequestBody ChangePasswordDto request) {
         try {
-            if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
+            if (!SecurityContextUtil.isStaffAuthenticated()) {
                 UserResponseDto existing = userService.getUserById(userId);
                 String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
                 if (existing.getCompanyId() == null || !existing.getCompanyId().equals(companyId)) {

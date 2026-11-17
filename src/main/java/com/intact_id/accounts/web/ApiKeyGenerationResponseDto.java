@@ -12,4 +12,6 @@ public class ApiKeyGenerationResponseDto {
     private String apiSecret;
     private LocalDateTime expiresAt;
     private String status;
+    // FULL, VERIFY or READ_ONLY
+    private String access;
 }

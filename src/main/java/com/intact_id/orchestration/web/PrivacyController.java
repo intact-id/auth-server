@@ -95,7 +95,7 @@ public class PrivacyController {
             + "including the ones before it. Refused during a legal hold or a minimum period; super admins may override=true. Cannot be undone.")
     public ResponseEntity<ApiResponse<DataErasure>> erase(@PathVariable String id, @RequestBody EraseRequest request) {
         return respond(HttpStatus.OK, "Data erased", retention.eraseNow(scope(), id, request.scope(), request.reason(), actor(),
-                Boolean.TRUE.equals(request.override()), SecurityContextUtil.isSuperAdminAuthenticated()));
+                Boolean.TRUE.equals(request.override()), SecurityContextUtil.hasPermission("privacy:override-platform")));
     }
 
     @PutMapping("/verifications/{id}/hold")
@@ -159,11 +159,11 @@ public class PrivacyController {
 
     /** null for super admins (any company), else the caller's company. */
     private static String scope() {
-        return SecurityContextUtil.isSuperAdminAuthenticated() ? null : SecurityContextUtil.resolveCompanyId(null);
+        return SecurityContextUtil.isStaffAuthenticated() ? null : SecurityContextUtil.resolveCompanyId(null);
     }
 
     private static String listScope(String companyId) {
-        boolean everyCompany = SecurityContextUtil.isSuperAdminAuthenticated() && (companyId == null || companyId.isBlank());
+        boolean everyCompany = SecurityContextUtil.isStaffAuthenticated() && (companyId == null || companyId.isBlank());
         return everyCompany ? null : SecurityContextUtil.resolveCompanyId(companyId);
     }
 

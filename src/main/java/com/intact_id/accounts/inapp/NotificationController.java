@@ -53,7 +53,7 @@ public class NotificationController {
 
                 Pageable pageable = PageRequest.of(page, size);
                 Page<NotificationResponseDto> notifications;
-                if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+                if (SecurityContextUtil.isStaffAuthenticated()) {
                         notifications = notificationService.getAllNotifications(pageable);
                 } else {
                         String companyId = SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();

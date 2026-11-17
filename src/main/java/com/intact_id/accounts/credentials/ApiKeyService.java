@@ -12,4 +12,7 @@ public interface ApiKeyService {
     void revokeApiKey(String companyId, String apiKeyId);
 
     List<ApiKeyGenerationResponseDto> getApiKeys(String companyId);
+
+    /** What the company's API key may do from now on (FULL, VERIFY or READ_ONLY). Tokens already issued keep theirs until they expire. */
+    String setAccess(String companyId, com.intact_id.accounts.Permissions.ApiAccess access);
 }

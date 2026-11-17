@@ -44,6 +44,11 @@ public class CompanyCredentials extends Auditable {
     @Column(name = "status", nullable = false)
     private GlobalStatuses status = GlobalStatuses.ACTIVE;
 
+    // What the key may do (Permissions.ApiAccess); every key starts with full access
+    @Enumerated(EnumType.STRING)
+    @Column(name = "api_access", nullable = false, length = 20)
+    private Permissions.ApiAccess apiAccess = Permissions.ApiAccess.FULL;
+
     @Column(name = "last_used_at")
     private LocalDateTime lastUsedAt;
 

@@ -91,7 +91,7 @@ public class CompanyAccessTokenAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        CompanyAuthentication authentication = new CompanyAuthentication(company);
+        CompanyAuthentication authentication = new CompanyAuthentication(company, jwtService.extractApiAccess(token));
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         log.debug("Authenticated company {} via access token for path: {}", company.getId(), request.getRequestURI());

@@ -70,7 +70,7 @@ public class BillingAccountController {
     @Operation(summary = "One invoice")
     public ResponseEntity<ApiResponse<BillingApi.Invoice>> invoice(@PathVariable String id,
                                                          @Parameter(description = COMPANY_ID) @RequestParam(required = false) String companyId) {
-        String owner = SecurityContextUtil.isSuperAdminAuthenticated() && blank(companyId) ? null : company(companyId);
+        String owner = SecurityContextUtil.isStaffAuthenticated() && blank(companyId) ? null : company(companyId);
         return ok(billing.invoice(owner, id));
     }
 
@@ -201,9 +201,10 @@ public class BillingAccountController {
         return value == null || value.isBlank();
     }
 
+    /** Billing administration: set-up, prices, FX, credits and invoices. */
     private static void requireSuperAdmin() {
-        if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
-            throw new ApplicationExceptions.IntactForbiddenException("Only Intact super admins manage billing");
+        if (!SecurityContextUtil.hasPermission("billing:manage-platform")) {
+            throw new ApplicationExceptions.IntactForbiddenException("Only Intact staff who manage billing can do this");
         }
     }
 

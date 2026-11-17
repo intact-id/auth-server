@@ -94,6 +94,24 @@ public class ApiKeyController {
                         .build());
     }
 
+    @PutMapping("/access")
+    @Operation(summary = "Set what the API key may do",
+            description = "FULL: everything. VERIFY: start sessions, submit verifications and read their results. READ_ONLY: read only. "
+                    + "Access tokens already issued keep their level until they expire.")
+    @PreAuthorize("hasAuthority('apikeys:manage')")
+    public ResponseEntity<ApiResponse<String>> setAccess(@RequestParam(required = false) String companyId,
+                                                        @RequestBody java.util.Map<String, String> body) {
+        com.intact_id.accounts.Permissions.ApiAccess access;
+        try {
+            access = com.intact_id.accounts.Permissions.ApiAccess.valueOf(String.valueOf(body.get("access")));
+        } catch (IllegalArgumentException e) {
+            throw new com.intact_id.util.exception.ApplicationExceptions.IntactBadRequestException("access must be FULL, VERIFY or READ_ONLY");
+        }
+        String result = apiKeyService.setAccess(SecurityContextUtil.resolveCompanyId(companyId), access);
+        return ResponseEntity.ok(ApiResponse.<String>builder().responseCode(HttpStatus.OK.value())
+                .responseMessage("API key access updated").success(true).data(result).build());
+    }
+
     @GetMapping("/usage")
     @Operation(summary = "Get API key usage metrics (Admin only)")
     @PreAuthorize("hasAuthority('apikeys:view')")

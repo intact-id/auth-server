@@ -70,7 +70,7 @@ public class TopUpController {
                                                                  @RequestParam(defaultValue = "20") int size) {
         var result = topUps.list(scope(companyId), status, page, size);
         return ok(Map.of("content", result.getContent(), "totalElements", result.getTotalElements(), "totalPages", result.getTotalPages(),
-                "waitingForReview", SecurityContextUtil.isSuperAdminAuthenticated() ? topUps.waitingForReview() : 0));
+                "waitingForReview", SecurityContextUtil.isStaffAuthenticated() ? topUps.waitingForReview() : 0));
     }
 
     @GetMapping("/top-ups/{id}/receipt")
@@ -113,7 +113,7 @@ public class TopUpController {
 
     /** Super admins: the company asked for, or all (null); everyone else: their own company. */
     private static String scope(String companyId) {
-        if (SecurityContextUtil.isSuperAdminAuthenticated()) return companyId == null || companyId.isBlank() ? null : companyId;
+        if (SecurityContextUtil.isStaffAuthenticated()) return companyId == null || companyId.isBlank() ? null : companyId;
         return SecurityContextUtil.resolveCompanyId(null);
     }
 

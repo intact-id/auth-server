@@ -200,7 +200,7 @@ public class KycVerificationController {
                         Authentication authentication) {
 
                 try {
-                        String companyId = SecurityContextUtil.isSuperAdminAuthenticated()
+                        String companyId = SecurityContextUtil.isStaffAuthenticated()
                                         ? null
                                         : SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
 
@@ -250,7 +250,7 @@ public class KycVerificationController {
                         Authentication authentication) {
 
                 String resolvedCompanyId;
-                if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+                if (SecurityContextUtil.isStaffAuthenticated()) {
                         resolvedCompanyId = (companyId != null && !companyId.isBlank())
                                         ? SecurityContextUtil.resolveCompanyId(companyId)
                                         : null;

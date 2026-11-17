@@ -52,7 +52,7 @@ public class CompanyAccessTokenService {
                 .getByApiKeyCompanyCredentialsWithStatusActive(apiKey);
         Company company = credentials.getCompany();
 
-        String accessToken = jwtService.generateCompanyAccessToken(company.getId());
+        String accessToken = jwtService.generateCompanyAccessToken(company.getId(), credentials.getApiAccess());
 
         log.info("Issued company access token for company={}", company.getId());
 

@@ -66,21 +66,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // "mfa_challenge"; neither should ever authenticate an API request.
                 String tokenType = jwtService.extractTokenType(jwt);
                 if (user != null && tokenType == null && jwtService.validateToken(jwt, username)) {
-                    // Create authorities from user roles and permissions
-                    List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
-                            .flatMap(role -> {
-                                // Add role as authority
-                                var roleAuthority = new SimpleGrantedAuthority("ROLE_" + role.getName());
-                                // Add permissions as authorities
-                                var permissionAuthorities = role.getPermissions().stream()
-                                        .map(permission -> new SimpleGrantedAuthority(permission.getName()))
-                                        .collect(Collectors.toList());
-                                permissionAuthorities.add(roleAuthority);
-                                return permissionAuthorities.stream();
-                            })
-                            .collect(Collectors.toList());
-                    // The permissions the API checks, from the person's built-in roles (Permissions)
-                    Permissions.forRoles(user.getRoles().stream().map(role -> role.getName()).toList())
+                    // The role names, and what those roles allow (built-in roles from Permissions, custom roles as
+                    // stored but limited to company permissions)
+                    List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+                    user.getRoles().forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName())));
+                    Permissions.forRoles(user.getRoles())
                             .forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
 
                     // Create authentication token

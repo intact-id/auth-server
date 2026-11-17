@@ -26,6 +26,14 @@ public class Role extends Auditable {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    // A custom role's company; null for built-in roles
+    @Column(name = "company_id")
+    private String companyId;
+
+    // What the console shows, e.g. "Compliance officer"
+    @Column(name = "label", length = 100)
+    private String label;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private GlobalStatuses status = GlobalStatuses.ACTIVE;
