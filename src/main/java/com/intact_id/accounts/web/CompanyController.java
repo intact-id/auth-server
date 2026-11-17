@@ -42,7 +42,7 @@ public class CompanyController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get company by ID")
-    @PreAuthorize("hasAuthority('companies:view')")
+    @PreAuthorize("hasAuthority('companies:profile')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> getCompanyById(@PathVariable String id) {
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
@@ -68,7 +68,7 @@ public class CompanyController {
 
     @GetMapping("/me")
     @Operation(summary = "Get current company details")
-    @PreAuthorize("hasAuthority('companies:view')")
+    @PreAuthorize("hasAuthority('companies:profile')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> getCurrentCompany(
             @RequestParam(required = false) String companyId) {
 
@@ -150,7 +150,7 @@ public class CompanyController {
 
     @GetMapping("/{id}/communication")
     @Operation(summary = "Get company communication details")
-    @PreAuthorize("hasAuthority('companies:view')")
+    @PreAuthorize("hasAuthority('webhooks:view')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> getCompanyCommunication(
             @PathVariable String id) {
 
@@ -179,7 +179,7 @@ public class CompanyController {
     @GetMapping("/{id}/communication/webhook/deliveries")
     @Operation(summary = "List webhook deliveries",
             description = "A company's webhook delivery attempts, newest first. Payloads and receiver responses are not included.")
-    @PreAuthorize("hasAuthority('companies:view')")
+    @PreAuthorize("hasAuthority('webhooks:view')")
     public ResponseEntity<ApiResponse<Page<WebhookDeliveryView>>> getWebhookDeliveries(
             @PathVariable String id,
             @Parameter(description = "PENDING, DELIVERED, FAILED or RETRYING") @RequestParam(required = false) String status,
@@ -208,7 +208,7 @@ public class CompanyController {
     @GetMapping("/{id}/communication/webhook/deliveries/summary")
     @Operation(summary = "Summarise webhook deliveries",
             description = "Delivery counts by status for the last `hours` hours (default 24, maximum 720).")
-    @PreAuthorize("hasAuthority('companies:view')")
+    @PreAuthorize("hasAuthority('webhooks:view')")
     public ResponseEntity<ApiResponse<WebhookDeliverySummary>> getWebhookDeliverySummary(
             @PathVariable String id,
             @RequestParam(defaultValue = "24") int hours) {
