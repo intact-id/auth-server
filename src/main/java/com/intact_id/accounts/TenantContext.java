@@ -17,7 +17,7 @@ public final class TenantContext {
     }
 
     public static boolean isSuperAdmin() {
-        return SecurityContextUtil.isSuperAdminAuthenticated();
+        return SecurityContextUtil.isStaffAuthenticated();
     }
 
     public static String resolveCompanyId(String requestedCompanyId) {

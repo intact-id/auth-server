@@ -96,7 +96,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                     .getByApiKeyCompanyCredentialsWithStatusActive(apiKey);
 
             // Set company in security context
-            CompanyAuthentication authentication = new CompanyAuthentication(credentials.getCompany());
+            CompanyAuthentication authentication = new CompanyAuthentication(credentials.getCompany(), credentials.getApiAccess());
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             log.info("Authenticated company: {} for path: {}",

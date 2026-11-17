@@ -50,7 +50,7 @@ public class CheckerApprovalController {
     }
 
     @PostMapping("/approvals/{approvalId}/checker-decision")
-    @PreAuthorize("hasAuthority('applications:manage')")
+    @PreAuthorize("hasAuthority('applications:check')")
     @Operation(summary = "Checker final decision (approve/reject)")
     public ResponseEntity<ApiResponse<ApplicationApprovalResponseDto>> checkerDecision(
             @PathVariable String approvalId,

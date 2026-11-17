@@ -144,7 +144,7 @@ public class KybController {
     @Operation(summary = "Business verifications waiting for their directors and owners",
             description = "Oldest first, with each required person's status and link details. Super admins without companyId see every company's.")
     public ResponseEntity<ApiResponse<List<KybParties.WaitingBusiness>>> waiting(@RequestParam(required = false) String companyId) {
-        boolean everyCompany = SecurityContextUtil.isSuperAdminAuthenticated() && (companyId == null || companyId.isBlank());
+        boolean everyCompany = SecurityContextUtil.isStaffAuthenticated() && (companyId == null || companyId.isBlank());
         return respond(HttpStatus.OK, "OK", kybParties.waiting(everyCompany ? null : SecurityContextUtil.resolveCompanyId(companyId)));
     }
 
@@ -215,7 +215,7 @@ public class KybController {
     @PreAuthorize("hasAuthority('kyb:view')")
     @Operation(summary = "Owner-check settings", description = "The company's effective settings and the platform default.")
     public ResponseEntity<ApiResponse<Map<String, KybSettings>>> getSettings(@RequestParam(required = false) String companyId) {
-        String company = companyId == null && SecurityContextUtil.isSuperAdminAuthenticated() ? null : SecurityContextUtil.resolveCompanyId(companyId);
+        String company = companyId == null && SecurityContextUtil.isStaffAuthenticated() ? null : SecurityContextUtil.resolveCompanyId(companyId);
         Map<String, KybSettings> body = new LinkedHashMap<>();
         body.put("platformDefault", settings.platformDefault());
         if (company != null) body.put("company", settings.effective(company));
@@ -249,7 +249,7 @@ public class KybController {
         VerificationRequest business = verifications.findByIdWithCompany(id)
                 .filter(v -> "business".equalsIgnoreCase(v.getVerificationType()))
                 .orElseThrow(() -> new ApplicationExceptions.IntactResourceNotFoundException("Business verification not found"));
-        if (!SecurityContextUtil.isSuperAdminAuthenticated()
+        if (!SecurityContextUtil.isStaffAuthenticated()
                 && !business.getCompany().getId().equals(SecurityContextUtil.getAuthenticatedCompanyFromAny().getId())) {
             throw new ApplicationExceptions.IntactResourceNotFoundException("Business verification not found");
         }

@@ -115,11 +115,11 @@ public class MonitoringController {
     }
 
     private static String scope() {
-        return SecurityContextUtil.isSuperAdminAuthenticated() ? null : SecurityContextUtil.resolveCompanyId(null);
+        return SecurityContextUtil.isStaffAuthenticated() ? null : SecurityContextUtil.resolveCompanyId(null);
     }
 
     private static String listScope(String companyId) {
-        boolean everyCompany = SecurityContextUtil.isSuperAdminAuthenticated() && (companyId == null || companyId.isBlank());
+        boolean everyCompany = SecurityContextUtil.isStaffAuthenticated() && (companyId == null || companyId.isBlank());
         return everyCompany ? null : SecurityContextUtil.resolveCompanyId(companyId);
     }
 

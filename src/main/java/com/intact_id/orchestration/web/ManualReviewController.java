@@ -84,7 +84,7 @@ public class ManualReviewController {
 
     /** Company admins work only their own company's reviews; super admins any (or one with companyId). */
     private static String reviewScope(String companyId) {
-        if (SecurityContextUtil.isSuperAdminAuthenticated()) {
+        if (SecurityContextUtil.isStaffAuthenticated()) {
             return companyId == null || companyId.isBlank() ? null : companyId;
         }
         return SecurityContextUtil.getAuthenticatedCompanyFromAny().getId();
