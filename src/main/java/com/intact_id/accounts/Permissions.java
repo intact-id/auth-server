@@ -52,6 +52,8 @@ public final class Permissions {
             company("users:view", "Team and company", "See team members"),
             company("users:manage", "Team and company", "Invite and change team members"),
             company("roles:manage", "Team and company", "Create roles and assign them to team members"),
+            company("documents:view", "Team and company", "See the company's compliance documents"),
+            company("documents:manage", "Team and company", "Upload compliance documents"),
             company("notifications:inbox", "Team and company", "See and clear notifications"),
             company("notifications:view", "Team and company", "See all of the company's notifications"),
             company("notifications:manage", "Team and company", "Send and delete notifications"),
@@ -69,6 +71,7 @@ public final class Permissions {
             platform("users:view-platform", "Companies", "See Intact staff and every company's users"),
             platform("users:manage-platform", "Companies", "Suspend users and assign staff roles"),
             platform("kyb:manage-platform", "Companies", "Change the platform's KYB defaults"),
+            platform("documents:review-platform", "Companies", "Approve and reject companies' compliance documents"),
             platform("privacy:manage-platform", "Companies", "Change the retention rules per country"),
             platform("privacy:override-platform", "Companies", "Erase data before its minimum period"),
             platform("services:manage-platform", "Catalog and pricing", "Manage the service catalog"),
@@ -102,7 +105,7 @@ public final class Permissions {
             "kyb:view", "kyb:invite", "kyb:manage", "screening:view", "screening:manage", "monitoring:use",
             "monitoring:manage", "risk:manage", "privacy:view", "privacy:requests", "privacy:manage",
             "privacy:manage-company", "notifications:inbox", "notifications:view", "services:available", "services:view",
-            "companies:profile");
+            "companies:profile", "documents:view", "documents:manage");
 
     private static final Set<String> REVIEWER = Set.of(
             "analytics:view", "verifications:view", "reviews:view", "reviews:manage", "kyb:view", "kyb:invite",
@@ -121,7 +124,7 @@ public final class Permissions {
     private static final Set<String> VIEWER = Set.of(
             "analytics:view", "verifications:view", "reviews:view", "kyb:view", "screening:view", "privacy:view",
             "notifications:inbox", "services:available", "services:view", "webhooks:view", "apikeys:view",
-            "topups:view", "companies:profile");
+            "topups:view", "companies:profile", "documents:view");
 
     /** An Intact super admin: every company and staff permission (not the API-key-only ones). */
     public static final Set<String> SUPER_ADMIN = Stream.concat(COMPANY_GRANTABLE.stream(),
@@ -136,7 +139,7 @@ public final class Permissions {
             "verifications:view", "verifications:manage", "reviews:view", "reviews:manage", "kyb:view", "kyb:invite",
             "kyb:manage", "kyb:manage-platform", "analytics:view", "analytics:view-platform", "notifications:inbox",
             "notifications:view", "notifications:manage", "monitoring:use", "screening:view", "services:view",
-            "services:available", "privacy:view", "system:use", "topups:view");
+            "services:available", "privacy:view", "system:use", "topups:view", "documents:view", "documents:review-platform");
 
     private static final Set<String> STAFF_FINANCE = Set.of(
             "billing:manage", "billing:view-platform", "billing:manage-platform", "topups:view", "topups:manage-platform",
@@ -150,9 +153,9 @@ public final class Permissions {
                     || p.equals("services:available"))
             .collect(Collectors.toUnmodifiableSet());
 
-    private static final Set<String> MAKER = Set.of("applications:view", "applications:make", "companies:view", "notifications:inbox");
+    private static final Set<String> MAKER = Set.of("applications:view", "applications:make", "companies:view", "notifications:inbox", "documents:view");
 
-    private static final Set<String> CHECKER = Set.of("applications:view", "applications:check", "companies:view", "notifications:inbox");
+    private static final Set<String> CHECKER = Set.of("applications:view", "applications:check", "companies:view", "notifications:inbox", "documents:view");
 
     /** A built-in role: its name in the database, how the console shows it, who holds it, and what it may do. */
     public record BuiltInRole(String name, String label, String description, boolean staff, Set<String> permissions) {
