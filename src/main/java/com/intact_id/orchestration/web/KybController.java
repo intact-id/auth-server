@@ -122,7 +122,7 @@ public class KybController {
     }
 
     @PostMapping("/api/v1/kyb/verifications/{id}/parties/{partyId}/invite")
-    @PreAuthorize("hasAuthority('kyb:manage')")
+    @PreAuthorize("hasAuthority('kyb:invite')")
     @Operation(summary = "Send a director or owner their verification link",
             description = "Emails the person (if an email was given) and returns the link; it works for 7 days. Sending again replaces the link.")
     public ResponseEntity<ApiResponse<Map<String, String>>> invite(@PathVariable String id, @PathVariable String partyId) {

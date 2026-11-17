@@ -30,7 +30,7 @@ public class ServiceCatalogController {
     private final CatalogAdminService adminService;
 
     @GetMapping("/available")
-    @PreAuthorize("hasAuthority('services:view')")
+    @PreAuthorize("hasAuthority('services:available')")
     @Operation(summary = "Services a merchant can add to a workflow")
     public ResponseEntity<ApiResponse<List<CatalogService>>> available(@RequestParam(required = false) SubjectType subjectType) {
         return respond(HttpStatus.OK, "OK", serviceCatalog.available(subjectType));

@@ -70,7 +70,7 @@ public class NotificationController {
 
         // The bell: the signed-in person's own notifications (their company's; Intact staff's for super admins)
         @GetMapping("/inbox")
-        @PreAuthorize("hasAuthority('notifications:view')")
+        @PreAuthorize("hasAuthority('notifications:inbox')")
         public ResponseEntity<ApiResponse<Page<NotificationResponseDto>>> inbox(
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "20") int size) {
@@ -82,7 +82,7 @@ public class NotificationController {
         }
 
         @GetMapping("/inbox/unread-count")
-        @PreAuthorize("hasAuthority('notifications:view')")
+        @PreAuthorize("hasAuthority('notifications:inbox')")
         public ResponseEntity<ApiResponse<Long>> inboxUnreadCount() {
                 return ResponseEntity.ok(ApiResponse.<Long>builder()
                                 .success(true)
@@ -92,7 +92,7 @@ public class NotificationController {
         }
 
         @PutMapping("/inbox/read")
-        @PreAuthorize("hasAuthority('notifications:manage')")
+        @PreAuthorize("hasAuthority('notifications:inbox')")
         public ResponseEntity<ApiResponse<Integer>> markInboxRead() {
                 return ResponseEntity.ok(ApiResponse.<Integer>builder()
                                 .success(true)
@@ -135,7 +135,7 @@ public class NotificationController {
         }
 
         @PutMapping("/{id}/read")
-        @PreAuthorize("hasAuthority('notifications:manage')")
+        @PreAuthorize("hasAuthority('notifications:inbox')")
         public ResponseEntity<ApiResponse<NotificationResponseDto>> markAsRead(@PathVariable Long id) {
                 log.info("Marking notification as read: {}", id);
 
