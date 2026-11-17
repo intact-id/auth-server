@@ -30,14 +30,14 @@ public class ServiceCatalogController {
     private final CatalogAdminService adminService;
 
     @GetMapping("/available")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('services:view')")
     @Operation(summary = "Services a merchant can add to a workflow")
     public ResponseEntity<ApiResponse<List<CatalogService>>> available(@RequestParam(required = false) SubjectType subjectType) {
         return respond(HttpStatus.OK, "OK", serviceCatalog.available(subjectType));
     }
 
     @PostMapping("/requirements")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('services:manage')")
     @Operation(summary = "Evaluate a set of services",
             description = "Execution order, fields, captures and widget screens they need, plus any problems (unknown, unavailable, missing dependency, unsupported country).")
     public ResponseEntity<ApiResponse<ServiceRequirements>> requirements(@Valid @RequestBody RequirementsRequestDto request) {
@@ -46,21 +46,21 @@ public class ServiceCatalogController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('services:view')")
     @Operation(summary = "All catalog services, optionally by status")
     public ResponseEntity<ApiResponse<List<CatalogService>>> list(@RequestParam(required = false) ServiceStatus status) {
         return respond(HttpStatus.OK, "OK", adminService.list(status));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('services:manage-platform')")
     @Operation(summary = "Add a service", description = "Starts IN_DEVELOPMENT, hidden from merchants until made AVAILABLE.")
     public ResponseEntity<ApiResponse<CatalogService>> create(@Valid @RequestBody CatalogServiceRequestDto request) {
         return respond(HttpStatus.CREATED, "Service created", adminService.create(request));
     }
 
     @PatchMapping("/{code}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('services:manage-platform')")
     @Operation(summary = "Update a service", description = "Omitted fields are kept; the code can't change.")
     public ResponseEntity<ApiResponse<CatalogService>> update(@PathVariable String code,
                                                               @Valid @RequestBody CatalogServiceRequestDto request) {
@@ -68,7 +68,7 @@ public class ServiceCatalogController {
     }
 
     @PostMapping("/{code}/status")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('services:manage-platform')")
     @Operation(summary = "Change a service's status",
             description = "IN_DEVELOPMENT -> AVAILABLE | RETIRED; AVAILABLE -> DEPRECATED; DEPRECATED -> AVAILABLE | RETIRED.")
     public ResponseEntity<ApiResponse<CatalogService>> changeStatus(@PathVariable String code,
@@ -77,7 +77,7 @@ public class ServiceCatalogController {
     }
 
     @DeleteMapping("/{code}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('services:manage-platform')")
     @Operation(summary = "Delete a service still in development", description = "Others are retired instead.")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable String code) {
         adminService.delete(code);

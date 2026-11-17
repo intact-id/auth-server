@@ -63,7 +63,7 @@ public class RiskController {
         return ok(risk.activeModel(company(companyId), customerType));
     }
 
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('risk:manage')")
     @PostMapping("/models")
     @Operation(summary = "Create a draft risk model", description = "Body: the risk model config (categories, attributes, thresholds, override rules).")
     public ResponseEntity<ApiResponse<RiskModelDetail>> createModel(@RequestBody RiskModelConfig config,
@@ -85,7 +85,7 @@ public class RiskController {
         return ok(risk.getModel(owner(companyId), id));
     }
 
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('risk:manage')")
     @PutMapping("/models/{id}")
     @Operation(summary = "Save a draft's config", description = "Only drafts can be edited; clone an active model to change it.")
     public ResponseEntity<ApiResponse<RiskModelDetail>> updateModel(@PathVariable String id, @RequestBody RiskModelConfig config,
@@ -93,7 +93,7 @@ public class RiskController {
         return respond(HttpStatus.OK, "Risk model saved", risk.updateModel(owner(companyId), id, config));
     }
 
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('risk:manage')")
     @DeleteMapping("/models/{id}")
     @Operation(summary = "Delete a draft")
     public ResponseEntity<ApiResponse<RiskModel>> deleteModel(@PathVariable String id,
@@ -101,7 +101,7 @@ public class RiskController {
         return respond(HttpStatus.OK, "Risk model deleted", risk.deleteModel(owner(companyId), id));
     }
 
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('risk:manage')")
     @PostMapping("/models/{id}/clone")
     @Operation(summary = "Copy a model into a new draft")
     public ResponseEntity<ApiResponse<RiskModel>> cloneModel(@PathVariable String id,
@@ -109,7 +109,7 @@ public class RiskController {
         return respond(HttpStatus.CREATED, "Draft created", risk.cloneModel(owner(companyId), id));
     }
 
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('risk:manage')")
     @PostMapping("/models/{id}/activate")
     @Operation(summary = "Make a draft the active model", description = "The previous active model for that customer type is retired.")
     public ResponseEntity<ApiResponse<RiskModel>> activateModel(@PathVariable String id,

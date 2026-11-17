@@ -43,7 +43,7 @@ public class BillingController {
     private final BillingService billingService;
 
     @PutMapping("/companies/{companyId}/profile")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:manage')")
     @Deprecated
     @Operation(summary = "Create or update a company billing profile", deprecated = true, description = "Deprecated: use POST /api/v1/billing/admin/setup, PATCH /api/v1/billing/admin/profile.")
     public ResponseEntity<ApiResponse<CompanyBillingProfileResponseDto>> upsertProfile(
@@ -55,7 +55,7 @@ public class BillingController {
     }
 
     @GetMapping("/companies/{companyId}/profile")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:view-platform')")
     @Deprecated
     @Operation(summary = "Get company billing profile", deprecated = true, description = "Deprecated: use GET /api/v1/billing/account?companyId=.")
     public ResponseEntity<ApiResponse<CompanyBillingProfileResponseDto>> getProfile(@PathVariable String companyId) {
@@ -65,7 +65,7 @@ public class BillingController {
     }
 
     @PostMapping("/companies/{companyId}/wallet/topup")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:manage')")
     @Deprecated
     @Operation(summary = "Top up a prepaid company wallet", deprecated = true, description = "Deprecated: use POST /api/v1/billing/admin/wallet/credit.")
     public ResponseEntity<ApiResponse<WalletTransactionResponseDto>> topUpWallet(
@@ -76,7 +76,7 @@ public class BillingController {
     }
 
     @GetMapping("/companies/{companyId}/summary")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:view-platform')")
     @Deprecated
     @Operation(summary = "Get company billing summary", deprecated = true, description = "Deprecated: use GET /api/v1/billing/account?companyId=.")
     public ResponseEntity<ApiResponse<BillingSummaryResponseDto>> getSummary(@PathVariable String companyId) {
@@ -85,7 +85,7 @@ public class BillingController {
     }
 
     @GetMapping("/companies/{companyId}/wallet/transactions")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:view-platform')")
     @Deprecated
     @Operation(summary = "Get company wallet transactions", deprecated = true, description = "Deprecated: use GET /api/v1/billing/wallet/history?companyId=.")
     public ResponseEntity<ApiResponse<List<WalletTransactionResponseDto>>> getWalletTransactions(
@@ -96,7 +96,7 @@ public class BillingController {
     }
 
     @GetMapping("/companies/{companyId}/invoices")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:view-platform')")
     @Deprecated
     @Operation(summary = "Get company invoices", deprecated = true, description = "Deprecated: use GET /api/v1/billing/invoices?companyId=.")
     public ResponseEntity<ApiResponse<List<BillingInvoiceResponseDto>>> getInvoices(@PathVariable String companyId) {
@@ -105,7 +105,7 @@ public class BillingController {
     }
 
     @PostMapping("/companies/{companyId}/invoices/generate")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:manage')")
     @Deprecated
     @Operation(summary = "Generate invoice for company", deprecated = true, description = "Deprecated: legacy local billing, no replacement yet (billing-service owns invoices).")
     public ResponseEntity<ApiResponse<BillingInvoiceResponseDto>> generateInvoice(
@@ -116,7 +116,7 @@ public class BillingController {
     }
 
     @PostMapping("/invoices/{invoiceId}/send")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('billing:manage')")
     @Deprecated
     @Operation(summary = "Send invoice email", deprecated = true, description = "Deprecated: legacy local billing, no replacement yet (billing-service owns invoices).")
     public ResponseEntity<ApiResponse<BillingInvoiceResponseDto>> sendInvoice(
@@ -127,7 +127,7 @@ public class BillingController {
     }
 
     @GetMapping("/me/profile")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('billing:view-api')")
     @Deprecated
     @Operation(summary = "Get billing profile for authenticated company", deprecated = true, description = "Deprecated: use GET /api/v1/billing/account.")
     public ResponseEntity<ApiResponse<CompanyBillingProfileResponseDto>> getMyProfile() {
@@ -136,7 +136,7 @@ public class BillingController {
     }
 
     @GetMapping("/me/summary")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('billing:view-api')")
     @Deprecated
     @Operation(summary = "Get billing summary for authenticated company", deprecated = true, description = "Deprecated: use GET /api/v1/billing/account.")
     public ResponseEntity<ApiResponse<BillingSummaryResponseDto>> getMySummary() {
@@ -145,7 +145,7 @@ public class BillingController {
     }
 
     @GetMapping("/me/invoices")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('billing:view-api')")
     @Deprecated
     @Operation(summary = "Get invoices for authenticated company", deprecated = true, description = "Deprecated: use GET /api/v1/billing/invoices.")
     public ResponseEntity<ApiResponse<List<BillingInvoiceResponseDto>>> getMyInvoices() {
@@ -154,7 +154,7 @@ public class BillingController {
     }
 
     @GetMapping("/me/wallet/transactions")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('billing:view-api')")
     @Deprecated
     @Operation(summary = "Get wallet transactions for authenticated company", deprecated = true, description = "Deprecated: use GET /api/v1/billing/wallet/history.")
     public ResponseEntity<ApiResponse<List<WalletTransactionResponseDto>>> getMyWalletTransactions() {

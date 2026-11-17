@@ -25,7 +25,7 @@ public class ManualReviewController {
     private final ManualReviewService manualReviewService;
 
     @GetMapping("/pending-review")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('reviews:view')")
     @Operation(summary = "List verifications pending manual review",
             description = "Longest-waiting first. Each item carries its review record (reason, assignee).")
     public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> getPendingReviewQueue(
@@ -49,7 +49,7 @@ public class ManualReviewController {
     }
 
     @PostMapping("/{verificationId}/review")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('reviews:manage')")
     @Operation(summary = "Approve or reject a verification pending manual review",
             description = "Records the reviewer, time and notes. The automated risk score and failure reason are kept.")
     public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> resolveReview(
@@ -63,7 +63,7 @@ public class ManualReviewController {
     }
 
     @PostMapping("/{verificationId}/assign")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('reviews:manage')")
     @Operation(summary = "Assign a pending review to yourself", description = "Takes the case over if someone else holds it.")
     public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> assignToMe(
             @PathVariable String verificationId,
@@ -73,7 +73,7 @@ public class ManualReviewController {
     }
 
     @DeleteMapping("/{verificationId}/assign")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('reviews:manage')")
     @Operation(summary = "Return a pending review to the unassigned queue")
     public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> unassign(
             @PathVariable String verificationId,

@@ -26,7 +26,7 @@ public class KycHandoffController {
     private final KycHandoffService handoffService;
 
     @PostMapping("/widget/drafts/{draftId}/handoff")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('widget:manage')")
     @Operation(summary = "Create a handoff link", description = "Render the url as a QR code. Replaces any earlier code for this draft.")
     public ResponseEntity<ApiResponse<KycHandoffResponseDto>> createHandoff(
             @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context,
@@ -35,7 +35,7 @@ public class KycHandoffController {
     }
 
     @DeleteMapping("/widget/drafts/{draftId}/handoff")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('widget:manage')")
     @Operation(summary = "Take the verification back from the phone", description = "Revokes the code and ends the phone's session.")
     public ResponseEntity<ApiResponse<KycDraftResponseDto>> revokeHandoff(
             @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context,

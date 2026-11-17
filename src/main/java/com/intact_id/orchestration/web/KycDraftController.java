@@ -19,7 +19,7 @@ import static com.intact_id.orchestration.web.WidgetResponses.respond;
 @RestController
 @RequestMapping("/api/v1/kyc/widget/drafts")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('COMPANY')")
+@PreAuthorize("hasAuthority('widget:use')")
 @Tag(name = "KYC Widget Drafts", description = "Resumable, multi-step widget verifications. Authenticated via X-Session-Token.")
 public class KycDraftController {
 

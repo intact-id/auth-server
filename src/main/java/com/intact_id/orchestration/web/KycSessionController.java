@@ -33,7 +33,7 @@ public class KycSessionController {
     private final WorkflowRuntime workflowRuntime;
 
     @PostMapping
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('widget:manage')")
     @Operation(
         summary = "Create widget session token",
         description = "Exchange your API key for a short-lived (15 min) session token. " +

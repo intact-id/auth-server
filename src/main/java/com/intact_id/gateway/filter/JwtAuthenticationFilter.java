@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import com.intact_id.accounts.Permissions;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -78,6 +79,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 return permissionAuthorities.stream();
                             })
                             .collect(Collectors.toList());
+                    // The permissions the API checks, from the person's built-in roles (Permissions)
+                    Permissions.forRoles(user.getRoles().stream().map(role -> role.getName()).toList())
+                            .forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
 
                     // Create authentication token
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
