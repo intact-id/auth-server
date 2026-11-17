@@ -135,10 +135,12 @@ public class RoleManagement {
                 && roles.countActiveInCompany(targetCompany, ADMIN) <= 1) {
             throw new ApplicationExceptions.IntactBadRequestException("The company needs at least one Admin; make someone else Admin first");
         }
+        List<String> before = target.getRoles().stream().map(Role::getName).sorted().toList();
         target.setRoles(new HashSet<>(chosen));
         users.save(target);
         List<String> names = chosen.stream().map(Role::getName).toList();
-        log.info("Roles of user {} set to {} by {}", target.getUsername(), names, SecurityContextUtil.getAuthenticatedUser().getUsername());
+        log.info("Roles of user {} changed from {} to {} by {}", target.getUsername(), before, names,
+                SecurityContextUtil.getAuthenticatedUser().getUsername());
         return names;
     }
 
