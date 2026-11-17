@@ -40,14 +40,14 @@ public class TopUpController {
     private final TopUps topUps;
 
     @GetMapping("/top-ups/instructions")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('topups:view')")
     @Operation(summary = "How to top up", description = "The wallet's currency, where to send bank transfers, and whether the account can be topped up.")
     public ResponseEntity<ApiResponse<Map<String, Object>>> instructions(@RequestParam(required = false) String companyId) {
         return ok(topUps.instructions(SecurityContextUtil.resolveCompanyId(companyId)));
     }
 
     @PostMapping(value = "/top-ups/bank", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('topups:manage')")
     @Operation(summary = "Report a bank transfer", description = "Amount in the wallet's currency, the bank's reference, the transfer date and the receipt (PDF or image, 10 MB). Intact reviews it before the wallet is credited.")
     public ResponseEntity<ApiResponse<WalletTopUp>> submitBank(@RequestParam(required = false) String companyId,
                                                                @RequestParam BigDecimal amount,
@@ -62,7 +62,7 @@ public class TopUpController {
     }
 
     @GetMapping("/top-ups")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('topups:view')")
     @Operation(summary = "Top-ups", description = "Newest first. Super admins without companyId see every company's; status filters (e.g. PENDING_REVIEW).")
     public ResponseEntity<ApiResponse<Map<String, Object>>> list(@RequestParam(required = false) String companyId,
                                                                  @RequestParam(required = false) TopUpStatus status,
@@ -74,7 +74,7 @@ public class TopUpController {
     }
 
     @GetMapping("/top-ups/{id}/receipt")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('topups:view')")
     @Operation(summary = "The receipt file")
     public ResponseEntity<InputStreamResource> receipt(@PathVariable String id) {
         WalletTopUp topUp = topUps.get(scope(null), id);
@@ -85,7 +85,7 @@ public class TopUpController {
     }
 
     @PostMapping("/top-ups/{id}/cancel")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('topups:manage')")
     @Operation(summary = "Withdraw a top-up before it is reviewed")
     public ResponseEntity<ApiResponse<WalletTopUp>> cancel(@PathVariable String id) {
         return respond(HttpStatus.OK, "Top-up cancelled", topUps.cancel(scope(null), id));
@@ -94,7 +94,7 @@ public class TopUpController {
     // ----- Intact review -----
 
     @PostMapping("/admin/top-ups/{id}/approve")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('topups:manage-platform')")
     @Operation(summary = "Approve and credit the wallet", description = "amount: what the bank statement shows (default: the amount submitted).")
     public ResponseEntity<ApiResponse<WalletTopUp>> approve(@PathVariable String id, @RequestBody(required = false) Review review) {
         return respond(HttpStatus.OK, "Top-up approved and credited", topUps.approve(id, review == null ? null : review.amount(),
@@ -102,7 +102,7 @@ public class TopUpController {
     }
 
     @PostMapping("/admin/top-ups/{id}/reject")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('topups:manage-platform')")
     @Operation(summary = "Reject a top-up", description = "The reason is shown to the company.")
     public ResponseEntity<ApiResponse<WalletTopUp>> reject(@PathVariable String id, @RequestBody Review review) {
         return respond(HttpStatus.OK, "Top-up rejected", topUps.reject(id, review.note(), actor()));

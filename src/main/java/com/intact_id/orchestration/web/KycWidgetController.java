@@ -33,7 +33,7 @@ public class KycWidgetController {
     private final VerificationService verificationService;
 
     @PostMapping(value = "/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('widget:manage')")
     @Operation(summary = "Submit KYC verification from widget",
                description = "Authenticated via X-Session-Token. The tier and workflow come from the session token.")
     public ResponseEntity<ApiResponse<KycVerificationResponseDto>> submitVerification(
@@ -117,7 +117,7 @@ public class KycWidgetController {
     }
 
     @GetMapping("/verify/{verificationId}")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('widget:view')")
     @Operation(summary = "Poll verification status from widget")
     public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getStatus(
             @PathVariable String verificationId,

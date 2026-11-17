@@ -36,7 +36,7 @@ public class PrivacyController {
     // ----- Intact's limits per country -----
 
     @GetMapping("/country-rules")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:view')")
     @Operation(summary = "Intact's limits per country", description = "For each country ('*' = any other) and kind of data "
             + "(BIOMETRICS, DOCUMENTS, PERSONAL_DATA, RECORD): minDays, maxDays, defaultDays, startsFrom and legalBasis.")
     public ResponseEntity<ApiResponse<List<RetentionRules.CountryView>>> countryRules() {
@@ -44,7 +44,7 @@ public class PrivacyController {
     }
 
     @PutMapping("/country-rules/{country}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage-platform')")
     @Operation(summary = "Set a country's limits", description = "Replaces that country's limits; a kind of data left out falls back to '*'.")
     public ResponseEntity<ApiResponse<RetentionRules.CountryView>> updateCountry(@PathVariable String country,
                                                                                 @RequestBody Map<RetentionCategory, RetentionRules.CountryLimit> limits) {
@@ -52,7 +52,7 @@ public class PrivacyController {
     }
 
     @DeleteMapping("/country-rules/{country}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage-platform')")
     @Operation(summary = "Remove a country's limits", description = "The country then uses the rules for any other country.")
     public ResponseEntity<ApiResponse<Void>> deleteCountry(@PathVariable String country) {
         rules.deleteCountry(country);
@@ -62,7 +62,7 @@ public class PrivacyController {
     // ----- the company's periods -----
 
     @GetMapping("/company-rules")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:view')")
     @Operation(summary = "The company's periods", description = "Per country ('*' = every country): the days the company set, "
             + "and what applies after Intact's limits (effective).")
     public ResponseEntity<ApiResponse<List<RetentionRules.CompanyCountryView>>> companyRules(@RequestParam(required = false) String companyId) {
@@ -70,7 +70,7 @@ public class PrivacyController {
     }
 
     @PutMapping("/company-rules/{country}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage')")
     @Operation(summary = "Set the company's periods for a country", description = "Body: days per kind of data, "
             + "e.g. {\"BIOMETRICS\": 30, \"DOCUMENTS\": 365}. A kind left out uses Intact's default. Must be within the country's limits.")
     public ResponseEntity<ApiResponse<List<RetentionRules.CompanyCountryView>>> updateCompany(@PathVariable String country,
@@ -82,7 +82,7 @@ public class PrivacyController {
     // ----- one verification -----
 
     @GetMapping("/verifications/{id}")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:view')")
     @Operation(summary = "A verification's retention", description = "Its data's country, legal hold, and for each kind of data "
             + "the period, when it is due, when it went, and how long it must be kept at least.")
     public ResponseEntity<ApiResponse<Retention.Status>> status(@PathVariable String id) {
@@ -90,7 +90,7 @@ public class PrivacyController {
     }
 
     @PostMapping("/verifications/{id}/erase")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage')")
     @Operation(summary = "Erase data now", description = "scope: BIOMETRICS, DOCUMENTS, PERSONAL_DATA (default) or RECORD, each "
             + "including the ones before it. Refused during a legal hold or a minimum period; super admins may override=true. Cannot be undone.")
     public ResponseEntity<ApiResponse<DataErasure>> erase(@PathVariable String id, @RequestBody EraseRequest request) {
@@ -99,21 +99,21 @@ public class PrivacyController {
     }
 
     @PutMapping("/verifications/{id}/hold")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage')")
     @Operation(summary = "Put on legal hold", description = "Nothing is deleted, by retention or on request, until the hold is released.")
     public ResponseEntity<ApiResponse<Retention.Status>> hold(@PathVariable String id, @RequestBody ReasonRequest request) {
         return respond(HttpStatus.OK, "Legal hold set", retention.hold(scope(), id, request.reason(), actor()));
     }
 
     @DeleteMapping("/verifications/{id}/hold")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage')")
     @Operation(summary = "Release the legal hold")
     public ResponseEntity<ApiResponse<Retention.Status>> release(@PathVariable String id) {
         return respond(HttpStatus.OK, "Legal hold released", retention.release(scope(), id, actor()));
     }
 
     @PostMapping("/verifications/{id}/relationship-ended")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage')")
     @Operation(summary = "The customer relationship ended", description = "Periods that start at the end of the relationship "
             + "(e.g. AML record keeping) count from endedAt (now when left out).")
     public ResponseEntity<ApiResponse<Retention.Status>> relationshipEnded(@PathVariable String id,
@@ -122,7 +122,7 @@ public class PrivacyController {
     }
 
     @PostMapping("/customers/{externalReference}/relationship-ended")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:manage-company')")
     @Operation(summary = "A customer's relationship ended", description = "Applies to every verification with this externalReference.")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> customerEnded(@PathVariable String externalReference,
                                                                           @RequestBody(required = false) EndedRequest request) {
@@ -134,14 +134,14 @@ public class PrivacyController {
     // ----- overview -----
 
     @GetMapping("/holds")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:view')")
     @Operation(summary = "Verifications on legal hold")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> holds(@RequestParam(required = false) String companyId) {
         return respond(HttpStatus.OK, "OK", retention.holds(listScope(companyId)));
     }
 
     @GetMapping("/erasures")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('privacy:view')")
     @Operation(summary = "The erasure log", description = "Newest first. Super admins without companyId see every company's.")
     public ResponseEntity<ApiResponse<List<DataErasure>>> erasures(@RequestParam(required = false) String companyId,
                                                                    @RequestParam(defaultValue = "100") int limit) {

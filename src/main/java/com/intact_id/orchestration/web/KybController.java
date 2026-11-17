@@ -61,7 +61,7 @@ public class KybController {
     private final KycDraftRepository drafts;
 
     @PostMapping(value = "/api/v1/kyb/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('kyb:manage-api')")
     @Operation(summary = "Submit a business verification",
             description = "Runs a business workflow (workflow=<key>, else the company's default). parties is a JSON array of "
                     + "{firstName, lastName, dateOfBirth, nationality, email, phone, director, ownershipPercent}.")
@@ -114,7 +114,7 @@ public class KybController {
     }
 
     @GetMapping("/api/v1/kyb/verifications/{id}/parties")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('kyb:view')")
     @Operation(summary = "Directors and owners of a business verification, with their check status")
     public ResponseEntity<ApiResponse<List<PartyView>>> parties(@PathVariable String id) {
         VerificationRequest business = ownBusiness(id);
@@ -122,7 +122,7 @@ public class KybController {
     }
 
     @PostMapping("/api/v1/kyb/verifications/{id}/parties/{partyId}/invite")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('kyb:manage')")
     @Operation(summary = "Send a director or owner their verification link",
             description = "Emails the person (if an email was given) and returns the link; it works for 7 days. Sending again replaces the link.")
     public ResponseEntity<ApiResponse<Map<String, String>>> invite(@PathVariable String id, @PathVariable String partyId) {
@@ -140,7 +140,7 @@ public class KybController {
     }
 
     @GetMapping("/api/v1/kyb/waiting")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('kyb:view')")
     @Operation(summary = "Business verifications waiting for their directors and owners",
             description = "Oldest first, with each required person's status and link details. Super admins without companyId see every company's.")
     public ResponseEntity<ApiResponse<List<KybParties.WaitingBusiness>>> waiting(@RequestParam(required = false) String companyId) {
@@ -151,7 +151,7 @@ public class KybController {
     // ----- widget: the person who submitted the business verifies themselves straight away -----
 
     @GetMapping("/api/v1/kyc/widget/business/{id}/people")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('kyb:view-api')")
     @Operation(summary = "Directors and owners who must verify, for the session that submitted the business")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> widgetPeople(
             @PathVariable String id, @RequestAttribute(WidgetSessionContext.ATTRIBUTE) WidgetSessionContext context) {
@@ -165,7 +165,7 @@ public class KybController {
     }
 
     @PostMapping("/api/v1/kyc/widget/business/{id}/people/{partyId}/session")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('kyb:manage-api')")
     @Operation(summary = "Start a director's or owner's own verification from the business's widget session")
     public ResponseEntity<ApiResponse<KycSessionResponseDto>> widgetPersonSession(
             @PathVariable String id, @PathVariable String partyId,
@@ -212,7 +212,7 @@ public class KybController {
     // ----- settings -----
 
     @GetMapping("/api/v1/kyb/settings")
-    @PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('kyb:view')")
     @Operation(summary = "Owner-check settings", description = "The company's effective settings and the platform default.")
     public ResponseEntity<ApiResponse<Map<String, KybSettings>>> getSettings(@RequestParam(required = false) String companyId) {
         String company = companyId == null && SecurityContextUtil.isSuperAdminAuthenticated() ? null : SecurityContextUtil.resolveCompanyId(companyId);
@@ -223,14 +223,14 @@ public class KybController {
     }
 
     @PutMapping("/api/v1/kyb/settings/default")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('kyb:manage-platform')")
     @Operation(summary = "Change the platform default", description = "Applies to every company without its own settings.")
     public ResponseEntity<ApiResponse<KybSettings>> updateDefault(@RequestBody KybSettings changes) {
         return respond(HttpStatus.OK, "Default updated", settings.update(null, changes));
     }
 
     @PutMapping("/api/v1/kyb/settings")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('kyb:manage')")
     @Operation(summary = "Set the company's own settings", description = "Overrides the platform default for this company.")
     public ResponseEntity<ApiResponse<KybSettings>> updateCompany(@RequestParam(required = false) String companyId,
                                                                  @RequestBody KybSettings changes) {
@@ -238,7 +238,7 @@ public class KybController {
     }
 
     @DeleteMapping("/api/v1/kyb/settings")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('kyb:manage')")
     @Operation(summary = "Go back to the platform default")
     public ResponseEntity<ApiResponse<KybSettings>> clearCompany(@RequestParam(required = false) String companyId) {
         return respond(HttpStatus.OK, "Company uses the platform default", settings.clearOverride(SecurityContextUtil.resolveCompanyId(companyId)));

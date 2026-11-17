@@ -528,6 +528,8 @@ public class UserService {
                 .roles(user.getRoles().stream()
                         .map(Role::getName)
                         .collect(Collectors.toList()))
+                .permissions(com.intact_id.accounts.Permissions.sorted(com.intact_id.accounts.Permissions.forRoles(
+                        user.getRoles().stream().map(Role::getName).toList())))
                 .companyId(user.getCompany() != null ? user.getCompany().getId() : null)
                 .build();
     }

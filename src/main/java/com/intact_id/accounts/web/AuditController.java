@@ -30,7 +30,7 @@ public class AuditController {
     private final AuditService auditService;
 
     @GetMapping("/api/admin/audit/sessions")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('audit:view')")
     @Operation(summary = "List user sessions")
     public ResponseEntity<ApiResponse<Page<UserSessionResponseDto>>> getSessions(
             @RequestParam(required = false) String userId,
@@ -54,7 +54,7 @@ public class AuditController {
     }
 
     @GetMapping("/api/admin/audit/sessions/{sessionId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('audit:view')")
     @Operation(summary = "Get one session summary")
     public ResponseEntity<ApiResponse<UserSessionResponseDto>> getSession(@PathVariable String sessionId) {
         UserSessionResponseDto session = auditService.getSession(sessionId);
@@ -67,7 +67,7 @@ public class AuditController {
     }
 
     @GetMapping("/api/admin/audit/activities")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('audit:view')")
     @Operation(summary = "List user activity logs")
     public ResponseEntity<ApiResponse<Page<UserActivityLogResponseDto>>> getActivities(
             @RequestParam(required = false) String userId,
@@ -95,7 +95,7 @@ public class AuditController {
     }
 
     @GetMapping("/api/admin/users/{userId}/logs")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('audit:view')")
     @Operation(summary = "Get logs for a single user")
     public ResponseEntity<ApiResponse<Page<UserActivityLogResponseDto>>> getUserLogs(
             @PathVariable String userId,

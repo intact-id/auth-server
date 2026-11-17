@@ -32,7 +32,7 @@ public class CheckerApprovalController {
     private final CheckerApprovalService checkerApprovalService;
 
     @GetMapping("/approvals/pending-checker")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('applications:view')")
     @Operation(summary = "Get pending maker approvals awaiting checker action")
     public ResponseEntity<ApiResponse<Page<CheckerApprovalQueueResponseDto>>> getPendingCheckerApprovals(
             @RequestParam(defaultValue = "0") int page,
@@ -50,7 +50,7 @@ public class CheckerApprovalController {
     }
 
     @PostMapping("/approvals/{approvalId}/checker-decision")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('applications:manage')")
     @Operation(summary = "Checker final decision (approve/reject)")
     public ResponseEntity<ApiResponse<ApplicationApprovalResponseDto>> checkerDecision(
             @PathVariable String approvalId,

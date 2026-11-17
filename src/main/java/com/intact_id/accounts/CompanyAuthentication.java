@@ -16,10 +16,12 @@ import java.util.List;
 @Getter
 public class CompanyAuthentication implements Authentication {
 
-    private static final List<GrantedAuthority> COMPANY_AUTHORITIES = List.of(
-            new SimpleGrantedAuthority("ROLE_COMPANY"),
-            new SimpleGrantedAuthority("kyc:read"),
-            new SimpleGrantedAuthority("kyc:write"));
+    // The COMPANY role plus every permission an API key holds (Permissions.API_KEY)
+    private static final List<GrantedAuthority> COMPANY_AUTHORITIES = java.util.stream.Stream.concat(
+            java.util.stream.Stream.of("ROLE_COMPANY", "kyc:read", "kyc:write"),
+            Permissions.API_KEY.stream())
+            .map(name -> (GrantedAuthority) new SimpleGrantedAuthority(name))
+            .toList();
 
     private final Company company;
     private boolean authenticated = true;

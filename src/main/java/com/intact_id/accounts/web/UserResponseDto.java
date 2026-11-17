@@ -21,7 +21,11 @@ public class UserResponseDto {
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private List<String> roles;
+    // What this person may do (Permissions), so the console shows only what they can use
+    private List<String> permissions;
     private String companyId;
     private Boolean is2faEnabled;
+    // The two-factor secret: used inside the server only, never sent in a response
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String googleAuthenticationKey;
 }

@@ -31,7 +31,7 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage')")
     @Operation(summary = "Create new user")
     public ResponseEntity<ApiResponse<UserResponseDto>> createUser(
             @Valid @RequestBody UserCreateDto request) {
@@ -62,7 +62,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('users:view')")
     @Operation(summary = "Get user by ID")
     public ResponseEntity<ApiResponse<UserResponseDto>> getUserById(@PathVariable String userId) {
         try {
@@ -99,7 +99,7 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('users:view')")
     @Operation(summary = "Get all users with filters")
     public ResponseEntity<ApiResponse<Page<UserResponseDto>>> getAllUsers(
             @RequestParam(required = false) GlobalStatuses status,
@@ -120,11 +120,7 @@ public class UserController {
     }
 
     @PutMapping("/{userId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')" +
-            "" +
-            "" +
-            "" +
-            "")
+    @PreAuthorize("hasAuthority('users:manage-platform')")
     @Operation(summary = "Update user")
     public ResponseEntity<ApiResponse<UserResponseDto>> updateUser(
             @PathVariable String userId,
@@ -166,7 +162,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/suspend")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage-platform')")
     @Operation(summary = "Suspend user")
     public ResponseEntity<ApiResponse<Void>> suspendUser(@PathVariable String userId) {
         userService.suspendUser(userId);
@@ -180,7 +176,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/activate")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage-platform')")
     @Operation(summary = "Activate user")
     public ResponseEntity<ApiResponse<Void>> activateUser(@PathVariable String userId) {
         userService.activateUser(userId);
@@ -194,7 +190,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/unlock")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage')")
     @Operation(summary = "Unlock user account")
     public ResponseEntity<ApiResponse<Void>> unlockUser(@PathVariable String userId) {
         if (!SecurityContextUtil.isSuperAdminAuthenticated()) {
@@ -220,7 +216,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/change-password")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("hasAuthority('users:manage') or #userId == authentication.principal.id")
     @Operation(summary = "Change user password")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @PathVariable String userId,
@@ -261,7 +257,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/roles")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage-platform')")
     @Operation(summary = "Assign roles to user")
     public ResponseEntity<ApiResponse<UserResponseDto>> assignRoles(
             @PathVariable String userId,
@@ -278,7 +274,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}/roles/{roleId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage-platform')")
     @Operation(summary = "Remove role from user")
     public ResponseEntity<ApiResponse<UserResponseDto>> removeRole(
             @PathVariable String userId,
@@ -295,7 +291,7 @@ public class UserController {
     }
 
     @PostMapping("/{userId}/logout")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage-platform')")
     @Operation(summary = "Force-logout a user by revoking all their active sessions")
     public ResponseEntity<ApiResponse<Void>> logoutUser(@PathVariable String userId) {
         userService.logoutUser(userId);
@@ -309,7 +305,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{userId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('users:manage-platform')")
     @Operation(summary = "Delete user")
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable String userId) {
         userService.deleteUser(userId);
@@ -323,7 +319,7 @@ public class UserController {
     }
 
     @GetMapping("/roles")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('users:view-platform')")
     @Operation(summary = "Get all available roles")
     public ResponseEntity<ApiResponse<List<RoleResponseDto>>> getAllRoles() {
         List<RoleResponseDto> roles = userService.getAllRoles();
