@@ -38,7 +38,7 @@ public class KycVerificationController {
 
         // The /dev/ and /prod/ paths are kept so older integrations keep working; each server is one environment
         @PostMapping(value = {"/verify/{tier}", "/dev/verify/{tier}"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        @PreAuthorize("hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('verifications:manage-api')")
         @Operation(summary = "Submit KYC verification request (PROD)", description = "Submit a new KYC verification with tier-specific requirements. "
                         + "Preferred auth: Bearer access token from POST /api/v1/auth/token. "
                         + "Direct X-API-Key/X-API-Secret auth still works here but is deprecated — see ApiKeyAuthFilter.")
@@ -153,7 +153,7 @@ public class KycVerificationController {
         }
 
         @PostMapping("/verifications/{verificationId}/release")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasAuthority('verifications:manage')")
         @Operation(summary = "Release a held verification", description = "Manually release a single ON_HOLD verification back to SUBMITTED so the scheduler will retry it")
         public ResponseEntity<ApiResponse<Void>> releaseHeldVerification(
                         @PathVariable String verificationId) {
@@ -180,7 +180,7 @@ public class KycVerificationController {
         }
 
         @PostMapping("/verifications/release-held")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasAuthority('verifications:manage')")
         @Operation(summary = "Release all held verifications", description = "Release all ON_HOLD verifications back to SUBMITTED. Optionally scope to a single company.")
         public ResponseEntity<ApiResponse<Void>> releaseAllHeld(
                         @Parameter(description = "Release only for this company (omit to release all)") @RequestParam(required = false) String companyId) {
@@ -193,7 +193,7 @@ public class KycVerificationController {
         }
 
         @GetMapping({"/verify/{verificationId}", "/prod/verify/{verificationId}", "/dev/verify/{verificationId}"})
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('verifications:view')")
         @Operation(summary = "Get verification status", description = "Retrieve the status and results of a verification request")
         public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getVerificationStatus(
                         @PathVariable String verificationId,
@@ -234,7 +234,7 @@ public class KycVerificationController {
         }
 
         @GetMapping({"/verifications", "/prod/verifications", "/dev/verifications"})
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('verifications:view')")
         @Operation(summary = "List verifications", description = "Get a paginated list of verification requests with optional filters")
         public ResponseEntity<ApiResponse<Page<VerificationStatusResponseDto>>> listVerifications(
                         @Parameter(description = "Filter by status") @RequestParam(required = false) GlobalStatuses status,
@@ -273,7 +273,7 @@ public class KycVerificationController {
         }
 
         @GetMapping({"/verifications/by-reference", "/dev/verifications/by-reference"})
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('verifications:view')")
         @Operation(summary = "Get latest PROD verification by your reference", description = "Returns the most recent PROD verification submitted with this externalReference")
         public ResponseEntity<ApiResponse<VerificationStatusResponseDto>> getLatestByExternalReference(
                         @RequestParam String externalReference,

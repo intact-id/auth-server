@@ -85,7 +85,7 @@ public class CompanyApplicationController {
     // ============ ADMIN ENDPOINTS ============
 
     @GetMapping("/api/admin/applications")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('applications:view')")
     @Operation(summary = "Get all applications (Admin)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<Page<CompanyApplicationResponseDto>>> getAllApplications(
@@ -118,7 +118,7 @@ public class CompanyApplicationController {
     }
 
     @GetMapping("/api/admin/applications/{id}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('applications:view')")
     @Operation(summary = "Get application by ID (Admin)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<CompanyApplicationResponseDto>> getApplicationById(
@@ -146,7 +146,7 @@ public class CompanyApplicationController {
     }
 
     @DeleteMapping("/api/admin/applications/{applicationId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('applications:manage')")
     @Operation(summary = "Delete application (Admin)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<ApiResponse<Void>> deleteApplication(

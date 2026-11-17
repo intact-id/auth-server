@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/system/status")
-@PreAuthorize("hasRole('SUPER_ADMIN')")
+@PreAuthorize("hasAuthority('system:use')")
 @Tag(name = "System status", description = "Service health checks, latency and uptime (super admins)")
 public class SystemStatusController {
 

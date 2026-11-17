@@ -26,7 +26,7 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/monitoring")
-@PreAuthorize("hasRole('COMPANY') or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+@PreAuthorize("hasAuthority('monitoring:use')")
 @Tag(name = "Ongoing monitoring", description = "Re-screening approved customers, alerts and their review.")
 public class MonitoringController {
 
@@ -39,7 +39,7 @@ public class MonitoringController {
     }
 
     @PutMapping("/settings")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('monitoring:manage')")
     @Operation(summary = "Change the monitoring settings", description = "frequency: DAILY, WEEKLY or MONTHLY. Applies to verifications approved from now on; start older ones by hand.")
     public ResponseEntity<ApiResponse<Monitoring.Settings>> updateSettings(@RequestParam(required = false) String companyId,
                                                                           @RequestBody Monitoring.Settings changes) {

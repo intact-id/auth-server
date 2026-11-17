@@ -27,7 +27,7 @@ public class NotificationController {
         private final NotificationService notificationService;
 
         @PostMapping
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasAuthority('notifications:manage')")
         public ResponseEntity<ApiResponse<NotificationResponseDto>> createNotification(
                         @Valid @RequestBody NotificationRequestDto request) {
                 String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(request.getCompanyId());
@@ -45,7 +45,7 @@ public class NotificationController {
         }
 
         @GetMapping
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasAuthority('notifications:view')")
         public ResponseEntity<ApiResponse<Page<NotificationResponseDto>>> getAllNotifications(
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "20") int size) {
@@ -70,7 +70,7 @@ public class NotificationController {
 
         // The bell: the signed-in person's own notifications (their company's; Intact staff's for super admins)
         @GetMapping("/inbox")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('notifications:view')")
         public ResponseEntity<ApiResponse<Page<NotificationResponseDto>>> inbox(
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "20") int size) {
@@ -82,7 +82,7 @@ public class NotificationController {
         }
 
         @GetMapping("/inbox/unread-count")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('notifications:view')")
         public ResponseEntity<ApiResponse<Long>> inboxUnreadCount() {
                 return ResponseEntity.ok(ApiResponse.<Long>builder()
                                 .success(true)
@@ -92,7 +92,7 @@ public class NotificationController {
         }
 
         @PutMapping("/inbox/read")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('notifications:manage')")
         public ResponseEntity<ApiResponse<Integer>> markInboxRead() {
                 return ResponseEntity.ok(ApiResponse.<Integer>builder()
                                 .success(true)
@@ -102,7 +102,7 @@ public class NotificationController {
         }
 
         @GetMapping("/company/{companyId}")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasAuthority('notifications:view')")
         public ResponseEntity<ApiResponse<List<NotificationResponseDto>>> getNotificationsByCompany(
                         @PathVariable String companyId) {
                 String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
@@ -119,7 +119,7 @@ public class NotificationController {
         }
 
         @GetMapping("/company/{companyId}/unread-count")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasAuthority('notifications:view')")
         public ResponseEntity<ApiResponse<Long>> getUnreadCount(@PathVariable String companyId) {
                 String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(companyId);
                 log.info("Fetching unread count for company: {}", resolvedCompanyId);
@@ -135,7 +135,7 @@ public class NotificationController {
         }
 
         @PutMapping("/{id}/read")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+        @PreAuthorize("hasAuthority('notifications:manage')")
         public ResponseEntity<ApiResponse<NotificationResponseDto>> markAsRead(@PathVariable Long id) {
                 log.info("Marking notification as read: {}", id);
 
@@ -150,7 +150,7 @@ public class NotificationController {
         }
 
         @DeleteMapping("/{id}")
-        @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+        @PreAuthorize("hasAuthority('notifications:manage')")
         public ResponseEntity<ApiResponse<Void>> deleteNotification(@PathVariable Long id) {
                 log.info("Deleting notification: {}", id);
 

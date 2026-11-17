@@ -75,7 +75,7 @@ public class CompanyAccessTokenController {
     }
 
     @PostMapping("/token/revoke")
-    @PreAuthorize("hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('apikeys:manage-api')")
     @Operation(summary = "Revoke an access token before its natural expiry",
             description = "Pass the token to revoke as a Bearer Authorization header. Adds its jti to "
                     + "the revocation denylist so it stops working immediately, even though it hasn't expired.")

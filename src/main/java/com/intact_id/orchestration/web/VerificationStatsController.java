@@ -33,7 +33,7 @@ public class VerificationStatsController {
     private final VerificationTimeline timeline;
 
     @GetMapping("/stats/verifications")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('analytics:view')")
     @Operation(summary = "Verification counts", description = "Totals, the previous period's totals, a daily series and "
             + "breakdowns by type, country and check, for verifications submitted in the last `days` days (default 30, max 365).")
     public ResponseEntity<ApiResponse<VerificationStatsDto>> verifications(
@@ -43,7 +43,7 @@ public class VerificationStatsController {
     }
 
     @GetMapping("/stats/turnaround")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('analytics:view-platform')")
     @Operation(summary = "Turnaround times", description = "Super admins only. Average, median and 90th-percentile time "
             + "from submission to decision, the average per stage and per check, and a daily series.")
     public ResponseEntity<ApiResponse<TurnaroundStatsDto>> turnaround(
@@ -53,7 +53,7 @@ public class VerificationStatsController {
     }
 
     @GetMapping("/kyc/verifications/{verificationId}/timeline")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('analytics:view-platform')")
     @Operation(summary = "A verification's turnaround time by stage", description = "Super admins only. Queued, automated "
             + "checks (with each check's time), waiting for a reviewer and under review.")
     public ResponseEntity<ApiResponse<VerificationTimelineDto>> timeline(@PathVariable String verificationId) {

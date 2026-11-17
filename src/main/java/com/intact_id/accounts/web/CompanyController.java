@@ -42,7 +42,7 @@ public class CompanyController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get company by ID")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('companies:view')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> getCompanyById(@PathVariable String id) {
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
@@ -68,7 +68,7 @@ public class CompanyController {
 
     @GetMapping("/me")
     @Operation(summary = "Get current company details")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('companies:view')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> getCurrentCompany(
             @RequestParam(required = false) String companyId) {
 
@@ -77,7 +77,7 @@ public class CompanyController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update company details")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> updateCompany(
             @PathVariable String id,
             @Valid @RequestBody CompanyUpdateRequestDto request) {
@@ -106,7 +106,7 @@ public class CompanyController {
 
     @GetMapping
     @Operation(summary = "Get all companies with filters (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:view')")
     public ResponseEntity<ApiResponse<Page<CompanyResponseDto>>> getAllCompanies(
             @RequestParam(required = false) GlobalStatuses status,
             @RequestParam(required = false) String country,
@@ -150,7 +150,7 @@ public class CompanyController {
 
     @GetMapping("/{id}/communication")
     @Operation(summary = "Get company communication details")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('companies:view')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> getCompanyCommunication(
             @PathVariable String id) {
 
@@ -179,7 +179,7 @@ public class CompanyController {
     @GetMapping("/{id}/communication/webhook/deliveries")
     @Operation(summary = "List webhook deliveries",
             description = "A company's webhook delivery attempts, newest first. Payloads and receiver responses are not included.")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('companies:view')")
     public ResponseEntity<ApiResponse<Page<WebhookDeliveryView>>> getWebhookDeliveries(
             @PathVariable String id,
             @Parameter(description = "PENDING, DELIVERED, FAILED or RETRYING") @RequestParam(required = false) String status,
@@ -208,7 +208,7 @@ public class CompanyController {
     @GetMapping("/{id}/communication/webhook/deliveries/summary")
     @Operation(summary = "Summarise webhook deliveries",
             description = "Delivery counts by status for the last `hours` hours (default 24, maximum 720).")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('companies:view')")
     public ResponseEntity<ApiResponse<WebhookDeliverySummary>> getWebhookDeliverySummary(
             @PathVariable String id,
             @RequestParam(defaultValue = "24") int hours) {
@@ -225,7 +225,7 @@ public class CompanyController {
 
     @PutMapping("/{id}/communication/webhook")
     @Operation(summary = "Update webhook settings")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> updateWebhookSettings(
             @PathVariable String id,
             @Valid @RequestBody WebhookSettingsRequestDto request) {
@@ -254,7 +254,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/communication/webhook/test")
     @Operation(summary = "Test webhook endpoint")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<String>> testWebhook(@PathVariable String id) {
 
         try {
@@ -301,7 +301,7 @@ public class CompanyController {
 
     @PutMapping("/{id}/communication/notification-settings")
     @Operation(summary = "Update applicant notification settings")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage-platform')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> updateApplicantNotifications(
             @PathVariable String id,
             @RequestBody java.util.Map<String, Boolean> flags) {
@@ -330,7 +330,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/communication/webhook/rotate-secret")
     @Operation(summary = "Rotate webhook signing secret")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<CompanyCommunicationResponseDto>> rotateWebhookSecret(@PathVariable String id) {
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
@@ -358,7 +358,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/credentials/suspend")
     @Operation(summary = "Suspend company credentials (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<String>> suspendCredentials(
             @PathVariable String id) {
 
@@ -384,7 +384,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/credentials/activate")
     @Operation(summary = "Activate company credentials (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<String>> activateCredentials(
             @PathVariable String id) {
 
@@ -412,7 +412,7 @@ public class CompanyController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete company (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<String>> deleteCompany(@PathVariable String id) {
         try {
             String resolvedCompanyId = SecurityContextUtil.resolveCompanyId(id);
@@ -443,7 +443,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/suspend")
     @Operation(summary = "Suspend company (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> suspendCompany(
             @PathVariable String id,
             @RequestParam(required = false) String reason) {
@@ -480,7 +480,7 @@ public class CompanyController {
 
     @PostMapping("/{id}/activate")
     @Operation(summary = "Activate company (Admin)")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage')")
     public ResponseEntity<ApiResponse<CompanyResponseDto>> activateCompany(@PathVariable String id) {
 
         try {
@@ -516,7 +516,7 @@ public class CompanyController {
 
     @GetMapping("/{id}/rate-limits")
     @Operation(summary = "Get rate limits for a company")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('companies:view')")
     public ResponseEntity<ApiResponse<RateLimitsResponseDto>> getRateLimits(@PathVariable String id) {
         String companyId = SecurityContextUtil.resolveCompanyId(id);
         Company company = companyService.getCompanyById(companyId);
@@ -530,7 +530,7 @@ public class CompanyController {
 
     @PutMapping("/{id}/rate-limits")
     @Operation(summary = "Configure rate limits for a company (SUPER_ADMIN only)")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('companies:manage-platform')")
     public ResponseEntity<ApiResponse<RateLimitsResponseDto>> updateRateLimits(
             @PathVariable String id,
             @RequestBody RateLimitsRequestDto request) {

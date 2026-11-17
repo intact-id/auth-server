@@ -42,7 +42,7 @@ public class ScreeningCheckController {
     }
 
     @PostMapping("/check")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('screening:manage')")
     @Operation(summary = "Screen a person or business now", description = "Against sanctions, PEP and watch lists. Not stored.")
     public ResponseEntity<ApiResponse<CheckResult>> check(@RequestBody CheckRequest request, Authentication authentication) {
         RiskScreening.Subject subject = subjectOf(request);

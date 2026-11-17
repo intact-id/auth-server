@@ -30,7 +30,7 @@ public class ScreeningRecordsController {
     private final ScreeningRecords screeningRecords;
 
     @GetMapping("/results")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('screening:view')")
     @Operation(summary = "List screening results", description = "Newest first. Each result links to its verification.")
     public ResponseEntity<ApiResponse<Page<ScreeningRecordDto>>> results(
             @Parameter(description = "NO_HIT, POTENTIAL_MATCH, CONFIRMED_MATCH or SKIPPED") @RequestParam(required = false) String verdict,
@@ -45,7 +45,7 @@ public class ScreeningRecordsController {
     }
 
     @GetMapping("/results/summary")
-    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('COMPANY')")
+    @PreAuthorize("hasAuthority('screening:view')")
     @Operation(summary = "Count screening results", description = "Per verdict over the last `days` days (default 30, max 365).")
     public ResponseEntity<ApiResponse<ScreeningSummaryDto>> summary(
             @RequestParam(required = false) String companyId,
